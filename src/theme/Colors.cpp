@@ -48,10 +48,10 @@ void ApplyColors(ImGuiStyle& style, const Palette& palette) {
     colors[ImGuiCol_HeaderHovered]         = ImVec4(palette.accent.x, palette.accent.y, palette.accent.z, 0.40f);
     colors[ImGuiCol_HeaderActive]          = ImVec4(palette.accent.x, palette.accent.y, palette.accent.z, 0.60f);
 
-    // Separators (Dock splitter & resize handles)
-    colors[ImGuiCol_Separator]             = ImVec4(palette.borderSubtle.x, palette.borderSubtle.y, palette.borderSubtle.z, 0.85f);
+    // Separators
+    colors[ImGuiCol_Separator]             = palette.borderSubtle;
     colors[ImGuiCol_SeparatorHovered]      = palette.accentHover;
-    colors[ImGuiCol_SeparatorActive]       = palette.accent;
+    colors[ImGuiCol_SeparatorActive]       = palette.accentActive;
 
     // Resize grips
     colors[ImGuiCol_ResizeGrip]            = palette.borderSubtle;

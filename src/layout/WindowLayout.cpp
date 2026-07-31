@@ -52,8 +52,8 @@ void SetupDefaultLayout(ImGuiID dockspaceId, const DockspaceBounds& bounds, bool
         // Split 1b: Split dockBottom into dominant Content Browser (Left 75%) and Output Log (Right 25%)
         ImGui::DockBuilderSplitNode(dockBottom, ImGuiDir_Left, 0.75f, &dockBottomLeft, &dockBottomRight);
 
-        // Split 2: Top-right dock (Outliner & Details) - 28% width of top area
-        ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.28f, &dockRight, &dockViewport);
+        // Split 2: Top-right dock (Outliner & Details) - 25% width of top area
+        ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.25f, &dockRight, &dockViewport);
 
         // Split 3: Right dock split vertically into Outliner (Top 45%) and Details (Bottom 55%)
         ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.55f, &dockRightBottom, &dockRightTop);

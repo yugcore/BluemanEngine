@@ -96,9 +96,8 @@ void ViewManipulate(float* view, float length, ImVec2 position, ImVec2 size, ImU
     drawList->AddRectFilled(ImVec2(center.x - half, center.y - half), ImVec2(center.x + half, center.y + half), backgroundColor, 4.0f);
     drawList->AddRect(ImVec2(center.x - half, center.y - half), ImVec2(center.x + half, center.y + half), IM_COL32(80, 160, 240, 255), 4.0f, 0, 1.5f);
 
-    // Axis Handles / Center Label
-    ImVec2 txtSize = ImGui::CalcTextSize("CUBE");
-    drawList->AddText(ImVec2(center.x - txtSize.x * 0.5f, center.y - txtSize.y * 0.5f), IM_COL32(255, 255, 255, 255), "CUBE");
+    // Axis Handles
+    drawList->AddText(ImVec2(center.x - 12.0f, center.y - 7.0f), IM_COL32(255, 255, 255, 255), "CUBE");
 }
 
 } // namespace ImGuizmo

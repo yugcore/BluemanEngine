@@ -5,7 +5,6 @@
 #include "core/EditorState.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
-#include "theme/Fonts.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -17,31 +16,18 @@ static int s_PerspectiveIdx = 0;
 static int s_QualityIdx = 0;
 static int s_ShowFlags = 7;
 
-static void RenderStatusPill(const char* label, const ImVec4& color, const char* tooltip = nullptr, bool useMono = false) {
+static void RenderStatusPill(const char* label, const ImVec4& color) {
     const auto& pal = Theme::GetPalette();
     ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, pal.bgElevated);
     ImGui::PushStyleColor(ImGuiCol_Text, color);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 3.0f));
 
-    bool fontPushed = false;
-    if (useMono && Theme::GetFontAtlas().monoFont) {
-        ImGui::PushFont(Theme::GetFontAtlas().monoFont);
-        fontPushed = true;
-    }
-
-    ImGui::Button(label, ImVec2(0.0f, 24.0f));
-
-    if (fontPushed) ImGui::PopFont();
-
-    if (tooltip && ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", tooltip);
-    }
+    ImGui::Button(label);
 
     ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(4);
+    ImGui::PopStyleColor(3);
 }
 
 void RenderViewportPanel(bool* pOpen) {
@@ -91,20 +77,17 @@ void RenderViewportPanel(bool* pOpen) {
             ImGui::ColorConvertFloat4ToU32(pal.borderSubtle), 1.0f);
     }
     
-    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x + Theme::Metrics::panelLeftMargin, cursorPos.y + (toolbarH - 24.0f) * 0.5f));
+    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x + Theme::Metrics::panelLeftMargin, cursorPos.y + (toolbarH - Theme::Metrics::rowHeight) * 0.5f));
     ImGui::BeginGroup();
 
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 3.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 4.0f));
     ImGui::PushStyleColor(ImGuiCol_Button, pal.bgPanel);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, pal.accent);
 
-    // --- Cluster 1: Perspective / Resolution Scale (1:2) / Show Filters ---
+    // --- Group 1: Perspective / 1:2 / Show ---
     const char* persNames[] = { "Perspective", "Top", "Front", "Side" };
-    if (ImGui::Button(persNames[s_PerspectiveIdx], ImVec2(0.0f, 24.0f))) ImGui::OpenPopup("ViewportPerspPopup");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Camera View Angle / Projection");
-
+    if (ImGui::Button(persNames[s_PerspectiveIdx])) ImGui::OpenPopup("ViewportPerspPopup");
     if (ImGui::BeginPopup("ViewportPerspPopup")) {
         if (ImGui::MenuItem("Perspective", nullptr, s_PerspectiveIdx == 0)) s_PerspectiveIdx = 0;
         if (ImGui::MenuItem("Top", nullptr, s_PerspectiveIdx == 1)) s_PerspectiveIdx = 1;
@@ -115,20 +98,16 @@ void RenderViewportPanel(bool* pOpen) {
 
     ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
     const char* qualNames[] = { "1:2", "1:1", "4K" };
-    if (ImGui::Button(qualNames[s_QualityIdx], ImVec2(0.0f, 24.0f))) ImGui::OpenPopup("ViewportQualPopup");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Viewport Resolution Scale: 1:2 (50% Render Resolution)");
-
+    if (ImGui::Button(qualNames[s_QualityIdx])) ImGui::OpenPopup("ViewportQualPopup");
     if (ImGui::BeginPopup("ViewportQualPopup")) {
-        if (ImGui::MenuItem("1:2 (Half Res - 50%)", nullptr, s_QualityIdx == 0)) s_QualityIdx = 0;
-        if (ImGui::MenuItem("1:1 (Full Res - 100%)", nullptr, s_QualityIdx == 1)) s_QualityIdx = 1;
-        if (ImGui::MenuItem("4K (Ultra HD - 200%)", nullptr, s_QualityIdx == 2)) s_QualityIdx = 2;
+        if (ImGui::MenuItem("1:2 (Half Res)", nullptr, s_QualityIdx == 0)) s_QualityIdx = 0;
+        if (ImGui::MenuItem("1:1 (Full Res)", nullptr, s_QualityIdx == 1)) s_QualityIdx = 1;
+        if (ImGui::MenuItem("4K (Ultra HD)", nullptr, s_QualityIdx == 2)) s_QualityIdx = 2;
         ImGui::EndPopup();
     }
 
     ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-    if (ImGui::Button("Show", ImVec2(0.0f, 24.0f))) ImGui::OpenPopup("ViewportShowPopup");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Viewport Visibility Filters & Flags");
-
+    if (ImGui::Button("Show")) ImGui::OpenPopup("ViewportShowPopup");
     if (ImGui::BeginPopup("ViewportShowPopup")) {
         bool showGrid = (s_ShowFlags & 1) != 0;
         bool showLights = (s_ShowFlags & 2) != 0;
@@ -139,12 +118,12 @@ void RenderViewportPanel(bool* pOpen) {
         ImGui::EndPopup();
     }
 
-    // Inter-cluster Divider 1
+    // Inter-group separator (groupGap = 18px)
     ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
     ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
 
-    // --- Cluster 2: Transform Gizmo Tools (Move / Rotate / Scale) ---
+    // --- Group 2: Transform Tools (Move / Rotate / Scale) ---
     auto& gizmo = EditorState::Get().gizmoOp;
     bool mvActive = (gizmo == GizmoOperation::Translate);
     bool rtActive = (gizmo == GizmoOperation::Rotate);
@@ -154,8 +133,7 @@ void RenderViewportPanel(bool* pOpen) {
         ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
         ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
     }
-    if (ImGui::Button("Move", ImVec2(0.0f, 24.0f))) gizmo = GizmoOperation::Translate;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Translate Gizmo Tool (W)");
+    if (ImGui::Button("Move")) gizmo = GizmoOperation::Translate;
     if (mvActive) ImGui::PopStyleColor(2);
 
     ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
@@ -163,8 +141,7 @@ void RenderViewportPanel(bool* pOpen) {
         ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
         ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
     }
-    if (ImGui::Button("Rotate", ImVec2(0.0f, 24.0f))) gizmo = GizmoOperation::Rotate;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rotate Gizmo Tool (E)");
+    if (ImGui::Button("Rotate")) gizmo = GizmoOperation::Rotate;
     if (rtActive) ImGui::PopStyleColor(2);
 
     ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
@@ -172,40 +149,53 @@ void RenderViewportPanel(bool* pOpen) {
         ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
         ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
     }
-    if (ImGui::Button("Scale", ImVec2(0.0f, 24.0f))) gizmo = GizmoOperation::Scale;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Scale Gizmo Tool (R)");
+    if (ImGui::Button("Scale")) gizmo = GizmoOperation::Scale;
     if (scActive) ImGui::PopStyleColor(2);
 
-    // Inter-cluster Divider 2
-    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
-
-    // --- Cluster 3: Readouts & Engine Stats ---
+    // --- Right-Aligned Status Pills ---
     const auto& stats = EditorState::Get().stats;
     
-    RenderStatusPill(stats.apiTag.c_str(), pal.textSecondary, "DirectX 12 (Agility SDK 1.614 Direct3D 12.2)");
-    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-
     char fpsBuf[32]; snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.1f", stats.fps);
-    RenderStatusPill(fpsBuf, pal.textSecondary, "Frames Per Second (Live Render Metric)", true);
-    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-
     char msBuf[32]; snprintf(msBuf, sizeof(msBuf), "Frame: %.2f ms", stats.frameTimeMs);
-    RenderStatusPill(msBuf, pal.textSecondary, "Frame Render Latency (milliseconds)", true);
-    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-
-    RenderStatusPill("DRR: 1:1", pal.accent, "Dynamic Resolution Rendering: 1:1 (Native 100%)");
-    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-
-    char wpBuf[48]; snprintf(wpBuf, sizeof(wpBuf), "World Partition: 2 Cells");
-    RenderStatusPill(wpBuf, pal.textSecondary, "Spatial Grid Partitioning: 2 Active Cells Loaded");
-    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-
+    char wpBuf[48]; snprintf(wpBuf, sizeof(wpBuf), "WP: 2 Cells");
     char entBuf[32]; snprintf(entBuf, sizeof(entBuf), "Entities: %u", stats.entityCount);
-    if (ImGui::Button(entBuf, ImVec2(0.0f, 24.0f))) ImGui::OpenPopup("EntitiesPopup");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Active Scene Entities (Click for selection & filter options)");
 
+    const float pillPaddingX = 16.0f;
+    const float gap = Theme::Metrics::intraGroupGap;
+    float actualPillsWidth = 0.0f;
+    actualPillsWidth += ImGui::CalcTextSize(stats.apiTag.c_str()).x + pillPaddingX + gap;
+    actualPillsWidth += ImGui::CalcTextSize(fpsBuf).x + pillPaddingX + gap;
+    actualPillsWidth += ImGui::CalcTextSize(msBuf).x + pillPaddingX + gap;
+    actualPillsWidth += ImGui::CalcTextSize("DRR: 1:1").x + pillPaddingX + gap;
+    actualPillsWidth += ImGui::CalcTextSize(wpBuf).x + pillPaddingX + gap;
+    actualPillsWidth += ImGui::CalcTextSize(entBuf).x + pillPaddingX;
+
+    float rightMargin = 20.0f;
+    float pillsStart = viewportAvail.x - actualPillsWidth - rightMargin;
+    float currentX = ImGui::GetCursorPosX() - cursorPos.x;
+
+    if (pillsStart > currentX + 16.0f) {
+        ImGui::SameLine(pillsStart);
+    } else {
+        ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
+    }
+
+    RenderStatusPill(stats.apiTag.c_str(), pal.textSecondary);
+    ImGui::SameLine(0.0f, gap);
+
+    RenderStatusPill(fpsBuf, pal.textSecondary);
+    ImGui::SameLine(0.0f, gap);
+
+    RenderStatusPill(msBuf, pal.textSecondary);
+    ImGui::SameLine(0.0f, gap);
+
+    RenderStatusPill("DRR: 1:1", pal.accent);
+    ImGui::SameLine(0.0f, gap);
+
+    RenderStatusPill(wpBuf, pal.textSecondary);
+    ImGui::SameLine(0.0f, gap);
+
+    if (ImGui::Button(entBuf)) ImGui::OpenPopup("EntitiesPopup");
     if (ImGui::BeginPopup("EntitiesPopup")) {
         ImGui::Text("Active Scene Entities: %u", stats.entityCount);
         ImGui::Separator();
@@ -214,7 +204,7 @@ void RenderViewportPanel(bool* pOpen) {
         ImGui::EndPopup();
     }
 
-    ImGui::PopStyleColor(3);
+    ImGui::PopStyleColor(2);
     ImGui::PopStyleVar(2);
     ImGui::EndGroup();
 
