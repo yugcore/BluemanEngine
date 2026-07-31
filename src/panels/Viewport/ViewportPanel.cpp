@@ -22,7 +22,7 @@ static void RenderStatusPill(const char* label, const ImVec4& color) {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
     ImGui::PushStyleColor(ImGuiCol_Text, color);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 3.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
 
     ImGui::Button(label);
 
@@ -77,7 +77,7 @@ void RenderViewportPanel(bool* pOpen) {
             ImGui::ColorConvertFloat4ToU32(pal.borderSubtle), 1.0f);
     }
     
-    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x + Theme::Metrics::panelLeftMargin, cursorPos.y + (toolbarH - Theme::Metrics::rowHeight) * 0.5f));
+    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x + Theme::Metrics::panelLeftMargin, cursorPos.y + (toolbarH - 24.0f) * 0.5f));
     ImGui::BeginGroup();
 
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);

@@ -19,7 +19,7 @@ static int currentViewMode = 0;
 static int currentPerspective = 0;
 
 static constexpr float kToolbarHeight = 42.0f;
-static constexpr float kButtonHeight  = 28.0f;
+static constexpr float kButtonHeight  = 24.0f;
 
 float GetToolbarTotalHeight() {
     return kToolbarHeight;
@@ -38,7 +38,7 @@ static bool ToolbarButton(const char* label, const char* tooltip, bool isActive 
         ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.accentHover);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, pal.accentActive);
-        ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
+        ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
     } else {
         ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
@@ -46,10 +46,7 @@ static bool ToolbarButton(const char* label, const char* tooltip, bool isActive 
         ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
     }
 
-    float textWidth = ImGui::CalcTextSize(label).x;
-    float btnWidth = width > 0.0f ? width : (textWidth + 24.0f);
-
-    bool clicked = ImGui::Button(label, ImVec2(btnWidth, kButtonHeight));
+    bool clicked = ImGui::Button(label, ImVec2(width, 0.0f));
     if (ImGui::IsItemHovered() && tooltip[0] != '\0') {
         ImGui::SetTooltip("%s", tooltip);
     }

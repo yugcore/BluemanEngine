@@ -110,9 +110,22 @@ static void RenderNodeRow(const SceneNode& node, const std::string& searchQuery,
     bool isOpen = s_OpenStates[node.name];
 
     if (hasChildren) {
-        const char* caretStr = isOpen ? "\xE2\x96\xBC" : "\xE2\x96\xB6"; // ▼ (U+25BC) or ▶ (U+25B6)
-        ImVec2 caretPos = ImVec2(currentX, rMin.y + (rowHeight - ImGui::GetTextLineHeight()) * 0.5f);
-        dl->AddText(caretPos, ImGui::ColorConvertFloat4ToU32(pal.textSecondary), caretStr);
+        ImU32 caretColor = ImGui::ColorConvertFloat4ToU32(pal.textSecondary);
+        float centerY = rMin.y + rowHeight * 0.5f;
+
+        if (isOpen) {
+            // Down-pointing vector triangle caret
+            ImVec2 p1(currentX + 2.0f, centerY - 2.0f);
+            ImVec2 p2(currentX + 10.0f, centerY - 2.0f);
+            ImVec2 p3(currentX + 6.0f, centerY + 3.0f);
+            dl->AddTriangleFilled(p1, p2, p3, caretColor);
+        } else {
+            // Right-pointing vector triangle caret
+            ImVec2 p1(currentX + 3.0f, centerY - 4.0f);
+            ImVec2 p2(currentX + 8.0f, centerY);
+            ImVec2 p3(currentX + 3.0f, centerY + 4.0f);
+            dl->AddTriangleFilled(p1, p2, p3, caretColor);
+        }
 
         ImRect caretRect(ImVec2(currentX - 2.0f, rMin.y), ImVec2(currentX + 14.0f, rMax.y));
         if (ImGui::IsMouseClicked(0) && caretRect.Contains(ImGui::GetMousePos())) {
@@ -209,9 +222,14 @@ void RenderOutlinerPanel(bool* pOpen) {
     // Left inline filter/funnel icon inside field (solid dot indicator)
     dl->AddCircleFilled(ImVec2(sMin.x + 12.0f, (sMin.y + sMax.y) * 0.5f), 3.5f, ImGui::ColorConvertFloat4ToU32(pal.textSecondary));
 
-    // Right inline dropdown chevron icon inside field
+    // Right inline dropdown chevron icon inside field (down-pointing vector triangle)
     float chevronX = sMax.x - 16.0f;
-    dl->AddText(ImVec2(chevronX, searchCenterY), ImGui::ColorConvertFloat4ToU32(pal.textSecondary), "\xE2\x96\xBE");
+    float cY = (sMin.y + sMax.y) * 0.5f;
+    ImU32 chevCol = ImGui::ColorConvertFloat4ToU32(pal.textSecondary);
+    dl->AddTriangleFilled(
+        ImVec2(chevronX, cY - 2.0f),
+        ImVec2(chevronX + 8.0f, cY - 2.0f),
+        ImVec2(chevronX + 4.0f, cY + 3.0f), chevCol);
 
     // Click area for dropdown options
     ImRect chevronRect(ImVec2(sMax.x - 24.0f, sMin.y), sMax);
@@ -269,16 +287,22 @@ void RenderOutlinerPanel(bool* pOpen) {
     ImGui::Dummy(ImVec2(1.0f, 0.0f));
     ImGui::SameLine(0.0f, 6.0f);
 
-    // Column Headers: Item Label (left) vs Type (right ~140px)
+    // Header Band Background & Semibold Column Headers
+    ImVec2 hMin = ImGui::GetCursorScreenPos();
+    float hWidth = ImGui::GetContentRegionAvail().x;
+    dl->AddRectFilled(ImVec2(hMin.x - 4.0f, hMin.y - 2.0f), ImVec2(hMin.x + hWidth + 8.0f, hMin.y + 22.0f), ImGui::ColorConvertFloat4ToU32(pal.bgHeader));
+
     float typeColWidth = 140.0f;
     float headerY = ImGui::GetCursorPosY() + (20.0f - ImGui::GetTextLineHeight()) * 0.5f;
 
     ImGui::SetCursorPosY(headerY);
-    ImGui::TextColored(pal.textSecondary, "Item Label");
+    if (Theme::GetFontAtlas().sectionHeaderFont) ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
+    ImGui::TextColored(pal.textPrimary, "Item Label");
 
     float availW = ImGui::GetWindowWidth();
     ImGui::SameLine(availW - typeColWidth);
-    ImGui::TextColored(pal.textSecondary, "Type");
+    ImGui::TextColored(pal.textPrimary, "Type");
+    if (Theme::GetFontAtlas().sectionHeaderFont) ImGui::PopFont();
 
     ImGui::PopStyleVar(2);
 

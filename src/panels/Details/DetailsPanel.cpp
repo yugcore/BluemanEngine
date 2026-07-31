@@ -9,6 +9,7 @@
 
 #include <unordered_map>
 #include <imgui.h>
+#include <imgui_internal.h>
 
 namespace EngineEditor {
 
@@ -31,71 +32,129 @@ void RenderDetailsPanel(bool* pOpen) {
         return;
     }
 
-    // 1. Header showing panel context / Instance Name
+    // 1. Header Block: Stacked Name & Type Layout with Type Icon + Right-aligned "Edit in C++"
     ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
-    if (Theme::GetFontAtlas().panelTitleFont)
-        ImGui::PushFont(Theme::GetFontAtlas().panelTitleFont);
-    ImGui::TextColored(pal.accent, "%s (Instance)", selectedNodeName.c_str());
-    if (Theme::GetFontAtlas().panelTitleFont)
-        ImGui::PopFont();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 headerStart = ImGui::GetCursorScreenPos();
 
-    ImGui::Spacing();
+    // Determine type icon color and shape
+    ImVec2 iconBoxMin = ImVec2(headerStart.x, headerStart.y + 2.0f);
+    ImVec2 iconBoxMax = ImVec2(iconBoxMin.x + 16.0f, iconBoxMin.y + 16.0f);
 
-    // 2. Component breadcrumb
-    ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
-    std::string componentName = selectedNodeType.empty() ? "ActorComponent" : (selectedNodeType + "Component");
-    ImGui::TextColored(pal.textPrimary, "%s (%s)", componentName.c_str(), componentName.c_str());
-
-    float rightBtnX = ImGui::GetWindowWidth() - 110.0f;
-    if (rightBtnX > ImGui::GetCursorPosX()) {
-        ImGui::SameLine(rightBtnX);
+    if (selectedNodeType == "Folder" || selectedNodeName.find("Folder") != std::string::npos) {
+        ImU32 folderCol = ImGui::ColorConvertFloat4ToU32(ImVec4(0.95f, 0.75f, 0.35f, 1.0f));
+        dl->AddRectFilled(ImVec2(iconBoxMin.x + 1.0f, iconBoxMin.y + 3.0f), ImVec2(iconBoxMax.x - 1.0f, iconBoxMax.y - 1.0f), folderCol, 2.0f);
+        dl->AddRectFilled(ImVec2(iconBoxMin.x + 1.0f, iconBoxMin.y + 1.0f), ImVec2(iconBoxMin.x + 7.0f, iconBoxMin.y + 4.0f), folderCol, 1.0f);
+    } else if (selectedNodeType == "Light" || selectedNodeName.find("Light") != std::string::npos) {
+        ImU32 lightCol = ImGui::ColorConvertFloat4ToU32(ImVec4(0.96f, 0.82f, 0.28f, 1.0f));
+        dl->AddCircleFilled(ImVec2(iconBoxMin.x + 8.0f, iconBoxMin.y + 8.0f), 5.5f, lightCol);
+    } else if (selectedNodeType == "Camera" || selectedNodeName.find("Camera") != std::string::npos) {
+        ImU32 camCol = ImGui::ColorConvertFloat4ToU32(ImVec4(0.40f, 0.85f, 0.50f, 1.0f));
+        dl->AddRectFilled(ImVec2(iconBoxMin.x + 2.0f, iconBoxMin.y + 4.0f), ImVec2(iconBoxMax.x - 2.0f, iconBoxMax.y - 2.0f), camCol, 2.0f);
     } else {
-        ImGui::SameLine();
+        ImU32 meshCol = ImGui::ColorConvertFloat4ToU32(pal.accent);
+        dl->AddRectFilled(ImVec2(iconBoxMin.x + 2.0f, iconBoxMin.y + 2.0f), ImVec2(iconBoxMax.x - 2.0f, iconBoxMax.y - 2.0f), meshCol, 2.0f);
     }
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
-    ImGui::PushStyleColor(ImGuiCol_Text, pal.accent);
-    if (ImGui::SmallButton("Edit in C++")) {
-        Logger::Get().Info("[Details] Edit in C++ clicked for " + selectedNodeName);
+
+    float textX = Theme::Metrics::panelLeftMargin + 22.0f;
+
+    // Right-aligned "Edit in C++" button aligned directly with top header row
+    const char* editCppLabel = "Edit in C++";
+    float editBtnWidth = ImGui::CalcTextSize(editCppLabel).x + 20.0f;
+    float editBtnX = ImGui::GetWindowWidth() - editBtnWidth - Theme::Metrics::panelLeftMargin;
+
+    if (editBtnX > textX + 100.0f) {
+        ImGui::SetCursorScreenPos(ImVec2(editBtnX, headerStart.y + 4.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+        ImGui::PushStyleColor(ImGuiCol_Text, pal.accent);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 4.0f));
+
+        if (ImGui::Button(editCppLabel)) {
+            Logger::Get().Info("[Details] Edit in C++ clicked for " + selectedNodeName);
+        }
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(3);
     }
-    ImGui::PopStyleColor(3);
+
+    // Stacked text layout on left side (Name + Type)
+    ImGui::SetCursorScreenPos(ImVec2(headerStart.x + 22.0f, headerStart.y));
+    ImGui::BeginGroup();
+
+    // Line 1: Object Name (Bold/Semibold)
+    if (Theme::GetFontAtlas().sectionHeaderFont) ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
+    ImGui::TextColored(pal.accent, "%s", selectedNodeName.c_str());
+    if (Theme::GetFontAtlas().sectionHeaderFont) ImGui::PopFont();
+
+    // Line 2: Type Label (Smaller, Muted Text directly below)
+    std::string componentName = selectedNodeType.empty() ? "ActorComponent" : (selectedNodeType + "Component");
+    ImGui::TextColored(pal.textDisabled, "%s", componentName.c_str());
+
+    ImGui::EndGroup();
 
     ImGui::Spacing();
     ImGui::Separator();
-    ImGui::Spacing();
 
-    auto RenderFlatHeader = [&](const char* label, bool defaultOpen = true) -> bool {
+    auto RenderCollapsibleHeader = [&](const char* label, bool defaultOpen = true) -> bool {
         static std::unordered_map<std::string, bool> s_States;
         if (s_States.find(label) == s_States.end()) s_States[label] = defaultOpen;
         bool& open = s_States[label];
 
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
-        ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
-        ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
+        ImGui::Spacing();
 
-        if (Theme::GetFontAtlas().sectionHeaderFont)
-            ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
-
+        ImVec2 hMin = ImGui::GetCursorScreenPos();
         float availW = ImGui::GetContentRegionAvail().x;
-        if (ImGui::Button(label, ImVec2(availW, 30.0f))) {
+        float hHeight = 26.0f;
+        ImVec2 hMax = ImVec2(hMin.x + availW, hMin.y + hHeight);
+
+        ImGui::ItemSize(ImVec2(availW, hHeight));
+        ImGui::ItemAdd(ImRect(hMin, hMax), ImGui::GetID(label));
+
+        bool hovered = ImGui::IsItemHovered();
+        bool clicked = ImGui::IsItemClicked();
+
+        if (clicked) {
             open = !open;
         }
 
-        if (Theme::GetFontAtlas().sectionHeaderFont)
-            ImGui::PopFont();
+        // Left-aligned header background fill
+        ImU32 bgCol = ImGui::ColorConvertFloat4ToU32(hovered ? pal.bgElevated : pal.bgHeader);
+        dl->AddRectFilled(hMin, hMax, bgCol, 2.0f);
 
-        ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar(2);
+        // Vector Triangle Disclosure Caret
+        float caretX = hMin.x + Theme::Metrics::panelLeftMargin;
+        float centerY = hMin.y + hHeight * 0.5f;
+        ImU32 caretCol = ImGui::ColorConvertFloat4ToU32(pal.textSecondary);
+
+        if (open) {
+            // Down-pointing triangle
+            ImVec2 p1(caretX, centerY - 3.0f);
+            ImVec2 p2(caretX + 8.0f, centerY - 3.0f);
+            ImVec2 p3(caretX + 4.0f, centerY + 3.0f);
+            dl->AddTriangleFilled(p1, p2, p3, caretCol);
+        } else {
+            // Right-pointing triangle
+            ImVec2 p1(caretX + 2.0f, centerY - 4.0f);
+            ImVec2 p2(caretX + 7.0f, centerY);
+            ImVec2 p3(caretX + 2.0f, centerY + 4.0f);
+            dl->AddTriangleFilled(p1, p2, p3, caretCol);
+        }
+
+        // Left-aligned section header title
+        ImVec2 textPos = ImVec2(caretX + 16.0f, hMin.y + (hHeight - ImGui::GetTextLineHeight()) * 0.5f);
+        dl->AddText(textPos, ImGui::ColorConvertFloat4ToU32(pal.textPrimary), label);
+
+        ImGui::Spacing();
         return open;
     };
 
-    // 3. Transition (Transform Block)
-    bool transitionOpen = RenderFlatHeader("Transition", true);
+    // 2. Transition (Transform Block)
+    bool transitionOpen = RenderCollapsibleHeader("Transition", true);
 
     if (transitionOpen) {
-        ImGui::Indent(Theme::Metrics::sectionIndent);
+        ImGui::Indent(Theme::Metrics::panelLeftMargin);
         ImGui::Spacing();
 
         auto& transform = EditorState::Get().activeTransform;
@@ -107,17 +166,15 @@ void RenderDetailsPanel(bool* pOpen) {
         Widgets::RenderVector3PropertyRow("Scale", transform.scale, 1.0f, &transform.lockAspect);
 
         ImGui::Spacing();
-        ImGui::Unindent(Theme::Metrics::sectionIndent);
+        ImGui::Unindent(Theme::Metrics::panelLeftMargin);
     }
 
-    ImGui::Spacing();
-
-    // 4. Component-Specific Section
+    // 3. Component-Specific Section
     if (selectedNodeName == "SkyAtmosphere" || selectedNodeType == "SkyAtmosphere") {
-        bool skyOpen = RenderFlatHeader("Sky Atmosphere", true);
+        bool skyOpen = RenderCollapsibleHeader("Sky Atmosphere", true);
 
         if (skyOpen) {
-            ImGui::Indent(Theme::Metrics::sectionIndent);
+            ImGui::Indent(Theme::Metrics::panelLeftMargin);
             ImGui::Spacing();
 
             auto& skyProps = EditorState::Get().skyAtmosphereProps;
@@ -188,13 +245,13 @@ void RenderDetailsPanel(bool* pOpen) {
             }
 
             ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::sectionIndent);
+            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
         }
     } else if (selectedNodeType == "Light" || selectedNodeName == "SunLight" || selectedNodeName == "SkyLight") {
-        bool lightOpen = RenderFlatHeader("Directional Light Component", true);
+        bool lightOpen = RenderCollapsibleHeader("Directional Light Component", true);
 
         if (lightOpen) {
-            ImGui::Indent(Theme::Metrics::sectionIndent);
+            ImGui::Indent(Theme::Metrics::panelLeftMargin);
             ImGui::Spacing();
             static float intensity = 100000.0f;
             static float lightColor[3] = { 1.0f, 0.95f, 0.85f };
@@ -208,19 +265,20 @@ void RenderDetailsPanel(bool* pOpen) {
             ImGui::ColorEdit3("##LightColor", lightColor);
 
             ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::sectionIndent);
+            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
         }
     } else {
-        bool actorOpen = RenderFlatHeader("Actor Component", true);
+        bool actorOpen = RenderCollapsibleHeader("Actor Component", true);
 
         if (actorOpen) {
-            ImGui::Indent(Theme::Metrics::sectionIndent);
+            ImGui::Indent(Theme::Metrics::panelLeftMargin);
             ImGui::Spacing();
             ImGui::TextDisabled("Generic Component Properties for %s", selectedNodeName.c_str());
+            ImGui::Spacing();
             static bool isStatic = true;
             ImGui::Checkbox("Static Mobility", &isStatic);
             ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::sectionIndent);
+            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
         }
     }
 

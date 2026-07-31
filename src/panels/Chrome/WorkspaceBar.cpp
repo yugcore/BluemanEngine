@@ -43,38 +43,54 @@ void RenderWorkspaceBar() {
 
         auto RenderTab = [&](const char* label, WorkspaceMode mode) {
             bool isActive = (state.activeWorkspace == mode);
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(18.0f, 4.0f));
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+
             if (isActive) {
-                ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.accentHover);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, pal.accentActive);
-                ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
+                ImGui::PushStyleColor(ImGuiCol_Text, pal.accent);
                 if (Theme::GetFontAtlas().sectionHeaderFont) {
                     ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
                 }
             } else {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, pal.accent);
                 ImGui::PushStyleColor(ImGuiCol_Text, pal.textSecondary);
             }
 
-            if (ImGui::Button(label, ImVec2(0.0f, 24.0f))) {
+            ImVec2 bMin = ImGui::GetCursorScreenPos();
+
+            if (ImGui::Button(label)) {
                 if (state.activeWorkspace != mode) {
                     state.activeWorkspace = mode;
                     Logger::Get().Info(std::string("[WorkspaceBar] Swapped workspace to ") + label);
                 }
             }
 
+            ImVec2 bMax = ImGui::GetItemRectMax();
+
             if (isActive) {
+                // Subtle 2px bottom accent indicator line for active tab
+                ImGui::GetWindowDrawList()->AddLine(
+                    ImVec2(bMin.x + 4.0f, bMax.y),
+                    ImVec2(bMax.x - 4.0f, bMax.y),
+                    ImGui::ColorConvertFloat4ToU32(pal.accent), 2.0f);
+
                 if (Theme::GetFontAtlas().sectionHeaderFont) {
                     ImGui::PopFont();
                 }
             }
+
             ImGui::PopStyleColor(4);
+            ImGui::PopStyleVar(2);
         };
 
-        // Center the Editor / Codebase / Run tabs in the workspace switcher bar
-        float totalTabsWidth = 72.0f + 88.0f + 56.0f + (2.0f * Theme::Metrics::intraGroupGap);
+        // Center the Editor / Codebase / Run tabs dynamically in the workspace switcher bar
+        float eW = ImGui::CalcTextSize("Editor").x + 36.0f;
+        float cW = ImGui::CalcTextSize("Codebase").x + 36.0f;
+        float rW = ImGui::CalcTextSize("Run").x + 36.0f;
+        float totalTabsWidth = eW + cW + rW + (2.0f * Theme::Metrics::intraGroupGap);
         float centerX = (ImGui::GetWindowWidth() - totalTabsWidth) * 0.5f;
         if (centerX > Theme::Metrics::panelLeftMargin) {
             ImGui::SetCursorPosX(centerX);
@@ -95,13 +111,18 @@ void RenderWorkspaceBar() {
             ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
         }
 
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
         ImGui::PushStyleColor(ImGuiCol_Text, pal.textSecondary);
-        if (ImGui::Button("Settings", ImVec2(settingsWidth, 24.0f))) {
+        float textY = ImGui::GetCursorPosY() + (24.0f - ImGui::GetTextLineHeight()) * 0.5f;
+        ImGui::SetCursorPosY(textY);
+        ImGui::TextColored(pal.textSecondary, "Settings");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ImGui::SetTooltip("Open Workspace Settings");
+        }
+        if (ImGui::IsItemClicked()) {
             Logger::Get().Info("[WorkspaceBar] Settings clicked.");
         }
-        ImGui::PopStyleColor(3);
+        ImGui::PopStyleColor();
     }
     ImGui::End();
 

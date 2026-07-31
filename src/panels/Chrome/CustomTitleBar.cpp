@@ -141,10 +141,10 @@ void RenderCustomTitleBar() {
         if (ImGui::BeginMenuBar()) {
             ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
 
-            if (Theme::GetFontAtlas().sectionHeaderFont)
-                ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
+            if (Theme::GetFontAtlas().panelTitleFont)
+                ImGui::PushFont(Theme::GetFontAtlas().panelTitleFont);
             ImGui::TextColored(pal.accent, "BLUEMAN ENGINE");
-            if (Theme::GetFontAtlas().sectionHeaderFont)
+            if (Theme::GetFontAtlas().panelTitleFont)
                 ImGui::PopFont();
 
             ImGui::SameLine();
