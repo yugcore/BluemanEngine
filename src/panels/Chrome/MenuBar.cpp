@@ -1,4 +1,10 @@
 #include "MenuBar.h"
+#include "layout/Dockspace.h"
+#include "layout/WindowLayout.h"
+#include "panels/Chrome/CustomTitleBar.h"
+#include "panels/Chrome/Toolbar.h"
+#include "panels/Chrome/StatusBar.h"
+#include "core/EditorState.h"
 #include "core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
@@ -72,19 +78,16 @@ void RenderMenuBarContents() {
     }
 
     if (ImGui::BeginMenu("Window")) {
-        static bool contentBrowserOpen = true;
-        static bool viewportOpen = true;
-        static bool outlinerOpen = true;
-        static bool detailsOpen = true;
-        static bool outputLogOpen = true;
+        auto& settings = EditorState::Get().settings;
 
-        ImGui::MenuItem("Content Browser", nullptr, &contentBrowserOpen);
-        ImGui::MenuItem("Viewport", nullptr, &viewportOpen);
-        ImGui::MenuItem("Outliner", nullptr, &outlinerOpen);
-        ImGui::MenuItem("Details", nullptr, &detailsOpen);
-        ImGui::MenuItem("Output Log", nullptr, &outputLogOpen);
+        ImGui::MenuItem("Content Browser", nullptr, &settings.showContentBrowser);
+        ImGui::MenuItem("Output Log", nullptr, &settings.showOutputLog);
+        ImGui::MenuItem("Render Control Strip", nullptr, &settings.showRenderControlStrip);
         ImGui::Separator();
-        if (ImGui::MenuItem("Reset Layout")) Logger::Get().Info("[Menu] Window > Reset Layout clicked");
+        if (ImGui::MenuItem("Reset Layout")) {
+            Layout::RequestLayoutReset();
+            Logger::Get().Info("[Menu] Window > Reset Layout executed.");
+        }
         ImGui::EndMenu();
     }
 

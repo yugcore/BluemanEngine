@@ -2,19 +2,23 @@
 #include "core/SceneGraph.h"
 #include "core/EditorState.h"
 #include "core/Logger.h"
-#include "widgets/SearchBar.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 #include "theme/Fonts.h"
 
 #include <imgui.h>
+#include <imgui_internal.h>
+#include <unordered_map>
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 
 namespace EngineEditor {
 
 static char s_OutlinerSearch[128] = "";
-static int s_ActiveScope = 0; // 0=Save, 1=World
+static bool s_FilterVisibleOnly = false;
+static bool s_FilterPinnedOnly = false;
+static std::unordered_map<std::string, bool> s_OpenStates;
 
 static bool CaseInsensitiveContains(const std::string& str, const std::string& query) {
     if (query.empty()) return true;
@@ -35,128 +39,292 @@ static bool NodeOrChildMatchesSearch(const SceneNode& node, const std::string& q
     return false;
 }
 
-static void RenderNodeRow(const SceneNode& node, const std::string& searchQuery) {
+static uint32_t CountNodes(const std::vector<SceneNode>& nodes) {
+    uint32_t count = 0;
+    for (const auto& node : nodes) {
+        count += 1;
+        count += CountNodes(node.children);
+    }
+    return count;
+}
+
+static void RenderNodeRow(const SceneNode& node, const std::string& searchQuery, int depth, float typeColWidth, const Theme::Palette& pal, int rowIndex) {
     if (!searchQuery.empty() && !NodeOrChildMatchesSearch(node, searchQuery)) {
         return;
     }
 
-    ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);
-
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanFullWidth;
-    bool isSelected = (EditorState::Get().selectedNodeName == node.name);
-    if (isSelected) {
-        flags |= ImGuiTreeNodeFlags_Selected;
-        const auto& pal = Theme::GetPalette();
-        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(pal.accent.x, pal.accent.y, pal.accent.z, 0.25f));
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(pal.accentHover.x, pal.accentHover.y, pal.accentHover.z, 0.35f));
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(pal.accentActive.x, pal.accentActive.y, pal.accentActive.z, 0.45f));
-    }
-
-    if (node.children.empty()) {
-        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-    }
-
-    if (!searchQuery.empty()) {
-        ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-    }
-
-    const char* iconTag = SceneGraph::GetTypeIconTag(node.type);
-    ImVec4 typeColor = isSelected ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : SceneGraph::GetTypeColor(node.type);
+    const float rowHeight = 22.0f;
+    const float indentPerLevel = 18.0f;
 
     ImGui::PushID(node.name.c_str());
 
-    bool nodeOpen = ImGui::TreeNodeEx("##NodeTree", flags);
+    bool isSelected = (EditorState::Get().selectedNodeName == node.name);
+    ImVec2 rMin = ImGui::GetCursorScreenPos();
+    float availWidth = ImGui::GetContentRegionAvail().x;
+    ImVec2 rMax = ImVec2(rMin.x + availWidth, rMin.y + rowHeight);
 
-    ImGui::SameLine();
-    if (iconTag && iconTag[0] != '\0') {
-        ImGui::TextColored(typeColor, "%s", iconTag);
-        ImGui::SameLine();
-    }
-    ImGui::TextColored(typeColor, "%s", node.name.c_str());
+    ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
-        EditorState::Get().SetSelection(node.name, SceneGraph::GetTypeName(node.type));
-        Logger::Get().Info("[Outliner] Selected scene node: " + node.name);
-    }
+    // Interaction target for full-width row
+    ImGui::ItemSize(ImVec2(availWidth, rowHeight));
+    ImGui::ItemAdd(ImRect(rMin, rMax), ImGui::GetID(node.name.c_str()));
 
+    bool hovered = ImGui::IsItemHovered();
+    bool clicked = ImGui::IsItemClicked();
+
+    // 1. Row Background Container (Selection > Hover > Zebra Striping)
     if (isSelected) {
-        ImGui::PopStyleColor(3);
+        // Selected: Solid 3px left-edge accent bar + 24% accent full-row background fill
+        dl->AddRectFilled(rMin, rMax, ImGui::ColorConvertFloat4ToU32(ImVec4(pal.accent.x, pal.accent.y, pal.accent.z, 0.24f)));
+        dl->AddRectFilled(rMin, ImVec2(rMin.x + 3.0f, rMax.y), ImGui::ColorConvertFloat4ToU32(pal.accent));
+    } else if (hovered) {
+        // Hovered: Full-width row highlight
+        dl->AddRectFilled(rMin, rMax, ImGui::ColorConvertFloat4ToU32(pal.bgElevated));
+    } else if (rowIndex % 2 == 1) {
+        // Odd row zebra stripe: subtle 3-4% background tint
+        dl->AddRectFilled(rMin, rMax, ImGui::ColorConvertFloat4ToU32(ImVec4(pal.bgHeader.x, pal.bgHeader.y, pal.bgHeader.z, 0.35f)));
     }
 
-    ImGui::TableSetColumnIndex(1);
-    ImGui::TextDisabled("%s", node.world.c_str());
+    if (clicked) {
+        EditorState::Get().SetSelection(node.name, SceneGraph::GetTypeName(node.type));
+        Logger::Get().Info("[Outliner] Selected node: " + node.name);
+    }
 
-    ImGui::TableSetColumnIndex(2);
-    ImGui::TextDisabled("%s", node.panel.c_str());
+    // 2. Persistent Vertical Guidelines connecting parent rows to children
+    for (int d = 1; d <= depth; ++d) {
+        float guideX = rMin.x + (d * indentPerLevel) - 8.0f;
+        dl->AddLine(ImVec2(guideX, rMin.y), ImVec2(guideX, rMax.y), ImGui::ColorConvertFloat4ToU32(pal.borderSubtle), 1.0f);
+    }
+
+    float currentX = rMin.x + (depth * indentPerLevel) + 4.0f;
+
+    // 3. Caret for Expand/Collapse (Nodes with children)
+    bool hasChildren = !node.children.empty();
+    if (s_OpenStates.find(node.name) == s_OpenStates.end()) {
+        s_OpenStates[node.name] = true;
+    }
+    if (!searchQuery.empty()) {
+        s_OpenStates[node.name] = true;
+    }
+
+    bool isOpen = s_OpenStates[node.name];
+
+    if (hasChildren) {
+        const char* caretStr = isOpen ? "\xE2\x96\xBC" : "\xE2\x96\xB6"; // ▼ (U+25BC) or ▶ (U+25B6)
+        ImVec2 caretPos = ImVec2(currentX, rMin.y + (rowHeight - ImGui::GetTextLineHeight()) * 0.5f);
+        dl->AddText(caretPos, ImGui::ColorConvertFloat4ToU32(pal.textSecondary), caretStr);
+
+        ImRect caretRect(ImVec2(currentX - 2.0f, rMin.y), ImVec2(currentX + 14.0f, rMax.y));
+        if (ImGui::IsMouseClicked(0) && caretRect.Contains(ImGui::GetMousePos())) {
+            s_OpenStates[node.name] = !isOpen;
+            isOpen = s_OpenStates[node.name];
+        }
+    }
+    currentX += 14.0f;
+
+    // 4. Fixed-size 16x16 Icon Bounding Box & Vector/Glyph Icon Rendering
+    float iconBoxSize = 16.0f;
+    ImVec2 iconBoxMin = ImVec2(currentX, rMin.y + (rowHeight - iconBoxSize) * 0.5f);
+    ImVec2 iconBoxMax = ImVec2(iconBoxMin.x + iconBoxSize, iconBoxMin.y + iconBoxSize);
+
+    ImVec4 iconColor = SceneGraph::GetTypeColor(node.type);
+
+    if (node.type == SceneNodeType::Folder) {
+        // Folder Icon Shape (Gold/Amber)
+        ImU32 folderCol = ImGui::ColorConvertFloat4ToU32(ImVec4(0.95f, 0.75f, 0.35f, 1.0f));
+        dl->AddRectFilled(ImVec2(iconBoxMin.x + 1.0f, iconBoxMin.y + 3.0f), ImVec2(iconBoxMax.x - 1.0f, iconBoxMax.y - 1.0f), folderCol, 2.0f);
+        dl->AddRectFilled(ImVec2(iconBoxMin.x + 1.0f, iconBoxMin.y + 1.0f), ImVec2(iconBoxMin.x + 7.0f, iconBoxMin.y + 4.0f), folderCol, 1.0f);
+    } else if (node.type == SceneNodeType::Light) {
+        // Light Icon (Amber Yellow Circle)
+        ImU32 lightCol = ImGui::ColorConvertFloat4ToU32(ImVec4(0.96f, 0.82f, 0.28f, 1.0f));
+        dl->AddCircleFilled(ImVec2(iconBoxMin.x + 8.0f, iconBoxMin.y + 8.0f), 5.5f, lightCol);
+    } else if (node.type == SceneNodeType::Camera) {
+        // Camera Icon (Green Rect)
+        ImU32 camCol = ImGui::ColorConvertFloat4ToU32(ImVec4(0.40f, 0.85f, 0.50f, 1.0f));
+        dl->AddRectFilled(ImVec2(iconBoxMin.x + 2.0f, iconBoxMin.y + 4.0f), ImVec2(iconBoxMax.x - 2.0f, iconBoxMax.y - 2.0f), camCol, 2.0f);
+    } else if (node.type == SceneNodeType::Audio) {
+        // Audio Icon (Purple Circle)
+        ImU32 audioCol = ImGui::ColorConvertFloat4ToU32(ImVec4(0.85f, 0.50f, 0.90f, 1.0f));
+        dl->AddCircleFilled(ImVec2(iconBoxMin.x + 8.0f, iconBoxMin.y + 8.0f), 5.0f, audioCol);
+    } else {
+        // Mesh / Actor / Default (Cyan / Blue Rounded Box)
+        ImU32 meshCol = ImGui::ColorConvertFloat4ToU32(iconColor);
+        dl->AddRectFilled(ImVec2(iconBoxMin.x + 2.0f, iconBoxMin.y + 2.0f), ImVec2(iconBoxMax.x - 2.0f, iconBoxMax.y - 2.0f), meshCol, 2.0f);
+    }
+
+    currentX += iconBoxSize + 6.0f; // Fixed spacing after 16x16 icon box
+
+    // 5. Item Name (Text aligned to exact left edge)
+    ImVec4 nameColor = isSelected ? pal.textPrimary : pal.textPrimary;
+    ImVec2 namePos = ImVec2(currentX, rMin.y + (rowHeight - ImGui::GetTextLineHeight()) * 0.5f);
+
+    float maxNameX = rMax.x - typeColWidth - 10.0f;
+    dl->PushClipRect(rMin, ImVec2(maxNameX, rMax.y), true);
+    dl->AddText(namePos, ImGui::ColorConvertFloat4ToU32(nameColor), node.name.c_str());
+    dl->PopClipRect();
+
+    // 6. Right-Aligned Type Column
+    const char* typeName = SceneGraph::GetTypeName(node.type);
+    float typeX = rMax.x - typeColWidth + 8.0f;
+    ImVec2 typePos = ImVec2(typeX, rMin.y + (rowHeight - ImGui::GetTextLineHeight()) * 0.5f);
+    dl->AddText(typePos, ImGui::ColorConvertFloat4ToU32(pal.textDisabled), typeName);
 
     ImGui::PopID();
 
-    if (nodeOpen && !(flags & ImGuiTreeNodeFlags_Leaf)) {
+    // --- Render Children Recursively ---
+    if (hasChildren && isOpen) {
+        int childIdx = 0;
         for (const auto& child : node.children) {
-            RenderNodeRow(child, searchQuery);
+            RenderNodeRow(child, searchQuery, depth + 1, typeColWidth, pal, childIdx++);
         }
-        ImGui::TreePop();
     }
 }
 
 void RenderOutlinerPanel(bool* pOpen) {
-    if (!ImGui::Begin("Outliner", pOpen)) {
+    if (!ImGui::Begin("Outliner", pOpen, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
 
     const auto& pal = Theme::GetPalette();
 
-    // --- Scope filter buttons ---
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
+    // ====================================================================
+    // ROW 1: SEARCH INPUT (Full Width with Inline Filter & Chevron Icons)
+    // ====================================================================
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(24.0f, 4.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, pal.bgHeader);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, pal.bgElevated);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, pal.bgElevated);
 
-    auto ScopeTab = [&](const char* label, int idx) {
-        bool active = (s_ActiveScope == idx);
-        if (active) {
-            ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
-            ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
-        } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
-            ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
-        }
-        if (ImGui::Button(label, ImVec2(0, Theme::Metrics::rowHeight))) s_ActiveScope = idx;
-        ImGui::PopStyleColor(2);
-    };
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##OutlinerSearch", "Search scene hierarchy...", s_OutlinerSearch, sizeof(s_OutlinerSearch));
 
-    ScopeTab("Save", 0);
+    ImVec2 sMin = ImGui::GetItemRectMin();
+    ImVec2 sMax = ImGui::GetItemRectMax();
+    float searchCenterY = (sMin.y + sMax.y) * 0.5f - ImGui::GetTextLineHeight() * 0.5f;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    // Left inline filter/funnel icon inside field (solid dot indicator)
+    dl->AddCircleFilled(ImVec2(sMin.x + 12.0f, (sMin.y + sMax.y) * 0.5f), 3.5f, ImGui::ColorConvertFloat4ToU32(pal.textSecondary));
+
+    // Right inline dropdown chevron icon inside field
+    float chevronX = sMax.x - 16.0f;
+    dl->AddText(ImVec2(chevronX, searchCenterY), ImGui::ColorConvertFloat4ToU32(pal.textSecondary), "\xE2\x96\xBE");
+
+    // Click area for dropdown options
+    ImRect chevronRect(ImVec2(sMax.x - 24.0f, sMin.y), sMax);
+    if (ImGui::IsMouseClicked(0) && chevronRect.Contains(ImGui::GetMousePos())) {
+        ImGui::OpenPopup("SearchTypeOptionsPopup");
+    }
+
+    if (ImGui::BeginPopup("SearchTypeOptionsPopup")) {
+        ImGui::MenuItem("Search by Name", nullptr, true);
+        ImGui::MenuItem("Search by Type");
+        ImGui::MenuItem("Search by Component");
+        ImGui::EndPopup();
+    }
+
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar(2);
+
+    ImGui::Spacing();
+
+    // ====================================================================
+    // ROW 2: TOOLBAR ROW & COLUMN HEADERS
+    // ====================================================================
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 0.0f));
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+
+    // Toggle Eye (Visibility)
+    ImGui::PushStyleColor(ImGuiCol_Text, s_FilterVisibleOnly ? pal.accent : pal.textSecondary);
+    if (ImGui::Button("\xE2\x97\x8F##VisToggle", ImVec2(20.0f, 20.0f))) {
+        s_FilterVisibleOnly = !s_FilterVisibleOnly;
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle Visibility Filter");
+    ImGui::PopStyleColor();
+
     ImGui::SameLine();
-    ScopeTab("World", 1);
+
+    // Toggle Pin (Favorite)
+    ImGui::PushStyleColor(ImGuiCol_Text, s_FilterPinnedOnly ? pal.accent : pal.textSecondary);
+    if (ImGui::Button("\xE2\x98\x85##PinToggle", ImVec2(20.0f, 20.0f))) {
+        s_FilterPinnedOnly = !s_FilterPinnedOnly;
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle Pinned Items");
+    ImGui::PopStyleColor();
+
+    ImGui::PopStyleColor(2);
+
+    // 1px Vertical divider line after toolbar icons
+    ImGui::SameLine(0.0f, 6.0f);
+    ImVec2 divP = ImGui::GetCursorScreenPos();
+    float divY1 = divP.y + 3.0f;
+    float divY2 = divY1 + 14.0f;
+    dl->AddLine(ImVec2(divP.x, divY1), ImVec2(divP.x, divY2), ImGui::ColorConvertFloat4ToU32(pal.borderSubtle), 1.0f);
+    ImGui::Dummy(ImVec2(1.0f, 0.0f));
+    ImGui::SameLine(0.0f, 6.0f);
+
+    // Column Headers: Item Label (left) vs Type (right ~140px)
+    float typeColWidth = 140.0f;
+    float headerY = ImGui::GetCursorPosY() + (20.0f - ImGui::GetTextLineHeight()) * 0.5f;
+
+    ImGui::SetCursorPosY(headerY);
+    ImGui::TextColored(pal.textSecondary, "Item Label");
+
+    float availW = ImGui::GetWindowWidth();
+    ImGui::SameLine(availW - typeColWidth);
+    ImGui::TextColored(pal.textSecondary, "Type");
 
     ImGui::PopStyleVar(2);
 
-    // --- Search bar ---
-    ImGui::SameLine(ImGui::GetWindowWidth() - 200.0f);
-    Widgets::RenderSearchBar("##OutlinerSearch", s_OutlinerSearch, sizeof(s_OutlinerSearch), "Search scene hierarchy...", 190.0f);
-    
     ImGui::Spacing();
 
-    // --- Tree Table ---
-    ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg |
-                                 ImGuiTableFlags_BordersOuterV | ImGuiTableFlags_BordersInnerV |
-                                 ImGuiTableFlags_ScrollY;
+    // ====================================================================
+    // ROW 3: SCROLLABLE TREE ROWS
+    // ====================================================================
+    const float footerHeight = 24.0f;
+    float treeChildHeight = ImGui::GetContentRegionAvail().y - footerHeight;
+    if (treeChildHeight < 50.0f) treeChildHeight = 50.0f;
 
-    if (ImGui::BeginTable("OutlinerTreeTable", 3, tableFlags)) {
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.55f);
-        ImGui::TableSetupColumn("World", ImGuiTableColumnFlags_WidthStretch, 0.25f);
-        ImGui::TableSetupColumn("Panel", ImGuiTableColumnFlags_WidthStretch, 0.20f);
-        ImGui::TableHeadersRow();
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
 
+    if (ImGui::BeginChild("##OutlinerTreeChild", ImVec2(0.0f, treeChildHeight), false, ImGuiWindowFlags_NoScrollbar)) {
         std::string query = s_OutlinerSearch;
         const auto& rootNodes = SceneGraph::Get().GetRootNodes();
 
+        int rootIdx = 0;
         for (const auto& root : rootNodes) {
-            RenderNodeRow(root, query);
+            RenderNodeRow(root, query, 0, typeColWidth, pal, rootIdx++);
         }
-
-        ImGui::EndTable();
     }
+    ImGui::EndChild();
+
+    ImGui::PopStyleVar(2);
+
+    // ====================================================================
+    // ROW 4: PINNED FOOTER (Live Actor Count)
+    // ====================================================================
+    ImVec2 fMin = ImGui::GetCursorScreenPos();
+    float fWidth = ImGui::GetContentRegionAvail().x;
+    ImVec2 fMax = ImVec2(fMin.x + fWidth, fMin.y + footerHeight);
+
+    // Thin top border line separating tree from footer
+    dl->AddLine(fMin, ImVec2(fMax.x, fMin.y), ImGui::ColorConvertFloat4ToU32(pal.borderSubtle), 1.0f);
+
+    uint32_t totalActors = CountNodes(SceneGraph::Get().GetRootNodes());
+    char footerBuf[64];
+    snprintf(footerBuf, sizeof(footerBuf), "%u actors (%u loaded)", totalActors, totalActors);
+
+    float textCenterY = fMin.y + (footerHeight - ImGui::GetTextLineHeight()) * 0.5f;
+    ImGui::SetCursorPosY(textCenterY - ImGui::GetWindowPos().y);
+    ImGui::SetCursorPosX(8.0f);
+    ImGui::TextColored(pal.textDisabled, "%s", footerBuf);
 
     ImGui::End();
 }

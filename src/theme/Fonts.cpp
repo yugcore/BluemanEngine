@@ -28,21 +28,26 @@ FontAtlas SetupFonts() {
         0,
     };
 
+    ImFontConfig fontCfg;
+    fontCfg.OversampleH = 3;
+    fontCfg.OversampleV = 3;
+    fontCfg.PixelSnapH = true;
+
     if (CheckFileExists(fontSans)) {
-        // Tier 3: Body / Field Labels (14px Regular - Default)
-        s_FontAtlas.bodyFont = io.Fonts->AddFontFromFileTTF(fontSans, 14.0f, nullptr, glyphRanges);
+        // Tier 3: Body / Field Labels (18.5px Regular base size)
+        s_FontAtlas.bodyFont = io.Fonts->AddFontFromFileTTF(fontSans, 18.5f, &fontCfg, glyphRanges);
         io.FontDefault = s_FontAtlas.bodyFont;
 
-        // Tier 1: Panel / Window Titles (15px Semibold/Bold)
+        // Tier 1: Panel / Window Titles (21.0px Bold - 20-22px semi-bold/bold range)
         s_FontAtlas.panelTitleFont = CheckFileExists(fontSansBold) ? 
-            io.Fonts->AddFontFromFileTTF(fontSansBold, 15.0f, nullptr, glyphRanges) : io.Fonts->AddFontFromFileTTF(fontSans, 15.0f, nullptr, glyphRanges);
+            io.Fonts->AddFontFromFileTTF(fontSansBold, 21.0f, &fontCfg, glyphRanges) : io.Fonts->AddFontFromFileTTF(fontSans, 21.0f, &fontCfg, glyphRanges);
 
-        // Tier 2: Section Headers (15px Semibold/Bold)
+        // Tier 2: Section Headers (18.0px Bold)
         s_FontAtlas.sectionHeaderFont = CheckFileExists(fontSansBold) ? 
-            io.Fonts->AddFontFromFileTTF(fontSansBold, 15.0f, nullptr, glyphRanges) : io.Fonts->AddFontFromFileTTF(fontSans, 15.0f, nullptr, glyphRanges);
+            io.Fonts->AddFontFromFileTTF(fontSansBold, 18.0f, &fontCfg, glyphRanges) : io.Fonts->AddFontFromFileTTF(fontSans, 18.0f, &fontCfg, glyphRanges);
 
-        // Tier 4: Secondary / Meta / Status Bar (12px Regular)
-        s_FontAtlas.secondaryFont = io.Fonts->AddFontFromFileTTF(fontSans, 12.0f, nullptr, glyphRanges);
+        // Tier 4: Secondary / Meta / Status Bar (15.0px Regular)
+        s_FontAtlas.secondaryFont = io.Fonts->AddFontFromFileTTF(fontSans, 15.0f, &fontCfg, glyphRanges);
     } else {
         s_FontAtlas.bodyFont = io.Fonts->AddFontDefault();
         s_FontAtlas.panelTitleFont = s_FontAtlas.bodyFont;
@@ -51,7 +56,8 @@ FontAtlas SetupFonts() {
     }
 
     if (CheckFileExists(fontMono)) {
-        s_FontAtlas.monoFont = io.Fonts->AddFontFromFileTTF(fontMono, 13.0f, nullptr, glyphRanges);
+        // Monospace Font (15.5px for Log Console, FPS/stats, and numeric readouts)
+        s_FontAtlas.monoFont = io.Fonts->AddFontFromFileTTF(fontMono, 15.5f, &fontCfg, glyphRanges);
     } else {
         s_FontAtlas.monoFont = s_FontAtlas.bodyFont;
     }

@@ -6,6 +6,12 @@
 
 namespace EngineEditor {
 
+enum class WorkspaceMode {
+    Editor,
+    Codebase,
+    Run
+};
+
 enum class GizmoOperation {
     Translate,
     Rotate,
@@ -69,6 +75,8 @@ struct RenderSettings {
 
     // Panel Visibility
     bool showRenderControlStrip = true;
+    bool showContentBrowser = true;
+    bool showOutputLog = true;
 };
 
 struct RenderStats {
@@ -80,6 +88,9 @@ struct RenderStats {
     uint32_t entityCount = 346;
     float fps = 185.2f;
     float frameTimeMs = 5.41f;
+    float ramUsedGB = 6.4f;
+    float ramTotalGB = 32.0f;
+    float cpuUsagePct = 14.2f;
     std::string upscalerMode = "DLSS 3.5 Quality (Frame Gen)";
     std::string rtxGIStatus = "RTX GI Ultra (4 Bounces)";
     std::string volumetricLighting = "Volumetric: Enabled";
@@ -89,6 +100,9 @@ struct RenderStats {
 };
 
 struct EditorState {
+    // Workspace Architecture
+    WorkspaceMode activeWorkspace = WorkspaceMode::Editor;
+
     // Status Bar & System Metadata (Phase 8)
     EngineStatus status = EngineStatus::Ready;
     std::string gitBranch = "feature/volumetrics";

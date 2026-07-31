@@ -5,6 +5,7 @@
 #include "theme/Metrics.h"
 #include "theme/Fonts.h"
 
+#include <unordered_map>
 #include <imgui.h>
 #include <cstdio>
 
@@ -20,7 +21,7 @@ void RenderRenderControlStripPanel(bool* pOpen) {
     ImGui::SetNextWindowPos(ImVec2(280.0f, 110.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(420.0f, 640.0f), ImGuiCond_FirstUseEver);
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_None;
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
 
     if (!ImGui::Begin("Render Control Strip", openPtr, flags)) {
         ImGui::End();
@@ -93,10 +94,37 @@ void RenderRenderControlStripPanel(bool* pOpen) {
     }
     ImGui::PopStyleColor(2);
 
+    auto RenderFlatHeader = [&](const char* label, bool defaultOpen = true) -> bool {
+        static std::unordered_map<std::string, bool> s_States;
+        if (s_States.find(label) == s_States.end()) s_States[label] = defaultOpen;
+        bool& open = s_States[label];
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+        ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
+
+        if (Theme::GetFontAtlas().sectionHeaderFont)
+            ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
+
+        float availW = ImGui::GetContentRegionAvail().x;
+        if (ImGui::Button(label, ImVec2(availW, 30.0f))) {
+            open = !open;
+        }
+
+        if (Theme::GetFontAtlas().sectionHeaderFont)
+            ImGui::PopFont();
+
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar(2);
+        return open;
+    };
+
     ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
     // --- Hardware Ray Tracing (DXR) ---
-    if (ImGui::CollapsingHeader("Hardware Ray Tracing (DXR)", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (RenderFlatHeader("Hardware Ray Tracing (DXR)", true)) {
         ImGui::Indent(Theme::Metrics::sectionIndent);
         ImGui::Spacing();
         ImGui::Checkbox("Ray Traced Global Illumination (RTGI) [Quality: Ultra, Bounces: 4]", &settings.rtGI);
@@ -115,7 +143,7 @@ void RenderRenderControlStripPanel(bool* pOpen) {
     }
 
     // --- World Partition & Spatial Grid ---
-    if (ImGui::CollapsingHeader("World Partition & Spatial Grid Streaming", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (RenderFlatHeader("World Partition & Spatial Grid Streaming", true)) {
         ImGui::Indent(Theme::Metrics::sectionIndent);
         ImGui::Spacing();
         ImGui::SetNextItemWidth(200.0f);
@@ -130,7 +158,7 @@ void RenderRenderControlStripPanel(bool* pOpen) {
     }
 
     // --- Nanite & Mesh Shader ---
-    if (ImGui::CollapsingHeader("Nanite Virtual Geometry & Mesh Shader Pipeline", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (RenderFlatHeader("Nanite Virtual Geometry & Mesh Shader Pipeline", true)) {
         ImGui::Indent(Theme::Metrics::sectionIndent);
         ImGui::Spacing();
         ImGui::Checkbox("Enable Virtual Geometry Clusters", &settings.naniteClusterCulling);
@@ -143,14 +171,14 @@ void RenderRenderControlStripPanel(bool* pOpen) {
     }
 
     // --- Quick Isolation Tests ---
-    if (ImGui::CollapsingHeader("Quick Isolating Tests (MRQ Floating)", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (RenderFlatHeader("Quick Isolating Tests (MRQ Floating)", true)) {
         ImGui::Indent(Theme::Metrics::sectionIndent);
         ImGui::Spacing();
         
         ImGui::Checkbox("Geometry isolation (Collapse scene occlusion with Dolly)", &settings.isoGeometry);
         ImGui::Checkbox("Texture isolation (Disable alt on route / safe route)", &settings.isoTextures);
         ImGui::Checkbox("Lighting isolation (Enable sun lightmaps sync)", &settings.isoLighting);
-        ImGui::Checkbox("Shadow isolation (Double shadow map process)", &settings.isoShadows);
+        ImGui::Checkbox("Shadow isolation (Disable double shadow map process)", &settings.isoShadows);
         ImGui::Checkbox("DXR Ray Tracing isolation (Disable DXR ray tracing)", &settings.isoDXR);
         ImGui::Checkbox("Material isolation (Use solid color accent)", &settings.isoMaterials);
         ImGui::Checkbox("Mesh isolation (Replace with 12-sample mesh)", &settings.isoMeshShader);

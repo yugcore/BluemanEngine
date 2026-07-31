@@ -17,89 +17,129 @@ void AssetRegistry::SeedDummyData() {
     m_RootFolder.name = "ZeGFX Workspace";
     m_RootFolder.path = "ZeGFX Workspace";
 
-    AssetFolder cookedFolder;
-    cookedFolder.name = "Blueman Cooked Assets";
-    cookedFolder.path = "ZeGFX Workspace/Blueman Cooked Assets";
+    // --- Content Folder ---
+    AssetFolder contentFolder;
+    contentFolder.name = "Content";
+    contentFolder.path = "ZeGFX Workspace/Content";
 
-    // 1. Meshes
-    AssetFolder meshesFolder;
-    meshesFolder.name = "Meshes";
-    meshesFolder.path = "ZeGFX Workspace/Blueman Cooked Assets/Meshes";
-    meshesFolder.items = {
-        { "M_Village_Wall_01_Base", AssetItemType::Mesh, meshesFolder.path + "/M_Village_Wall_01_Base" },
-        { "M_Village_Gate_Detailed", AssetItemType::Mesh, meshesFolder.path + "/M_Village_Gate_Detailed" },
-        { "M_Village_Ground_Terrain_H", AssetItemType::Mesh, meshesFolder.path + "/M_Village_Ground_Terrain_H" }
-    };
+    // --- StarterContent Folder ---
+    AssetFolder starterFolder;
+    starterFolder.name = "StarterContent";
+    starterFolder.path = "ZeGFX Workspace/Content/StarterContent";
 
-    // 2. Materials
+    // 1. Materials Folder (matching UE5 screenshot)
     AssetFolder materialsFolder;
     materialsFolder.name = "Materials";
-    materialsFolder.path = "ZeGFX Workspace/Blueman Cooked Assets/Materials";
+    materialsFolder.path = "ZeGFX Workspace/Content/StarterContent/Materials";
     materialsFolder.items = {
-        { "Mat_Village_Architecture_PBR", AssetItemType::Material, materialsFolder.path + "/Mat_Village_Architecture_PBR" },
-        { "Mat_Village_Terrain_Auto", AssetItemType::Material, materialsFolder.path + "/Mat_Village_Terrain_Auto" },
-        { "Mat_Sky_Atmosphere_Advanced", AssetItemType::Material, materialsFolder.path + "/Mat_Sky_Atmosphere_Advanced" }
+        { "M_Asset_Platform", AssetItemType::Material, materialsFolder.path + "/M_Asset_Platform" },
+        { "M_Basic_Floor", AssetItemType::Material, materialsFolder.path + "/M_Basic_Floor" },
+        { "M_Basic_Wall", AssetItemType::Material, materialsFolder.path + "/M_Basic_Wall" },
+        { "M_Brick_Clay_Beveled", AssetItemType::Material, materialsFolder.path + "/M_Brick_Clay_Beveled" },
+        { "M_Brick_Clay_Old", AssetItemType::Material, materialsFolder.path + "/M_Brick_Clay_Old" },
+        { "M_Brick_Cut_Stone", AssetItemType::Material, materialsFolder.path + "/M_Brick_Cut_Stone" },
+        { "M_Brick_Hewn_Stone", AssetItemType::Material, materialsFolder.path + "/M_Brick_Hewn_Stone" },
+        { "M_Ceramic_Tile_Checker", AssetItemType::Material, materialsFolder.path + "/M_Ceramic_Tile_Checker" },
+        { "M_CobbleStone_Pebble", AssetItemType::Material, materialsFolder.path + "/M_CobbleStone_Pebble" },
+        { "M_CobbleStone_Rough", AssetItemType::Material, materialsFolder.path + "/M_CobbleStone_Rough" },
+        { "M_CobbleStone_Smooth", AssetItemType::Material, materialsFolder.path + "/M_CobbleStone_Smooth" },
+        { "M_ColorGrid_LowSpec", AssetItemType::Material, materialsFolder.path + "/M_ColorGrid_LowSpec" },
+        { "M_Concrete_Grime", AssetItemType::Material, materialsFolder.path + "/M_Concrete_Grime" },
+        { "M_Concrete_Panels", AssetItemType::Material, materialsFolder.path + "/M_Concrete_Panels" },
+        { "M_Concrete_Poured", AssetItemType::Material, materialsFolder.path + "/M_Concrete_Poured" },
+        { "M_Concrete_Tiles", AssetItemType::Material, materialsFolder.path + "/M_Concrete_Tiles" },
+        { "M_Glass", AssetItemType::Material, materialsFolder.path + "/M_Glass" },
+        { "M_Ground_Grass", AssetItemType::Material, materialsFolder.path + "/M_Ground_Grass" },
+        { "M_Ground_Gravel", AssetItemType::Material, materialsFolder.path + "/M_Ground_Gravel" },
+        { "M_Ground_Moss", AssetItemType::Material, materialsFolder.path + "/M_Ground_Moss" },
+        { "M_Metal_Brushed_Nickel", AssetItemType::Material, materialsFolder.path + "/M_Metal_Brushed_Nickel" },
+        { "M_Metal_Burnished_Steel", AssetItemType::Material, materialsFolder.path + "/M_Metal_Burnished_Steel" },
+        { "M_Metal_Chrome", AssetItemType::Material, materialsFolder.path + "/M_Metal_Chrome" },
+        { "M_Metal_Copper", AssetItemType::Material, materialsFolder.path + "/M_Metal_Copper" },
+        { "M_Metal_Gold", AssetItemType::Material, materialsFolder.path + "/M_Metal_Gold" },
+        { "M_Metal_Rust", AssetItemType::Material, materialsFolder.path + "/M_Metal_Rust" },
+        { "M_Metal_Steel", AssetItemType::Material, materialsFolder.path + "/M_Metal_Steel" },
+        { "M_Rock_Basalt", AssetItemType::Material, materialsFolder.path + "/M_Rock_Basalt" },
+        { "M_Rock_Marble_Polished", AssetItemType::Material, materialsFolder.path + "/M_Rock_Marble_Polished" },
+        { "M_Rock_Sandstone", AssetItemType::Material, materialsFolder.path + "/M_Rock_Sandstone" },
+        { "M_Rock_Slate", AssetItemType::Material, materialsFolder.path + "/M_Rock_Slate" }
     };
 
-    // 3. Textures
-    AssetFolder texturesFolder;
-    texturesFolder.name = "Textures";
-    texturesFolder.path = "ZeGFX Workspace/Blueman Cooked Assets/Textures";
-    texturesFolder.items = {
-        { "T_Village_Wall_Albedo", AssetItemType::Texture, texturesFolder.path + "/T_Village_Wall_Albedo" },
-        { "T_Village_Wall_Normal", AssetItemType::Texture, texturesFolder.path + "/T_Village_Wall_Normal" },
-        { "T_Village_Wall_Roughness", AssetItemType::Texture, texturesFolder.path + "/T_Village_Wall_Roughness" }
+    // 2. Architecture
+    AssetFolder archFolder;
+    archFolder.name = "Architecture";
+    archFolder.path = "ZeGFX Workspace/Content/StarterContent/Architecture";
+    archFolder.items = {
+        { "SM_DoorFrame", AssetItemType::Mesh, archFolder.path + "/SM_DoorFrame" },
+        { "SM_PillarFrame", AssetItemType::Mesh, archFolder.path + "/SM_PillarFrame" },
+        { "SM_Wall_400x400", AssetItemType::Mesh, archFolder.path + "/SM_Wall_400x400" }
     };
+
+    // 3. Audio
+    AssetFolder audioFolder;
+    audioFolder.name = "Audio";
+    audioFolder.path = "ZeGFX Workspace/Content/StarterContent/Audio";
 
     // 4. Blueprints
     AssetFolder blueprintsFolder;
     blueprintsFolder.name = "Blueprints";
-    blueprintsFolder.path = "ZeGFX Workspace/Blueman Cooked Assets/Blueprints";
+    blueprintsFolder.path = "ZeGFX Workspace/Content/StarterContent/Blueprints";
     blueprintsFolder.items = {
         { "BP_GameController", AssetItemType::Blueprint, blueprintsFolder.path + "/BP_GameController" },
-        { "BP_Npc_Villager", AssetItemType::Blueprint, blueprintsFolder.path + "/BP_Npc_Villager" },
-        { "BP_Npc_Villager_Havager", AssetItemType::Blueprint, blueprintsFolder.path + "/BP_Npc_Villager_Havager" }
+        { "BP_LightStudio", AssetItemType::Blueprint, blueprintsFolder.path + "/BP_LightStudio" }
     };
 
-    // 5. AI
-    AssetFolder aiFolder;
-    aiFolder.name = "AI";
-    aiFolder.path = "ZeGFX Workspace/Blueman Cooked Assets/AI";
-    aiFolder.items = {
-        { "BT_Villager_Behaviors", AssetItemType::AI, aiFolder.path + "/BT_Villager_Behaviors" }
-    };
+    // 5. HDRI
+    AssetFolder hdriFolder;
+    hdriFolder.name = "HDRI";
+    hdriFolder.path = "ZeGFX Workspace/Content/StarterContent/HDRI";
 
-    // 6. Level Scripts
-    AssetFolder scriptsFolder;
-    scriptsFolder.name = "Level_Scripts";
-    scriptsFolder.path = "ZeGFX Workspace/Blueman Cooked Assets/Level_Scripts";
-    scriptsFolder.items = {
-        { "LS_Atmospheric_Sequence", AssetItemType::LevelScript, scriptsFolder.path + "/LS_Atmospheric_Sequence" }
-    };
+    // 6. Maps
+    AssetFolder mapsFolder;
+    mapsFolder.name = "Maps";
+    mapsFolder.path = "ZeGFX Workspace/Content/StarterContent/Maps";
 
-    cookedFolder.subfolders = {
-        meshesFolder,
-        materialsFolder,
-        texturesFolder,
+    // 7. Particles
+    AssetFolder particlesFolder;
+    particlesFolder.name = "Particles";
+    particlesFolder.path = "ZeGFX Workspace/Content/StarterContent/Particles";
+
+    // 8. Props
+    AssetFolder propsFolder;
+    propsFolder.name = "Props";
+    propsFolder.path = "ZeGFX Workspace/Content/StarterContent/Props";
+
+    // 9. Shapes
+    AssetFolder shapesFolder;
+    shapesFolder.name = "Shapes";
+    shapesFolder.path = "ZeGFX Workspace/Content/StarterContent/Shapes";
+
+    // 10. Textures
+    AssetFolder texturesFolder;
+    texturesFolder.name = "Textures";
+    texturesFolder.path = "ZeGFX Workspace/Content/StarterContent/Textures";
+
+    starterFolder.subfolders = {
+        archFolder,
+        audioFolder,
         blueprintsFolder,
-        aiFolder,
-        scriptsFolder
+        hdriFolder,
+        mapsFolder,
+        materialsFolder,
+        particlesFolder,
+        propsFolder,
+        shapesFolder,
+        texturesFolder
     };
 
-    // Additional top-level folders matching reference
-    AssetFolder sampleFolder;
-    sampleFolder.name = "sampleproject";
-    sampleFolder.path = "ZeGFX Workspace/sampleproject";
+    contentFolder.subfolders = { starterFolder };
 
-    AssetFolder examplesFolder;
-    examplesFolder.name = "examples";
-    examplesFolder.path = "ZeGFX Workspace/examples";
+    // Engine folder
+    AssetFolder engineFolder;
+    engineFolder.name = "Engine";
+    engineFolder.path = "ZeGFX Workspace/Engine";
 
-    AssetFolder docsFolder;
-    docsFolder.name = "docs";
-    docsFolder.path = "ZeGFX Workspace/docs";
-
-    m_RootFolder.subfolders = { cookedFolder, sampleFolder, examplesFolder, docsFolder };
+    m_RootFolder.subfolders = { contentFolder, engineFolder };
 }
 
 const AssetFolder* AssetRegistry::FindFolder(const std::string& path, const AssetFolder* current) const {
@@ -131,11 +171,11 @@ const char* AssetRegistry::GetTypeName(AssetItemType type) {
 ImVec4 AssetRegistry::GetTypeColor(AssetItemType type) {
     switch (type) {
         case AssetItemType::Mesh:        return ImVec4(0.20f, 0.70f, 0.90f, 1.00f); // Cyan/Blue
-        case AssetItemType::Material:    return ImVec4(0.25f, 0.80f, 0.40f, 1.00f); // Green
-        case AssetItemType::Texture:     return ImVec4(0.95f, 0.75f, 0.20f, 1.00f); // Yellow/Amber
-        case AssetItemType::Blueprint:   return ImVec4(0.65f, 0.40f, 0.90f, 1.00f); // Purple/Violet
+        case AssetItemType::Material:    return ImVec4(0.25f, 0.80f, 0.40f, 1.00f); // Green (UE5 Material)
+        case AssetItemType::Texture:     return ImVec4(0.95f, 0.75f, 0.20f, 1.00f); // Amber/Yellow
+        case AssetItemType::Blueprint:   return ImVec4(0.65f, 0.40f, 0.90f, 1.00f); // Purple
         case AssetItemType::AI:          return ImVec4(0.95f, 0.50f, 0.20f, 1.00f); // Orange
-        case AssetItemType::LevelScript: return ImVec4(0.90f, 0.30f, 0.50f, 1.00f); // Magenta/Pink
+        case AssetItemType::LevelScript: return ImVec4(0.90f, 0.30f, 0.50f, 1.00f); // Pink
         default:                         return ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
     }
 }

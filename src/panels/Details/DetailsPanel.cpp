@@ -7,12 +7,13 @@
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 
+#include <unordered_map>
 #include <imgui.h>
 
 namespace EngineEditor {
 
 void RenderDetailsPanel(bool* pOpen) {
-    if (!ImGui::Begin("Details", pOpen)) {
+    if (!ImGui::Begin("Details", pOpen, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
@@ -20,15 +21,18 @@ void RenderDetailsPanel(bool* pOpen) {
     const std::string& selectedNodeName = EditorState::Get().selectedNodeName;
     const std::string& selectedNodeType = EditorState::Get().selectedNodeType;
 
+    const auto& pal = Theme::GetPalette();
+
     if (selectedNodeName.empty()) {
-        ImGui::TextDisabled("No selection.");
+        ImGui::Dummy(ImVec2(0.0f, Theme::Metrics::sectionIndent));
+        ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
+        ImGui::TextColored(pal.textDisabled, "No selection.");
         ImGui::End();
         return;
     }
 
-    const auto& pal = Theme::GetPalette();
-
-    // 1. Header: Instance Name + Type
+    // 1. Header showing panel context / Instance Name
+    ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
     if (Theme::GetFontAtlas().panelTitleFont)
         ImGui::PushFont(Theme::GetFontAtlas().panelTitleFont);
     ImGui::TextColored(pal.accent, "%s (Instance)", selectedNodeName.c_str());
@@ -38,27 +42,59 @@ void RenderDetailsPanel(bool* pOpen) {
     ImGui::Spacing();
 
     // 2. Component breadcrumb
-    ImGui::TextColored(pal.textSecondary, "\xE2\x96\xB8");
-    ImGui::SameLine();
-    
-    // Determine component name
+    ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
     std::string componentName = selectedNodeType.empty() ? "ActorComponent" : (selectedNodeType + "Component");
     ImGui::TextColored(pal.textPrimary, "%s (%s)", componentName.c_str(), componentName.c_str());
 
-    ImGui::SameLine(ImGui::GetWindowWidth() - 100.0f);
+    float rightBtnX = ImGui::GetWindowWidth() - 110.0f;
+    if (rightBtnX > ImGui::GetCursorPosX()) {
+        ImGui::SameLine(rightBtnX);
+    } else {
+        ImGui::SameLine();
+    }
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
     ImGui::PushStyleColor(ImGuiCol_Text, pal.accent);
     if (ImGui::SmallButton("Edit in C++")) {
         Logger::Get().Info("[Details] Edit in C++ clicked for " + selectedNodeName);
     }
-    ImGui::PopStyleColor(2);
+    ImGui::PopStyleColor(3);
 
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
 
+    auto RenderFlatHeader = [&](const char* label, bool defaultOpen = true) -> bool {
+        static std::unordered_map<std::string, bool> s_States;
+        if (s_States.find(label) == s_States.end()) s_States[label] = defaultOpen;
+        bool& open = s_States[label];
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+        ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
+
+        if (Theme::GetFontAtlas().sectionHeaderFont)
+            ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
+
+        float availW = ImGui::GetContentRegionAvail().x;
+        if (ImGui::Button(label, ImVec2(availW, 30.0f))) {
+            open = !open;
+        }
+
+        if (Theme::GetFontAtlas().sectionHeaderFont)
+            ImGui::PopFont();
+
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar(2);
+        return open;
+    };
+
     // 3. Transition (Transform Block)
-    if (ImGui::CollapsingHeader("Transition", ImGuiTreeNodeFlags_DefaultOpen)) {
+    bool transitionOpen = RenderFlatHeader("Transition", true);
+
+    if (transitionOpen) {
         ImGui::Indent(Theme::Metrics::sectionIndent);
         ImGui::Spacing();
 
@@ -78,17 +114,18 @@ void RenderDetailsPanel(bool* pOpen) {
 
     // 4. Component-Specific Section
     if (selectedNodeName == "SkyAtmosphere" || selectedNodeType == "SkyAtmosphere") {
-        if (ImGui::CollapsingHeader("Sky Atmosphere", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool skyOpen = RenderFlatHeader("Sky Atmosphere", true);
+
+        if (skyOpen) {
             ImGui::Indent(Theme::Metrics::sectionIndent);
             ImGui::Spacing();
 
             auto& skyProps = EditorState::Get().skyAtmosphereProps;
 
-            // Property rows with label-value layout
             ImGui::Columns(2, "##SkyProps", false);
-            ImGui::SetColumnWidth(0, 260.0f);
+            ImGui::SetColumnWidth(0, Theme::Metrics::labelColumnWidth * 2.0f);
 
-            ImGui::TextUnformatted("Rayleigh Scattering Coefficient (10\xE2\x81\xBB\xE2\x81\xB6 m\xE2\x81\xBB\xC2\xB9)");
+            ImGui::TextUnformatted("Rayleigh Scattering (10\xE2\x81\xBB\xE2\x81\xB6 m\xE2\x81\xBB\xC2\xB9)");
             ImGui::NextColumn();
             ImGui::SetNextItemWidth(-1.0f);
             ImGui::DragFloat("##RayleighScattering", &skyProps.rayleighScattering, 0.001f, 0.000f, 1.000f, "%.4f");
@@ -112,7 +149,7 @@ void RenderDetailsPanel(bool* pOpen) {
             ImGui::DragFloat("##AtmosphereHeight", &skyProps.atmosphereHeightKm, 0.5f, 1.0f, 100.0f, "%.1f km");
             ImGui::NextColumn();
 
-            ImGui::TextUnformatted("Aerial Perspective View Distance Scale");
+            ImGui::TextUnformatted("Aerial Perspective Scale");
             ImGui::NextColumn();
             ImGui::SetNextItemWidth(-1.0f);
             ImGui::DragFloat("##AerialPerspective", &skyProps.aerialPerspectiveDistanceScale, 0.05f, 0.1f, 10.0f, "%.2f");
@@ -154,7 +191,9 @@ void RenderDetailsPanel(bool* pOpen) {
             ImGui::Unindent(Theme::Metrics::sectionIndent);
         }
     } else if (selectedNodeType == "Light" || selectedNodeName == "SunLight" || selectedNodeName == "SkyLight") {
-        if (ImGui::CollapsingHeader("Directional Light Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool lightOpen = RenderFlatHeader("Directional Light Component", true);
+
+        if (lightOpen) {
             ImGui::Indent(Theme::Metrics::sectionIndent);
             ImGui::Spacing();
             static float intensity = 100000.0f;
@@ -172,7 +211,9 @@ void RenderDetailsPanel(bool* pOpen) {
             ImGui::Unindent(Theme::Metrics::sectionIndent);
         }
     } else {
-        if (ImGui::CollapsingHeader("Actor Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool actorOpen = RenderFlatHeader("Actor Component", true);
+
+        if (actorOpen) {
             ImGui::Indent(Theme::Metrics::sectionIndent);
             ImGui::Spacing();
             ImGui::TextDisabled("Generic Component Properties for %s", selectedNodeName.c_str());

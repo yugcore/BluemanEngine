@@ -31,7 +31,7 @@ ImGuiID RenderDockspaceHost(const DockspaceBounds& bounds, ImGuiDockNodeFlags fl
     ImGui::PopStyleVar(3);
 
     ImGuiID dockspaceId = ImGui::GetID("EngineDockspace");
-    ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), flags);
+    ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), flags | ImGuiDockNodeFlags_NoWindowMenuButton);
 
     ImGui::End();
 

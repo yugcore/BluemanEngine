@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    io.IniFilename = "imgui.ini";
+    io.IniFilename = nullptr;
 
     // Apply Dark Theme
     EngineEditor::ApplyTheme();

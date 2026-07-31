@@ -1,5 +1,6 @@
 #include "OutputLogPanel.h"
 #include "core/Logger.h"
+#include "core/EditorState.h"
 #include "widgets/SearchBar.h"
 #include "theme/Fonts.h"
 #include "theme/Colors.h"
@@ -27,7 +28,10 @@ static bool CaseInsensitiveContains(const std::string& str, const std::string& q
 }
 
 void RenderOutputLogPanel(bool* pOpen) {
-    if (!ImGui::Begin("Output Log", pOpen)) {
+    bool* openPtr = pOpen ? pOpen : &EditorState::Get().settings.showOutputLog;
+    if (!*openPtr) return;
+
+    if (!ImGui::Begin("Output Log", openPtr, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }

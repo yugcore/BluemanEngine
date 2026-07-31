@@ -75,7 +75,7 @@ void RenderViewportGizmos(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 viewpor
 
     // ViewManipulate Orientation Cube
     float viewMat[16] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
-    ImGuizmo::ViewManipulate(viewMat, 8.0f, ImVec2(cursorPos.x + viewportAvail.x - 70.0f, cursorPos.y + 45.0f), ImVec2(60.0f, 60.0f), IM_COL32(23, 23, 26, 200));
+    ImGuizmo::ViewManipulate(viewMat, 8.0f, ImVec2(cursorPos.x + viewportAvail.x - 84.0f, cursorPos.y + 45.0f), ImVec2(60.0f, 60.0f), IM_COL32(23, 23, 26, 200));
 }
 
 } // namespace EngineEditor::Panels

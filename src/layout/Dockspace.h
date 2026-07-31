@@ -10,7 +10,7 @@ struct DockspaceBounds {
     ImVec2 size;
 };
 
-DockspaceBounds CalculateDockspaceBounds(float topOffset = 62.0f, float bottomOffset = 28.0f);
+DockspaceBounds CalculateDockspaceBounds(float topOffset = 72.0f, float bottomOffset = 32.0f);
 ImGuiID RenderDockspaceHost(const DockspaceBounds& bounds, ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_PassthruCentralNode);
 
 } // namespace EngineEditor::Layout

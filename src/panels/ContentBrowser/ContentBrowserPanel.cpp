@@ -27,123 +27,151 @@ static bool CaseInsensitiveContains(const std::string& str, const std::string& q
     return it != str.end();
 }
 
-static void RenderFolderTreeNode(const AssetFolder& folder, std::string& selectedFolder) {
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
-    if (folder.path == selectedFolder) {
-        flags |= ImGuiTreeNodeFlags_Selected;
-    }
-    if (folder.subfolders.empty()) {
-        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-    }
-
-    const auto& pal = Theme::GetPalette();
-    bool isOpen = false;
-    
-    ImGui::PushStyleColor(ImGuiCol_Text, (folder.path == selectedFolder) ? pal.textPrimary : pal.textSecondary);
-    isOpen = ImGui::TreeNodeEx(folder.path.c_str(), flags, "%s", folder.name.c_str());
-    ImGui::PopStyleColor();
-
-    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
-        selectedFolder = folder.path;
-        EditorState::Get().selectedFolderPath = folder.path;
-    }
-
-    if (isOpen && !(flags & ImGuiTreeNodeFlags_Leaf)) {
-        for (const auto& sub : folder.subfolders) {
-            RenderFolderTreeNode(sub, selectedFolder);
-        }
-        ImGui::TreePop();
-    }
-}
-
 void RenderContentBrowserPanel(bool* pOpen) {
-    if (!ImGui::Begin("Content Browser", pOpen)) {
+    bool* openPtr = pOpen ? pOpen : &EditorState::Get().settings.showContentBrowser;
+    if (!*openPtr) return;
+
+    if (!ImGui::Begin("Content Browser", openPtr, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
 
     const auto& pal = Theme::GetPalette();
 
-    // 1. Top Control Strip (+ Add / Import / Save All) with styled buttons
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
+    // 1. Top Control Strip (+ Add / Import / Save All, [<] [>], Breadcrumbs, Search, Dock in Layout, Settings)
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 6.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Theme::Metrics::intraGroupGap, 4.0f));
     
+    // + Add (Vibrant primary action button)
+    ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.accentHover);
+    ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
+    if (ImGui::Button("+ Add", ImVec2(0.0f, Theme::Metrics::rowHeight))) {
+        Logger::Get().Info("[ContentBrowser] + Add asset dialog opened.");
+    }
+    ImGui::PopStyleColor(3);
+
+    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
     ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
 
-    if (ImGui::Button("+ Add", ImVec2(55.0f, Theme::Metrics::rowHeight))) {
-        Logger::Get().Info("[ContentBrowser] + Add asset dialog opened.");
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Import", ImVec2(55.0f, Theme::Metrics::rowHeight))) {
+    if (ImGui::Button("Import", ImVec2(0.0f, Theme::Metrics::rowHeight))) {
         Logger::Get().Info("[ContentBrowser] Import external asset selected.");
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Save All", ImVec2(55.0f, Theme::Metrics::rowHeight))) {
+    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+    if (ImGui::Button("Save All", ImVec2(0.0f, Theme::Metrics::rowHeight))) {
         Logger::Get().Info("[ContentBrowser] Save All cooked assets completed.");
     }
+
+    // Navigation history buttons [<] [>]
+    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+    ImGui::Button("<", ImVec2(28.0f, Theme::Metrics::rowHeight));
+    ImGui::SameLine(0.0f, 4.0f);
+    ImGui::Button(">", ImVec2(28.0f, Theme::Metrics::rowHeight));
+
+    // Path Breadcrumbs (All > Content > StarterContent > Materials)
+    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
+    ImGui::AlignTextToFramePadding();
+
+    const AssetFolder* currentFolder = AssetRegistry::Get().FindFolder(EditorState::Get().selectedFolderPath);
+    if (!currentFolder) {
+        currentFolder = AssetRegistry::Get().FindFolder("ZeGFX Workspace/Content/StarterContent/Materials");
+    }
+
+    ImGui::TextColored(pal.textDisabled, "All  >");
+    ImGui::SameLine(0.0f, 6.0f);
+    if (currentFolder) {
+        ImGui::TextColored(pal.textPrimary, "%s", currentFolder->path.c_str());
+    } else {
+        ImGui::TextColored(pal.textPrimary, "ZeGFX Workspace/Content/StarterContent/Materials");
+    }
+
+    // Search Bar right after breadcrumbs
+    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
+    Widgets::RenderSearchBar("##SearchFilter", s_SearchFilter, sizeof(s_SearchFilter), "Search Materials", 240.0f);
+
+    // Right-aligned header tools: Dock in Layout & Settings
+    float rightToolsWidth = 220.0f;
+    float rightStart = ImGui::GetWindowWidth() - rightToolsWidth - Theme::Metrics::panelLeftMargin;
+    if (rightStart > ImGui::GetCursorPosX()) {
+        ImGui::SameLine(rightStart);
+    } else {
+        ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
+    }
+
+    if (ImGui::Button("Dock in Layout", ImVec2(0.0f, Theme::Metrics::rowHeight))) {
+        Logger::Get().Info("[ContentBrowser] Docked in layout.");
+    }
+    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+    if (ImGui::Button("Settings", ImVec2(0.0f, Theme::Metrics::rowHeight))) {
+        ImGui::OpenPopup("ContentBrowserSettingsPopup");
+    }
+    if (ImGui::BeginPopup("ContentBrowserSettingsPopup")) {
+        ImGui::MenuItem("Show Engine Content");
+        ImGui::MenuItem("Show C++ Classes");
+        ImGui::MenuItem("Thumbnail Size: Medium");
+        ImGui::EndPopup();
+    }
+
     ImGui::PopStyleColor(2);
-
-    // Search bar (right-aligned)
-    ImGui::SameLine(ImGui::GetWindowWidth() - 220.0f);
-    Widgets::RenderSearchBar("##SearchFilter", s_SearchFilter, sizeof(s_SearchFilter), "Search assets...", 210.0f);
-
     ImGui::PopStyleVar(2);
 
     ImGui::Spacing();
+
+    // 2. Horizontal Folder Navigation Bar (Favorites & Folders below control strip)
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 3.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6.0f, 0.0f));
+
+    ImGui::TextDisabled("Folders:");
+    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+
+    struct FolderChoice { const char* label; const char* path; };
+    FolderChoice choices[] = {
+        { "Materials", "ZeGFX Workspace/Content/StarterContent/Materials" },
+        { "Architecture", "ZeGFX Workspace/Content/StarterContent/Architecture" },
+        { "Blueprints", "ZeGFX Workspace/Content/StarterContent/Blueprints" },
+        { "Textures", "ZeGFX Workspace/Content/StarterContent/Textures" },
+        { "Audio", "ZeGFX Workspace/Content/StarterContent/Audio" },
+        { "Shapes", "ZeGFX Workspace/Content/StarterContent/Shapes" },
+        { "Props", "ZeGFX Workspace/Content/StarterContent/Props" }
+    };
+
+    std::string& selectedFolderPath = EditorState::Get().selectedFolderPath;
+    for (size_t i = 0; i < 7; ++i) {
+        bool isSel = (selectedFolderPath == choices[i].path);
+        if (isSel) {
+            ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
+            ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
+            ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
+        }
+        if (ImGui::Button(choices[i].label)) {
+            selectedFolderPath = choices[i].path;
+            EditorState::Get().selectedFolderPath = choices[i].path;
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::SameLine();
+    }
+
+    ImGui::PopStyleVar(3);
+    ImGui::Spacing();
     
-    // Subtle separator
+    // Subtle separator line
     ImVec2 sepPos = ImGui::GetCursorScreenPos();
     ImGui::GetWindowDrawList()->AddLine(
         sepPos, ImVec2(sepPos.x + ImGui::GetContentRegionAvail().x, sepPos.y),
         ImGui::ColorConvertFloat4ToU32(pal.borderSubtle), 1.0f);
     ImGui::Spacing();
 
-    // 2. Two-Pane Split Layout
-    ImGui::Columns(2, "ContentBrowserColumns", true);
-    
-    static bool setColumnWidth = true;
-    if (setColumnWidth) {
-        ImGui::SetColumnWidth(0, 200.0f);
-        setColumnWidth = false;
-    }
+    // 3. Full-Width Landscape Asset Browser Grid (BELOW the folder bar)
+    ImGui::BeginChild("FullLandscapeAssetGrid", ImVec2(0, 0), false);
 
-    // --- Left Pane: Folder Tree ---
-    ImGui::BeginChild("FolderTreeChild", ImVec2(0, 0), false);
-    
-    // Section header
-    if (Theme::GetFontAtlas().sectionHeaderFont)
-        ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
-    ImGui::TextColored(pal.textDisabled, "ZeGFX Workspace");
-    if (Theme::GetFontAtlas().sectionHeaderFont)
-        ImGui::PopFont();
-    
-    ImGui::Spacing();
-
-    const auto& rootFolder = AssetRegistry::Get().GetRootFolder();
-    RenderFolderTreeNode(rootFolder, EditorState::Get().selectedFolderPath);
-
-    ImGui::EndChild();
-
-    ImGui::NextColumn();
-
-    // --- Right Pane: Asset Items ---
-    ImGui::BeginChild("AssetItemsChild", ImVec2(0, 0), false);
-    
-    const AssetFolder* currentFolder = AssetRegistry::Get().FindFolder(EditorState::Get().selectedFolderPath);
     std::string searchQuery = s_SearchFilter;
-
-    if (!searchQuery.empty()) {
-        ImGui::TextDisabled("Search Results for: \"%s\"", s_SearchFilter);
-    } else if (currentFolder) {
-        ImGui::TextDisabled("Location: %s", currentFolder->path.c_str());
-    } else {
-        ImGui::TextDisabled("Location: Root");
-    }
-    ImGui::Spacing();
-
     std::vector<AssetItem> itemsToDisplay;
 
+    const auto& rootFolder = AssetRegistry::Get().GetRootFolder();
     auto collectItems = [&](auto& self, const AssetFolder& folder) -> void {
         for (const auto& item : folder.items) {
             if (searchQuery.empty() || CaseInsensitiveContains(item.name, searchQuery) || CaseInsensitiveContains(folder.name, searchQuery)) {
@@ -164,10 +192,11 @@ void RenderContentBrowserPanel(bool* pOpen) {
     if (itemsToDisplay.empty()) {
         ImGui::TextDisabled("No assets found in this folder.");
     } else {
-        float itemWidth = 140.0f;
-        float itemHeight = 70.0f;
+        float itemWidth = Theme::Metrics::tileWidth;   // 104.0f
+        float itemHeight = Theme::Metrics::tileHeight; // 118.0f
+        float cellGap = Theme::Metrics::tileGap;       // 10.0f
         float windowWidth = ImGui::GetContentRegionAvail().x;
-        int columnsCount = (int)(windowWidth / (itemWidth + Theme::Metrics::sectionIndent));
+        int columnsCount = (int)((windowWidth + cellGap) / (itemWidth + cellGap));
         if (columnsCount < 1) columnsCount = 1;
 
         int currentCol = 0;
@@ -186,16 +215,21 @@ void RenderContentBrowserPanel(bool* pOpen) {
 
             currentCol++;
             if (currentCol < columnsCount) {
-                ImGui::SameLine(0.0f, Theme::Metrics::sectionIndent);
+                ImGui::SameLine(0.0f, cellGap);
             } else {
                 currentCol = 0;
+                ImGui::Dummy(ImVec2(0.0f, cellGap));
             }
         }
+
+        // Bottom Item Count Footer
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::TextDisabled("%zu items", itemsToDisplay.size());
     }
 
     ImGui::EndChild();
-
-    ImGui::Columns(1);
     ImGui::End();
 }
 

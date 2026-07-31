@@ -1,5 +1,6 @@
 #include "Toolbar.h"
 #include "CustomTitleBar.h"
+#include "WorkspaceBar.h"
 #include "core/EditorState.h"
 #include "core/CommandStack.h"
 #include "core/Logger.h"
@@ -17,31 +18,38 @@ static float snapValue = 0.50f;
 static int currentViewMode = 0;
 static int currentPerspective = 0;
 
-// Toolbar layout constants
-static constexpr float kToolbarHeight = 36.0f;
-static constexpr float kButtonHeight  = Theme::Metrics::rowHeight;
-static constexpr float kSeparatorSpacing = Theme::Metrics::sectionIndent;
+static constexpr float kToolbarHeight = 42.0f;
+static constexpr float kButtonHeight  = 28.0f;
 
 float GetToolbarTotalHeight() {
     return kToolbarHeight;
 }
 
-// --- Reusable toolbar button with optional active state ---
+// --- Reusable toolbar button ---
 static bool ToolbarButton(const char* label, const char* tooltip, bool isActive = false,
-                          float width = 0.0f) {
+                          float width = 0.0f, bool isDisabled = false) {
     const auto& pal = Theme::GetPalette();
-    if (isActive) {
+    if (isDisabled) {
+        ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgHeader);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, pal.bgHeader);
+        ImGui::PushStyleColor(ImGuiCol_Text, pal.textDisabled);
+    } else if (isActive) {
         ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.accentHover);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, pal.accentActive);
-        ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
+        ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
     } else {
         ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, pal.accent);
         ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
     }
-    bool clicked = ImGui::Button(label, ImVec2(width, kButtonHeight));
+
+    float textWidth = ImGui::CalcTextSize(label).x;
+    float btnWidth = width > 0.0f ? width : (textWidth + 24.0f);
+
+    bool clicked = ImGui::Button(label, ImVec2(btnWidth, kButtonHeight));
     if (ImGui::IsItemHovered() && tooltip[0] != '\0') {
         ImGui::SetTooltip("%s", tooltip);
     }
@@ -49,20 +57,21 @@ static bool ToolbarButton(const char* label, const char* tooltip, bool isActive 
     return clicked;
 }
 
-// --- Vertical separator with spacing ---
+// --- Vertical separator with 24px groupGap cluster spacing ---
 static void ToolbarSeparator() {
-    ImGui::SameLine(0.0f, kSeparatorSpacing);
+    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine(0.0f, kSeparatorSpacing);
+    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
 }
 
 void RenderToolbar() {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     const auto& pal = Theme::GetPalette();
+    auto& state = EditorState::Get();
 
-    // Position toolbar below the title bar
-    float titleBarBottom = viewport->Pos.y + GetTitleBarTotalHeight();
-    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, titleBarBottom));
+    // Position toolbar below the workspace bar
+    float topOffset = GetTitleBarTotalHeight() + GetWorkspaceBarTotalHeight();
+    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + topOffset));
     ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, kToolbarHeight));
     ImGui::SetNextWindowViewport(viewport->ID);
 
@@ -70,105 +79,161 @@ void RenderToolbar() {
                                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking;
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Theme::Metrics::panelLeftMargin, 4.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Theme::Metrics::panelLeftMargin, 7.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 4.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Theme::Metrics::intraGroupGap, 0.0f));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, pal.bgPanel);
 
     if (ImGui::Begin("##ToolbarWindow", nullptr, windowFlags)) {
 
-        // === Group 1: Save / Undo / Redo ===
-        if (ToolbarButton("Save", "Save Scene (Ctrl+S)", false, 50.0f)) Logger::Get().Info("[Toolbar] Quick Save executed.");
-        ImGui::SameLine();
-        if (ToolbarButton("Undo", "Undo Action (Ctrl+Z)", false, 50.0f)) CommandStack::Get().Undo();
-        ImGui::SameLine();
-        if (ToolbarButton("Redo", "Redo Action (Ctrl+Y)", false, 50.0f)) CommandStack::Get().Redo();
+        // ====================================================================
+        // WORKSPACE MODE: EDITOR
+        // ====================================================================
+        if (state.activeWorkspace == WorkspaceMode::Editor) {
 
-        ToolbarSeparator();
+            // File Actions
+            if (ToolbarButton("Save", "Save Scene (Ctrl+S)", false, 60.0f)) Logger::Get().Info("[Toolbar] Quick Save executed.");
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Undo", "Undo Action (Ctrl+Z)", false, 60.0f)) CommandStack::Get().Undo();
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Redo", "Redo Action (Ctrl+Y)", false, 60.0f)) CommandStack::Get().Redo();
 
-        // === Group 2: Import / Add dropdowns ===
-        if (ToolbarButton("Import \xE2\x96\xBC", "Import External Assets (Ctrl+I)", false, 72.0f))
-            ImGui::OpenPopup("ImportPopup");
-        if (ImGui::BeginPopup("ImportPopup")) {
-            if (ImGui::MenuItem("Import 3D Mesh...")) Logger::Get().Info("[Toolbar] Import Mesh selected");
-            if (ImGui::MenuItem("Import Texture...")) Logger::Get().Info("[Toolbar] Import Texture selected");
-            if (ImGui::MenuItem("Import Audio...")) Logger::Get().Info("[Toolbar] Import Audio selected");
-            ImGui::EndPopup();
+            ToolbarSeparator();
+
+            // Import / Add
+            // Import / Add
+            if (ToolbarButton("Import", "Import External Assets", false, 0.0f)) ImGui::OpenPopup("ImportPopup");
+            if (ImGui::BeginPopup("ImportPopup")) {
+                if (ImGui::MenuItem("Import 3D Mesh...")) Logger::Get().Info("[Toolbar] Import Mesh");
+                if (ImGui::MenuItem("Import Texture...")) Logger::Get().Info("[Toolbar] Import Texture");
+                ImGui::EndPopup();
+            }
+
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("+ Add", "Add Actor or Component", false, 0.0f)) ImGui::OpenPopup("AddPopup");
+            if (ImGui::BeginPopup("AddPopup")) {
+                if (ImGui::MenuItem("Add Actor")) Logger::Get().Info("[Toolbar] Add Actor");
+                if (ImGui::MenuItem("Add Light")) Logger::Get().Info("[Toolbar] Add Light");
+                ImGui::EndPopup();
+            }
+
+            ToolbarSeparator();
+
+            // Selection & Transform Tools
+            auto& gizmoOp = state.gizmoOp;
+            bool isMove = (gizmoOp == GizmoOperation::Translate);
+            bool isRotate = (gizmoOp == GizmoOperation::Rotate);
+            bool isScale = (gizmoOp == GizmoOperation::Scale);
+
+            if (ToolbarButton("Select", "Select Tool (Q)", false, 0.0f)) gizmoOp = GizmoOperation::Translate;
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Move", "Move Tool (W)", isMove, 0.0f)) gizmoOp = GizmoOperation::Translate;
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Rotate", "Rotate Tool (E)", isRotate, 0.0f)) gizmoOp = GizmoOperation::Rotate;
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Scale", "Scale Tool (R)", isScale, 0.0f)) gizmoOp = GizmoOperation::Scale;
+
+            ToolbarSeparator();
+
+            // Snapping
+            {
+                char snapBuf[32];
+                snprintf(snapBuf, sizeof(snapBuf), "Snap %.2f", snapValue);
+                if (ToolbarButton(snapBuf, "Toggle Transform Grid Snapping", snapEnabled, 0.0f))
+                    snapEnabled = !snapEnabled;
+            }
+
+            ToolbarSeparator();
+
+            // Simulation
+            if (ToolbarButton("Play", "Start Simulation / Play", false, 0.0f)) Logger::Get().Info("[Toolbar] Play started.");
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Frame", "Single Frame Step", false, 0.0f)) Logger::Get().Info("[Toolbar] Frame step.");
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Stop", "Stop Simulation", false, 0.0f)) Logger::Get().Info("[Toolbar] Simulation stopped.");
+
+            ToolbarSeparator();
+
+            // Build
+            if (ToolbarButton("Build", "Build Geometry and Lighting", false, 0.0f)) ImGui::OpenPopup("BuildPopup");
+            if (ImGui::BeginPopup("BuildPopup")) {
+                if (ImGui::MenuItem("Quick Build")) Logger::Get().Info("[Toolbar] Quick Build");
+                if (ImGui::MenuItem("Production Build")) Logger::Get().Info("[Toolbar] Production Build");
+                ImGui::EndPopup();
+            }
+
+        }
+        // ====================================================================
+        // WORKSPACE MODE: CODEBASE (Disabled Visual Stubs Only)
+        // ====================================================================
+        else if (state.activeWorkspace == WorkspaceMode::Codebase) {
+
+            // File Actions
+            ToolbarButton("Save File", "Save Active Document (Ctrl+S)", false, 0.0f);
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            ToolbarButton("Undo", "Undo Code Edit (Ctrl+Z)", false, 0.0f);
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            ToolbarButton("Redo", "Redo Code Edit (Ctrl+Y)", false, 0.0f);
+
+            ToolbarSeparator();
+
+            // Code Actions (Disabled Visual Stubs)
+            ToolbarButton("Format", "Format Source Code (Disabled Stub)", false, 0.0f, true);
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            ToolbarButton("Find in Files", "Search Codebase (Disabled Stub)", false, 0.0f, true);
+
+            ToolbarSeparator();
+
+            // Build (Disabled Visual Stub)
+            ToolbarButton("Build Code", "Compile Workspace (Disabled Stub)", false, 0.0f, true);
+
+            ToolbarSeparator();
+
+            // Git (Disabled Visual Stub)
+            ToolbarButton("Git: main", "Git Repository Branch (Disabled Stub)", false, 0.0f, true);
+
+        }
+        // ====================================================================
+        // WORKSPACE MODE: RUN (Primary Simulation Controls & Disabled Stubs)
+        // ====================================================================
+        else if (state.activeWorkspace == WorkspaceMode::Run) {
+
+            // Primary Simulation Controls
+            if (ToolbarButton("Play", "Resume Game Execution", true, 0.0f)) Logger::Get().Info("[Run] Play clicked.");
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Pause", "Pause Execution", false, 0.0f)) Logger::Get().Info("[Run] Pause clicked.");
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Step", "Step Single Frame", false, 0.0f)) Logger::Get().Info("[Run] Step clicked.");
+            ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+            if (ToolbarButton("Stop", "Stop Game Execution", false, 0.0f)) Logger::Get().Info("[Run] Stop clicked.");
+
+            ToolbarSeparator();
+
+            // Performance Preset (Disabled Visual Stub)
+            ToolbarButton("Perf: High", "Performance Profile (Disabled Stub)", false, 0.0f, true);
+
+            ToolbarSeparator();
+
+            // Debugger Attacher (Disabled Visual Stub)
+            ToolbarButton("Attach Debugger", "Attach Native Debugger (Disabled Stub)", false, 0.0f, true);
+
         }
 
-        ImGui::SameLine();
-        if (ToolbarButton("+ Add \xE2\x96\xBC", "Add Actor or Component", false, 68.0f))
-            ImGui::OpenPopup("AddPopup");
-        if (ImGui::BeginPopup("AddPopup")) {
-            if (ImGui::MenuItem("Add Actor")) Logger::Get().Info("[Toolbar] Add Actor selected");
-            if (ImGui::MenuItem("Add Component")) Logger::Get().Info("[Toolbar] Add Component selected");
-            if (ImGui::MenuItem("Add Light")) Logger::Get().Info("[Toolbar] Add Light selected");
-            ImGui::EndPopup();
-        }
-
-        ToolbarSeparator();
-
-        // === Group 3: Transform Tools ===
-        auto& gizmoOp = EditorState::Get().gizmoOp;
-        bool isMove = (gizmoOp == GizmoOperation::Translate);
-        bool isRotate = (gizmoOp == GizmoOperation::Rotate);
-        bool isScale = (gizmoOp == GizmoOperation::Scale);
-
-        if (ToolbarButton("Select", "Select Tool (Q)", false, 55.0f)) gizmoOp = GizmoOperation::Translate;
-        ImGui::SameLine();
-        if (ToolbarButton("Move", "Move Tool (W)", isMove, 50.0f)) gizmoOp = GizmoOperation::Translate;
-        ImGui::SameLine();
-        if (ToolbarButton("Rotate", "Rotate Tool (E)", isRotate, 55.0f)) gizmoOp = GizmoOperation::Rotate;
-        ImGui::SameLine();
-        if (ToolbarButton("Scale", "Scale Tool (R)", isScale, 50.0f)) gizmoOp = GizmoOperation::Scale;
-
-        ToolbarSeparator();
-
-        // === Group 4: Snap Toggle ===
-        {
-            char snapBuf[32];
-            snprintf(snapBuf, sizeof(snapBuf), "Snap %.2f", snapValue);
-            if (ToolbarButton(snapBuf, "Toggle Transform Grid Snapping", snapEnabled, 82.0f))
-                snapEnabled = !snapEnabled;
-        }
-
-        ToolbarSeparator();
-
-        // === Group 5: Play / Frame / Stop (neutral monochrome) ===
-        if (ToolbarButton("\xE2\x96\xB6 Play", "Start Simulation / Play", false, 65.0f))
-            Logger::Get().Info("[Toolbar] Play mode started.");
-
-        ImGui::SameLine();
-        if (ToolbarButton("Frame", "Single Frame Step", false, 55.0f))
-            Logger::Get().Info("[Toolbar] Single frame step.");
-
-        ImGui::SameLine();
-        if (ToolbarButton("Stop", "Stop Simulation", false, 50.0f))
-            Logger::Get().Info("[Toolbar] Simulation stopped.");
-
-        ToolbarSeparator();
-
-        // === Group 6: Build dropdown ===
-        if (ToolbarButton("Build \xE2\x96\xBC", "Build Geometry and Lighting", false, 68.0f))
-            ImGui::OpenPopup("BuildPopup");
-        if (ImGui::BeginPopup("BuildPopup")) {
-            if (ImGui::MenuItem("Quick Build")) Logger::Get().Info("[Toolbar] Quick Build started");
-            if (ImGui::MenuItem("Production Build")) Logger::Get().Info("[Toolbar] Production Build started");
-            ImGui::EndPopup();
-        }
-
-        // === Right-aligned controls ===
-        float rightControlsWidth = 260.0f;
-        float rightStart = ImGui::GetWindowWidth() - rightControlsWidth;
+        // ====================================================================
+        // RIGHT-ALIGNED CONTROLS (Shared across workspaces)
+        // ====================================================================
+        float rightControlsWidth = 280.0f;
+        float rightStart = ImGui::GetWindowWidth() - rightControlsWidth - Theme::Metrics::panelLeftMargin;
         if (rightStart > ImGui::GetCursorPosX()) {
             ImGui::SameLine(rightStart);
         } else {
-            ImGui::SameLine();
+            ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
         }
 
-        const char* perspectiveOptions[] = { "Perspective \xE2\x96\xBC", "Top \xE2\x96\xBC", "Front \xE2\x96\xBC", "Side \xE2\x96\xBC" };
-        if (ToolbarButton(perspectiveOptions[currentPerspective], "Camera Perspective", false, 100.0f))
+        const char* perspectiveOptions[] = { "Perspective", "Top", "Front", "Side" };
+        if (ToolbarButton(perspectiveOptions[currentPerspective], "Camera Perspective", false, 0.0f)) {
             ImGui::OpenPopup("PerspectivePopup");
+        }
         if (ImGui::BeginPopup("PerspectivePopup")) {
             if (ImGui::MenuItem("Perspective", nullptr, currentPerspective == 0)) currentPerspective = 0;
             if (ImGui::MenuItem("Top Ortho", nullptr, currentPerspective == 1)) currentPerspective = 1;
@@ -177,10 +242,11 @@ void RenderToolbar() {
             ImGui::EndPopup();
         }
 
-        ImGui::SameLine();
-        const char* viewModes[] = { "Lit \xE2\x96\xBC", "Unlit \xE2\x96\xBC", "Wire \xE2\x96\xBC", "Light \xE2\x96\xBC" };
-        if (ToolbarButton(viewModes[currentViewMode], "View Mode", false, 60.0f))
+        ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+        const char* viewModes[] = { "Lit", "Unlit", "Wire", "Light" };
+        if (ToolbarButton(viewModes[currentViewMode], "View Mode", false, 0.0f)) {
             ImGui::OpenPopup("ViewModePopup");
+        }
         if (ImGui::BeginPopup("ViewModePopup")) {
             if (ImGui::MenuItem("Lit", nullptr, currentViewMode == 0)) currentViewMode = 0;
             if (ImGui::MenuItem("Unlit", nullptr, currentViewMode == 1)) currentViewMode = 1;
@@ -189,8 +255,8 @@ void RenderToolbar() {
             ImGui::EndPopup();
         }
 
-        ImGui::SameLine();
-        if (ToolbarButton("Settings", "Editor Settings", false, 65.0f))
+        ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
+        if (ToolbarButton("Settings", "Editor Settings", false, 75.0f))
             Logger::Get().Info("[Toolbar] Editor Settings dialog opened.");
     }
     ImGui::End();

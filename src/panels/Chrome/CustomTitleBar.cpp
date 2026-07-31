@@ -24,10 +24,10 @@ static int s_WinStartX = 0;
 static int s_WinStartY = 0;
 
 // Unified chrome metrics
-static constexpr float kMinTitleBarHeight = 36.0f;
-static constexpr float kFallbackFontSize  = 15.0f;
+static constexpr float kMinTitleBarHeight = 40.0f;
+static constexpr float kFallbackFontSize  = 16.0f;
 static constexpr float kBarVerticalPad    = 6.0f;
-static constexpr float kWindowBtnWidth    = 42.0f;
+static constexpr float kWindowBtnWidth    = 44.0f;
 static constexpr float kWindowBtnCount    = 3.0f;
 
 static float s_TitleBarHeight = kMinTitleBarHeight;

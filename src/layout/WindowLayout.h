@@ -6,6 +6,7 @@
 
 namespace EngineEditor::Layout {
 
+void RequestLayoutReset();
 void SetupDefaultLayout(ImGuiID dockspaceId, const DockspaceBounds& bounds, bool forceRebuild = false);
 
 } // namespace EngineEditor::Layout

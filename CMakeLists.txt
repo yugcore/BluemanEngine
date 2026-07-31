@@ -57,6 +57,8 @@ file(GLOB SOURCES
     "src/third_party/glad/*.c"
     "src/third_party/ImGuizmo/*.cpp"
     "src/panels/Chrome/*.cpp"
+    "src/panels/Codebase/*.cpp"
+    "src/panels/Run/*.cpp"
     "src/panels/ContentBrowser/*.cpp"
     "src/panels/Details/*.cpp"
     "src/panels/Outliner/*.cpp"
