@@ -26,7 +26,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 
-# ImGui library with GLFW and OpenGL3 backends
+# ImGui library with GLFW and DX12 backends
 set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_demo.cpp
@@ -34,7 +34,7 @@ set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_dx12.cpp
 )
 
 add_library(imgui_lib STATIC ${IMGUI_SOURCES})
@@ -46,7 +46,7 @@ target_include_directories(imgui_lib PUBLIC
 target_link_libraries(imgui_lib PUBLIC glfw)
 
 # Main Executable
-file(GLOB SOURCES
+file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/*.cpp"
     "src/app/*.cpp"
     "src/theme/*.cpp"
@@ -54,7 +54,6 @@ file(GLOB SOURCES
     "src/layout/*.cpp"
     "src/core/*.cpp"
     "src/render/*.cpp"
-    "src/third_party/glad/*.c"
     "src/third_party/ImGuizmo/*.cpp"
     "src/panels/Chrome/*.cpp"
     "src/panels/Codebase/*.cpp"
@@ -76,7 +75,8 @@ target_include_directories(engine_editor PRIVATE
 )
 
 if (WIN32)
-    target_link_libraries(engine_editor PRIVATE imgui_lib glfw opengl32)
+    target_link_libraries(engine_editor PRIVATE imgui_lib glfw d3d12 dxgi d3dcompiler)
 else()
     target_link_libraries(engine_editor PRIVATE imgui_lib glfw GL dl)
 endif()
+

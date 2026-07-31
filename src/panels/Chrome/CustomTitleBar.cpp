@@ -141,21 +141,18 @@ void RenderCustomTitleBar() {
         if (ImGui::BeginMenuBar()) {
             ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
 
+            ImGui::AlignTextToFramePadding();
             if (Theme::GetFontAtlas().panelTitleFont)
                 ImGui::PushFont(Theme::GetFontAtlas().panelTitleFont);
             ImGui::TextColored(pal.accent, "BLUEMAN ENGINE");
             if (Theme::GetFontAtlas().panelTitleFont)
                 ImGui::PopFont();
 
-            ImGui::SameLine();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(pal.textDisabled, "v2.0 Enterprise");
-            ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
-
-            ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-            ImGui::SameLine(0.0f, Theme::Metrics::sectionIndent);
+            ImGui::SameLine(0.0f, 12.0f);
 
             RenderMenuBarContents();
+
+
 
             const char* workspaceLabel = "ZeGFX Workspace";
             float workspaceTagWidth = ImGui::CalcTextSize(workspaceLabel).x + 20.0f;

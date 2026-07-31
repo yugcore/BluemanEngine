@@ -174,20 +174,20 @@ void RenderToolbar() {
 
             ToolbarSeparator();
 
-            // Code Actions (Disabled Visual Stubs)
-            ToolbarButton("Format", "Format Source Code (Disabled Stub)", false, 0.0f, true);
+            // Code Actions (Explanatory Disabled Stubs)
+            ToolbarButton("Format", "Format Source Code (Coming soon: Zelyn/C++ auto-formatter)", false, 0.0f, true);
             ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-            ToolbarButton("Find in Files", "Search Codebase (Disabled Stub)", false, 0.0f, true);
+            ToolbarButton("Find in Files", "Search Codebase (Coming soon: Global regex search)", false, 0.0f, true);
 
             ToolbarSeparator();
 
-            // Build (Disabled Visual Stub)
-            ToolbarButton("Build Code", "Compile Workspace (Disabled Stub)", false, 0.0f, true);
+            // Build (Explanatory Disabled Stub)
+            ToolbarButton("Build Code", "Build Workspace (Coming soon: Incremental compiler target integration)", false, 0.0f, true);
 
             ToolbarSeparator();
 
-            // Git (Disabled Visual Stub)
-            ToolbarButton("Git: main", "Git Repository Branch (Disabled Stub)", false, 0.0f, true);
+            // Git (Explanatory Disabled Stub)
+            ToolbarButton("Git: main", "Git Branch (Coming soon: Embedded libgit2 integration)", false, 0.0f, true);
 
         }
         // ====================================================================

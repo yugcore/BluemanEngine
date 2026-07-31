@@ -130,6 +130,13 @@ struct EditorState {
     std::string selectedNodeName = "";
     std::string selectedNodeType = "";
 
+    // Active Code Document State
+    std::string activeCodeFileName = "Main.cpp";
+    int activeCodeLine = 14;
+    int activeCodeColumn = 5;
+    int activeCodeErrorsCount = 2;
+    bool showNewFileDialog = false;
+
     void SetSelection(const std::string& name, const std::string& type, const std::string& path = "") {
         selectedNodeName = name;
         selectedNodeType = type;

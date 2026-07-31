@@ -1,5 +1,6 @@
 #include "StatusBar.h"
 #include "core/EditorState.h"
+#include "panels/Codebase/CodeHighlighter.h"
 #include "theme/Fonts.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
@@ -166,87 +167,142 @@ void RenderStatusBar() {
         // 10. Git Branch
         const char* gitVal = state.gitBranch.c_str();
 
-        // Calculate total width of the right group
-        float rightGroupWidth = 0.0f;
-        rightGroupWidth += ImGui::CalcTextSize(arText).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("\xE2\x97\x8F").x + 5.0f + ImGui::CalcTextSize(statusText).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("GPU: ").x + ImGui::CalcTextSize(gpuVal).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("FPS: ").x + ImGui::CalcTextSize(fpsVal).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("VRAM: ").x + ImGui::CalcTextSize(vramVal).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("RAM: ").x + ImGui::CalcTextSize(ramVal).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("Draws: ").x + ImGui::CalcTextSize(drawVal.c_str()).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("Entities: ").x + ImGui::CalcTextSize(entVal).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("Preset: ").x + ImGui::CalcTextSize(presets[pIdx]).x + dividerGap;
-        rightGroupWidth += ImGui::CalcTextSize("Git: ").x + ImGui::CalcTextSize(gitVal).x;
+        if (state.activeWorkspace == WorkspaceMode::Codebase) {
+            LanguageType lang = CodeHighlighter::GetLanguageFromExtension(state.activeCodeFileName);
+            const char* langName = CodeHighlighter::GetLanguageDisplayName(lang);
+            ImVec4 langColor = CodeHighlighter::GetLanguageBadgeColor(lang);
 
-        float winWidth = ImGui::GetWindowWidth();
-        float rightStartX = winWidth - rightGroupWidth - 12.0f; // 12px window padding
-        if (rightStartX < leftGroupEndX + 16.0f) {
-            rightStartX = leftGroupEndX + 16.0f;
+            char posBuf[32];
+            snprintf(posBuf, sizeof(posBuf), "Ln %d, Col %d", state.activeCodeLine, state.activeCodeColumn);
+
+            float rightGroupWidth = 0.0f;
+            rightGroupWidth += ImGui::CalcTextSize(langName).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize(posBuf).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("Spaces: 4").x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("UTF-8").x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("Git: ").x + ImGui::CalcTextSize(gitVal).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("\xE2\x97\x8F").x + 5.0f + ImGui::CalcTextSize(statusText).x;
+
+            float winWidth = ImGui::GetWindowWidth();
+            float rightStartX = winWidth - rightGroupWidth - 12.0f;
+            if (rightStartX < leftGroupEndX + 16.0f) rightStartX = leftGroupEndX + 16.0f;
+
+            ImGui::SameLine(rightStartX);
+
+            // Language Badge
+            ImGui::SetCursorPosY(textY);
+            ImGui::TextColored(langColor, "%s", langName);
+
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // Ln / Col Position
+            RenderStatItem("", posBuf, pal, textY);
+
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // Indentation
+            RenderStatItem("", "Spaces: 4", pal, textY);
+
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // Encoding
+            RenderStatItem("", "UTF-8", pal, textY);
+
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // Git Branch
+            RenderStatItem("Git:", gitVal, pal, textY);
+
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // Status
+            ImGui::SetCursorPosY(textY);
+            ImGui::TextColored(statusDotColor, "\xE2\x97\x8F");
+            ImGui::SameLine(0.0f, 5.0f);
+            ImGui::TextColored(pal.textPrimary, "%s", statusText);
+        } else {
+            // Calculate total width of the right group
+            float rightGroupWidth = 0.0f;
+            rightGroupWidth += ImGui::CalcTextSize(arText).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("\xE2\x97\x8F").x + 5.0f + ImGui::CalcTextSize(statusText).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("GPU: ").x + ImGui::CalcTextSize(gpuVal).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("FPS: ").x + ImGui::CalcTextSize(fpsVal).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("VRAM: ").x + ImGui::CalcTextSize(vramVal).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("RAM: ").x + ImGui::CalcTextSize(ramVal).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("Draws: ").x + ImGui::CalcTextSize(drawVal.c_str()).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("Entities: ").x + ImGui::CalcTextSize(entVal).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("Preset: ").x + ImGui::CalcTextSize(presets[pIdx]).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("Git: ").x + ImGui::CalcTextSize(gitVal).x;
+
+            float winWidth = ImGui::GetWindowWidth();
+            float rightStartX = winWidth - rightGroupWidth - 12.0f; // 12px window padding
+            if (rightStartX < leftGroupEndX + 16.0f) {
+                rightStartX = leftGroupEndX + 16.0f;
+            }
+
+            ImGui::SameLine(rightStartX);
+
+            // 1. Asset Registry
+            ImGui::SetCursorPosY(textY);
+            ImGui::TextColored(pal.textSecondary, "%s", arText);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 2. Engine Status
+            ImGui::SetCursorPosY(textY);
+            ImGui::TextColored(statusDotColor, "\xE2\x97\x8F");
+            ImGui::SameLine(0.0f, 5.0f);
+            ImGui::TextColored(pal.textPrimary, "%s", statusText);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 3. GPU / API
+            RenderStatItem("GPU:", gpuVal, pal, textY);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 4. FPS & Frame Time
+            RenderStatItem("FPS:", fpsVal, pal, textY);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 5. VRAM
+            RenderStatItem("VRAM:", vramVal, pal, textY);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 6. RAM
+            RenderStatItem("RAM:", ramVal, pal, textY);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 7. Draws
+            RenderStatItem("Draws:", drawVal.c_str(), pal, textY);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 8. Entities
+            RenderStatItem("Entities:", entVal, pal, textY);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 9. Quality Preset
+            RenderStatItem("Preset:", presets[pIdx], pal, textY);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 10. Git Branch
+            RenderStatItem("Git:", gitVal, pal, textY);
         }
-
-        ImGui::SameLine(rightStartX);
-
-        // 1. Asset Registry
-        ImGui::SetCursorPosY(textY);
-        ImGui::TextColored(pal.textSecondary, "%s", arText);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 2. Engine Status
-        ImGui::SetCursorPosY(textY);
-        ImGui::TextColored(statusDotColor, "\xE2\x97\x8F");
-        ImGui::SameLine(0.0f, 5.0f);
-        ImGui::TextColored(pal.textPrimary, "%s", statusText);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 3. GPU / API
-        RenderStatItem("GPU:", gpuVal, pal, textY);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 4. FPS & Frame Time
-        RenderStatItem("FPS:", fpsVal, pal, textY);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 5. VRAM
-        RenderStatItem("VRAM:", vramVal, pal, textY);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 6. RAM
-        RenderStatItem("RAM:", ramVal, pal, textY);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 7. Draws
-        RenderStatItem("Draws:", drawVal.c_str(), pal, textY);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 8. Entities
-        RenderStatItem("Entities:", entVal, pal, textY);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 9. Quality Preset
-        RenderStatItem("Preset:", presets[pIdx], pal, textY);
-
-        // Separator
-        RenderVerticalSeparator(pal, windowTopY);
-
-        // 10. Git Branch
-        RenderStatItem("Git:", gitVal, pal, textY);
     }
     ImGui::End();
 
