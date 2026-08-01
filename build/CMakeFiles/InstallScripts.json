@@ -1,9 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"Z:/BluemanEditor/build/cmake_install.cmake",
-		"Z:/BluemanEditor/build/_deps/glfw-build/cmake_install.cmake",
-		"Z:/BluemanEditor/build/_deps/glfw-build/src/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
