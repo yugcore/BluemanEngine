@@ -1,15 +1,26 @@
 #include "ViewportPanel.h"
 #include "Overlay.h"
 #include "Gizmos.h"
+#include "ViewportMath.h"
+#include "ViewportPicker.h"
+#include "ViewportSelection.h"
+#include "ViewportMeasurement.h"
+#include "ViewportContextMenu.h"
+#include "ViewportPreferences.h"
+#include "ViewportDragDrop.h"
 #include "render/ViewportRenderer.h"
 #include "core/EditorState.h"
 #include "core/SceneGraph.h"
+#include "core/CommandStack.h"
+#include "core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
+#include "third_party/ImGuizmo/ImGuizmo.h"
 #include <cstdio>
+#include <filesystem>
 
 namespace EngineEditor {
 
@@ -86,11 +97,8 @@ void RenderViewportPanel(bool* pOpen) {
 
         // Space key: Cycle World/Local space
         if (ImGui::IsKeyPressed(ImGuiKey_Space)) {
-            if (EditorState::Get().activeTransformSpace == TransformSpace::World) {
-                EditorState::Get().activeTransformSpace = TransformSpace::Local;
-            } else {
-                EditorState::Get().activeTransformSpace = TransformSpace::World;
-            }
+            EditorState::Get().activeTransformSpace = (EditorState::Get().activeTransformSpace == TransformSpace::World) 
+                ? TransformSpace::Local : TransformSpace::World;
         }
 
         // F key: Frame selection
@@ -107,6 +115,49 @@ void RenderViewportPanel(bool* pOpen) {
         if (ImGui::IsKeyPressed(ImGuiKey_Home)) {
             camera.ResetToDefault();
         }
+
+        // Insert / D key: Pivot edit mode toggle
+        if (ImGui::IsKeyPressed(ImGuiKey_Insert) || ImGui::IsKeyPressed(ImGuiKey_D)) {
+            EditorState::Get().isPivotEditingMode = !EditorState::Get().isPivotEditingMode;
+        }
+
+        // Alt + H: Isolate Selection toggle
+        if (io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_H)) {
+            EditorState::Get().isIsolationMode = !EditorState::Get().isIsolationMode;
+        }
+
+        // Ctrl + A: Select All
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A)) {
+            Panels::ViewportSelection::Get().SelectAll();
+        }
+
+        // Ctrl + I: Invert Selection
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_I)) {
+            Panels::ViewportSelection::Get().InvertSelection();
+        }
+
+        // Ctrl + Z: Undo, Ctrl + Y: Redo
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z)) {
+            CommandStack::Get().Undo();
+        }
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y)) {
+            CommandStack::Get().Redo();
+        }
+
+        // Camera Bookmarks: Ctrl+Shift+0..9 to Save, Ctrl+0..9 to Load
+        for (int bIdx = 0; bIdx < 10; ++bIdx) {
+            ImGuiKey numKey = (ImGuiKey)(ImGuiKey_0 + bIdx);
+            if (ImGui::IsKeyPressed(numKey)) {
+                if (io.KeyCtrl && io.KeyShift) {
+                    camera.SaveBookmark(bIdx);
+                    Logger::Get().Info("[Viewport] Saved camera bookmark slot " + std::to_string(bIdx));
+                } else if (io.KeyCtrl) {
+                    if (camera.LoadBookmark(bIdx)) {
+                        Logger::Get().Info("[Viewport] Loaded camera bookmark slot " + std::to_string(bIdx));
+                    }
+                }
+            }
+        }
     }
 
     ViewportRenderer::Get().RenderScene(deltaTime);
@@ -116,7 +167,15 @@ void RenderViewportPanel(bool* pOpen) {
 
     if (textureID != 0) {
         ImGui::Image((ImTextureID)textureID, viewportAvail, ImVec2(0, 1), ImVec2(1, 0));
+    } else {
+        ImGui::Dummy(viewportAvail);
     }
+
+    // Drag-and-drop target handling
+    float viewMat[16], projMat[16];
+    camera.GetViewMatrix(viewMat);
+    camera.GetProjectionMatrix(viewportAvail.x / viewportAvail.y, projMat);
+    Panels::ViewportDragDrop::Get().HandleDragDropTarget(cursorPos, viewportAvail, viewMat, projMat);
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const auto& pal = Theme::GetPalette();
@@ -279,10 +338,41 @@ void RenderViewportPanel(bool* pOpen) {
         true
     );
 
+    // 1. Render 3D Overlays, Grids, Orientation Triad, Isolation Banner
     Panels::RenderViewport3DOverlays(drawList, cursorPos, viewportAvail, s_ShowFlags);
+
+    // 2. Render Transform Gizmos
     Panels::RenderViewportGizmos(drawList, cursorPos, viewportAvail);
 
+    // 3. Handle Mouse Marquee Drag Box Selection
+    if (isHovered && camera.GetMode() == CameraMode::Idle && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing()) {
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            Panels::ViewportSelection::Get().StartMarquee(io.MousePos);
+        } else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+            Panels::ViewportSelection::Get().UpdateMarquee(io.MousePos);
+        } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && Panels::ViewportSelection::Get().IsMarqueeActive()) {
+            Panels::ViewportSelection::Get().EndMarquee(cursorPos, viewportAvail, viewMat, projMat, io.KeyShift, io.KeyCtrl);
+        }
+
+        // Right Click 3D Context Menu
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !io.KeyAlt) {
+            Panels::RaycastHit hit;
+            std::string hitNode = "";
+            if (Panels::ViewportPicker::Get().PickNode(io.MousePos, cursorPos, viewportAvail, viewMat, projMat, hit)) {
+                hitNode = hit.nodeName;
+            }
+            Panels::ViewportContextMenu::Get().OpenMenu(hitNode);
+        }
+    }
+
+    // 4. Render Marquee Drag Box & Measurement Tools
+    Panels::ViewportSelection::Get().RenderMarquee(drawList);
+    Panels::ViewportMeasurement::Get().Render(drawList, cursorPos, viewportAvail, viewMat, projMat);
+
     drawList->PopClipRect();
+
+    // 5. Render 3D Context Menu Popup
+    Panels::ViewportContextMenu::Get().Render();
 
     ImGui::End();
     ImGui::PopStyleVar();

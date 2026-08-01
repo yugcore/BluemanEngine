@@ -30,7 +30,7 @@ public:
     void Shutdown();
     void Resize(uint32_t width, uint32_t height);
     void Render(ID3D12GraphicsCommandList* cmdList, uint32_t width, uint32_t height, float deltaTime);
-    void SyncEngineState();
+    void SyncEngineState(float deltaTime = 0.016f);
 
     bool IsInitialized() const { return m_Initialized; }
     zephysics::PhysicsWorld* GetPhysicsWorld() { return m_PhysicsWorld.get(); }

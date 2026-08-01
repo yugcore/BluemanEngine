@@ -4,6 +4,7 @@
 #include <string>
 #include <cstdint>
 #include "EditorCamera.h"
+#include "SceneGraph.h"
 
 namespace EngineEditor {
 
@@ -138,7 +139,7 @@ struct RenderSettings {
     int giRaysPerProbe = 64;
     int giProbesUpdatedPerFrame = 32;
     bool rtAO = false;
-    bool rtReflections = true;
+    bool rtReflections = false;
     float dsrScale = 1.00f;
     bool dsrEnabled = true;
 
@@ -281,9 +282,18 @@ struct EditorState {
     std::string selectedAssetPath = "";
     std::string selectedAssetType = "";
 
-    // Scene Graph Node Selection State
+    // Scene Graph Node Selection State (Multi-selection enabled)
     std::string selectedNodeName = "";
     std::string selectedNodeType = "";
+    std::vector<std::string> selectedNodeNames;
+
+    // Viewport Special Modes & Tool States
+    bool isPivotEditingMode = false;
+    float customPivotOffset[3] = { 0.0f, 0.0f, 0.0f };
+    bool isIsolationMode = false;
+    bool isMeasurementToolActive = false;
+    Vec3f measureStartPos{ 0.0f, 0.0f, 0.0f };
+    Vec3f measureEndPos{ 0.0f, 0.0f, 0.0f };
 
     // Active Code Document State
     std::string activeCodeFileName = "";
@@ -326,14 +336,79 @@ struct EditorState {
     bool showNavigationBuilderPanel = false;
     bool showLightBakingPanel = false;
 
+    // Simulation & File State
+    bool isSimulating = false;
+    bool isPaused = false;
+    std::string currentScenePath = "";
+    bool showAboutModal = false;
+
+    bool IsSelected(const std::string& name) const {
+        if (name.empty()) return false;
+        if (selectedNodeName == name) return true;
+        return std::find(selectedNodeNames.begin(), selectedNodeNames.end(), name) != selectedNodeNames.end();
+    }
+
+    void ClearSelection() {
+        selectedNodeName.clear();
+        selectedNodeType.clear();
+        selectedNodeNames.clear();
+        activeTransform = TransformData();
+    }
+
     void SetSelection(const std::string& name, const std::string& type, const std::string& path = "") {
+        selectedNodeNames.clear();
+        if (name.empty()) {
+            selectedNodeName.clear();
+            selectedNodeType.clear();
+            return;
+        }
+        selectedNodeNames.push_back(name);
         selectedNodeName = name;
         selectedNodeType = type;
-        if (!name.empty()) {
-            selectedAssetName = name;
-            selectedAssetType = type;
-            selectedAssetPath = path.empty() ? ("Scene/" + name) : path;
-            showDetailsPanel = true; // Automatically opens or expands when an object is selected
+        
+        selectedAssetName = name;
+        selectedAssetType = type;
+        selectedAssetPath = path.empty() ? ("Scene/" + name) : path;
+        showDetailsPanel = true;
+
+        const SceneNode* node = SceneGraph::Get().FindNode(name);
+        if (node) {
+            activeTransform.location[0] = node->location[0];
+            activeTransform.location[1] = node->location[1];
+            activeTransform.location[2] = node->location[2];
+
+            activeTransform.rotation[0] = node->rotation[0];
+            activeTransform.rotation[1] = node->rotation[1];
+            activeTransform.rotation[2] = node->rotation[2];
+
+            activeTransform.scale[0] = node->scale[0];
+            activeTransform.scale[1] = node->scale[1];
+            activeTransform.scale[2] = node->scale[2];
+        }
+    }
+
+    void AddSelection(const std::string& name, const std::string& type = "Actor") {
+        if (name.empty()) return;
+        if (!IsSelected(name)) {
+            selectedNodeNames.push_back(name);
+        }
+        selectedNodeName = name;
+        selectedNodeType = type;
+        showDetailsPanel = true;
+    }
+
+    void ToggleSelection(const std::string& name, const std::string& type = "Actor") {
+        if (name.empty()) return;
+        auto it = std::find(selectedNodeNames.begin(), selectedNodeNames.end(), name);
+        if (it != selectedNodeNames.end()) {
+            selectedNodeNames.erase(it);
+            if (selectedNodeName == name) {
+                selectedNodeName = selectedNodeNames.empty() ? "" : selectedNodeNames.back();
+            }
+        } else {
+            selectedNodeNames.push_back(name);
+            selectedNodeName = name;
+            selectedNodeType = type;
         }
     }
 

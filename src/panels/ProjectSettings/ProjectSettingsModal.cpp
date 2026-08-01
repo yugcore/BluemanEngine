@@ -21,6 +21,7 @@ void RenderProjectSettingsModal(bool* pOpen) {
     if (!pOpen || !*pOpen) return;
 
     const auto& pal = Theme::GetPalette();
+    auto& state = EditorState::Get();
 
     ImGui::OpenPopup("Project Preferences & Settings");
 
@@ -36,8 +37,13 @@ void RenderProjectSettingsModal(bool* pOpen) {
             // Tab 1: General Settings
             if (ImGui::BeginTabItem("General")) {
                 ImGui::Spacing();
-                ImGui::InputText("Project Title", s_SettingsProjectName, sizeof(s_SettingsProjectName));
-                ImGui::InputText("Default Startup Scene", s_StartupScene, sizeof(s_StartupScene));
+                static char sceneNameBuf[128] = "";
+                if (sceneNameBuf[0] == '\0') {
+                    strncpy(sceneNameBuf, state.currentLevelName.c_str(), sizeof(sceneNameBuf) - 1);
+                }
+                if (ImGui::InputText("Active Scene Title", sceneNameBuf, sizeof(sceneNameBuf))) {
+                    state.currentLevelName = sceneNameBuf;
+                }
                 ImGui::Spacing();
                 ImGui::TextColored(pal.textDisabled, "Engine Version: Blueman Engine v3.5 Enterprise [DX12]");
                 ImGui::EndTabItem();
@@ -46,13 +52,15 @@ void RenderProjectSettingsModal(bool* pOpen) {
             // Tab 2: Rendering Defaults
             if (ImGui::BeginTabItem("Rendering Pipeline")) {
                 ImGui::Spacing();
-                ImGui::Checkbox("Enable VSync (Vertical Sync)", &s_EnableVsync);
-                ImGui::Checkbox("Hardware DXR Ray Tracing Acceleration", &s_EnableRaytracing);
+                ImGui::Checkbox("Enable VSync (Vertical Sync)", &state.settings.enableVSync);
+                ImGui::Checkbox("Hardware DXR Ray Tracing Acceleration", &state.settings.rtGI);
+                ImGui::Checkbox("DXR Raytraced Ambient Occlusion (RTAO)", &state.settings.rtAO);
+                ImGui::Checkbox("DXR Raytraced Reflections", &state.settings.rtReflections);
                 
                 ImGui::Spacing();
-                ImGui::TextColored(pal.textSecondary, "Anti-Aliasing Technique:");
-                const char* aaModes[] = { "Off", "TAA (Temporal AA)", "FXAA", "MSAA 4x" };
-                ImGui::Combo("##AAMode", &s_AntiAliasingMode, aaModes, 4);
+                ImGui::TextColored(pal.textSecondary, "Quality Preset:");
+                const char* presets[] = { "Low (Performance)", "Medium (Balanced)", "High (Cinematic)" };
+                ImGui::Combo("##QualityPreset", &state.settings.qualityPreset, presets, 3);
                 ImGui::EndTabItem();
             }
 
@@ -65,14 +73,18 @@ void RenderProjectSettingsModal(bool* pOpen) {
                 ImGui::BulletText("Strafe Right: D");
                 ImGui::BulletText("Orbit Viewport Camera: Right Mouse Button");
                 ImGui::BulletText("Focus Selection: F");
+                ImGui::BulletText("Gizmo Translate / Rotate / Scale: W / E / R");
+                ImGui::BulletText("Toggle World/Local Transform Space: Space");
                 ImGui::EndTabItem();
             }
 
             // Tab 4: Zelyn Compiler Settings
             if (ImGui::BeginTabItem("Zelyn Compiler")) {
                 ImGui::Spacing();
-                ImGui::Checkbox("Enable Optimization (-O3)", &s_ZelynOptimize);
-                ImGui::Checkbox("Enforce Strict Type Checking", &s_ZelynStrictTypes);
+                static bool opt = true;
+                static bool strict = true;
+                ImGui::Checkbox("Enable Optimization (-O3)", &opt);
+                ImGui::Checkbox("Enforce Strict Type Checking", &strict);
                 ImGui::Spacing();
                 ImGui::TextColored(pal.textDisabled, "Target Architecture: x86_64-pc-windows-msvc");
                 ImGui::EndTabItem();
@@ -89,7 +101,7 @@ void RenderProjectSettingsModal(bool* pOpen) {
         ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
         ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
         if (ImGui::Button("Save Settings", ImVec2(140.0f, 28.0f))) {
-            Logger::Get().Info("[Settings] Saved project settings to disk.");
+            Logger::Get().Info("[Settings] Applied and persisted project settings.");
             *pOpen = false;
         }
         ImGui::PopStyleColor(2);

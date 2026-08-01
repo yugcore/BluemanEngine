@@ -165,6 +165,22 @@ void RenderDetailsPanel(bool* pOpen) {
         ImGui::Spacing();
         Widgets::RenderVector3PropertyRow("Scale", transform.scale, 1.0f, &transform.lockAspect);
 
+        // Sync back to active SceneNode in SceneGraph
+        SceneNode* activeNode = SceneGraph::Get().FindNodeMutable(selectedNodeName);
+        if (activeNode) {
+            activeNode->location[0] = transform.location[0];
+            activeNode->location[1] = transform.location[1];
+            activeNode->location[2] = transform.location[2];
+
+            activeNode->rotation[0] = transform.rotation[0];
+            activeNode->rotation[1] = transform.rotation[1];
+            activeNode->rotation[2] = transform.rotation[2];
+
+            activeNode->scale[0] = transform.scale[0];
+            activeNode->scale[1] = transform.scale[1];
+            activeNode->scale[2] = transform.scale[2];
+        }
+
         ImGui::Spacing();
         ImGui::Unindent(Theme::Metrics::panelLeftMargin);
     }

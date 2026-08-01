@@ -82,7 +82,7 @@ void ZeGFXAdapter::Resize(uint32_t width, uint32_t height) {
     }
 }
 
-void ZeGFXAdapter::SyncEngineState() {
+void ZeGFXAdapter::SyncEngineState(float deltaTime) {
     if (!m_Renderer) return;
 
     const auto& edSettings = EditorState::Get().settings;
@@ -204,16 +204,39 @@ void ZeGFXAdapter::SyncEngineState() {
                 zegfx::RenderInstance inst = {};
                 inst.mesh = zegfx::RenderMeshHandle{ (uint32_t)m_DefaultMeshHandle };
                 inst.material = zegfx::RenderMaterialHandle{ (uint32_t)m_DefaultMaterialHandle };
+
+                float pitch = node.rotation[0] * 3.14159265f / 180.0f;
+                float yaw   = node.rotation[1] * 3.14159265f / 180.0f;
+                float roll  = node.rotation[2] * 3.14159265f / 180.0f;
+
+                float cx = std::cos(pitch), sx = std::sin(pitch);
+                float cy = std::cos(yaw),   sy = std::sin(yaw);
+                float cz = std::cos(roll),  sz = std::sin(roll);
+
+                float r00 = cy * cz + sy * sx * sz;
+                float r01 = cx * sz;
+                float r02 = -sy * cz + cy * sx * sz;
+
+                float r10 = -cy * sz + sy * sx * cz;
+                float r11 = cx * cz;
+                float r12 = sy * sz + cy * sx * cz;
+
+                float r20 = sy * cx;
+                float r21 = -sx;
+                float r22 = cy * cx;
+
                 inst.world = zegfx::Mat4::identity();
-                inst.world.m[3][0] = node.location[0];
-                inst.world.m[3][1] = node.location[1];
-                inst.world.m[3][2] = node.location[2];
+                inst.world.m[0][0] = r00 * node.scale[0]; inst.world.m[0][1] = r01 * node.scale[0]; inst.world.m[0][2] = r02 * node.scale[0]; inst.world.m[0][3] = 0.0f;
+                inst.world.m[1][0] = r10 * node.scale[1]; inst.world.m[1][1] = r11 * node.scale[1]; inst.world.m[1][2] = r12 * node.scale[1]; inst.world.m[1][3] = 0.0f;
+                inst.world.m[2][0] = r20 * node.scale[2]; inst.world.m[2][1] = r21 * node.scale[2]; inst.world.m[2][2] = r22 * node.scale[2]; inst.world.m[2][3] = 0.0f;
+                inst.world.m[3][0] = node.location[0];    inst.world.m[3][1] = node.location[1];    inst.world.m[3][2] = node.location[2];    inst.world.m[3][3] = 1.0f;
+
                 inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
                 inst.visibilityFlags = 1;
                 m_OpaqueInstances.push_back(inst);
             } else if (node.type == SceneNodeType::FoliageCluster) {
                 // High-density foliage instancing (trees, shrubs, grass) across 500m-1km area
-                const int numTrees = 250;
+                const int numTrees = 0; // Default 0 for empty scene; set via foliage settings when enabled
                 for (int i = 0; i < numTrees; ++i) {
                     float angle = (float)i * 0.125f;
                     float dist = 20.0f + (float)(i % 50) * 15.0f; // Spans up to 770m
@@ -301,7 +324,19 @@ void ZeGFXAdapter::SyncEngineState() {
     camera.farPlane = 1000.0f;
 
     // Render snapshot through bulk mode API
+    auto tStartRender = std::chrono::high_resolution_clock::now();
     m_Renderer->render(snapshot, camera, m_Renderer->getSettings());
+    auto tEndRender = std::chrono::high_resolution_clock::now();
+    double renderMs = std::chrono::duration<double, std::milli>(tEndRender - tStartRender).count();
+
+    static uint64_t s_AdapterFrames = 0;
+    static double s_AccRenderMs = 0.0;
+    s_AdapterFrames++;
+    s_AccRenderMs += renderMs;
+    if (s_AdapterFrames % 120 == 0) {
+        std::cout << "[ZEGFX PROFILER] Average Renderer::render() time: " << (s_AccRenderMs / 120.0) << " ms" << std::endl;
+        s_AccRenderMs = 0.0;
+    }
 
     auto& stats = EditorState::Get().stats;
     zegfx::IRendererDiagnostics* diag = m_Renderer->getDiagnostics();
@@ -310,6 +345,9 @@ void ZeGFXAdapter::SyncEngineState() {
         if (diagData.totalFrameGpuMs > 0) {
             stats.frameTimeMs = diagData.totalFrameGpuMs;
             stats.fps = 1000.0f / diagData.totalFrameGpuMs;
+        } else {
+            stats.frameTimeMs = deltaTime * 1000.0f;
+            stats.fps = (deltaTime > 0.00001f) ? (1.0f / deltaTime) : 60.0f;
         }
         stats.drawCalls = diagData.drawCallCount;
         stats.triangleCount = diagData.triangleCount;
@@ -327,7 +365,7 @@ void ZeGFXAdapter::Render(ID3D12GraphicsCommandList* cmdList, uint32_t width, ui
 
     m_TimeAccumulator += deltaTime;
     Resize(width, height);
-    SyncEngineState();
+    SyncEngineState(deltaTime);
 
     if (m_PhysicsWorld && deltaTime > 0.0f) {
         float stepTime = (deltaTime > 0.033f) ? 0.033f : deltaTime;

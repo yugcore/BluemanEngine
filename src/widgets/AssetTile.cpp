@@ -1,5 +1,8 @@
 #include "AssetTile.h"
 #include "theme/Colors.h"
+#include "core/SceneGraph.h"
+#include "core/Logger.h"
+#include "core/EditorState.h"
 #include <imgui_internal.h>
 #include <cmath>
 #include <vector>
@@ -28,7 +31,7 @@ static ImU32 GetMaterialBaseColor(const std::string& name) {
     return IM_COL32(r, g, b, 255);
 }
 
-bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, const char* typeName, const ImVec4& typeColor, bool isSelected, float width, float height, bool* outDoubleClicked) {
+bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, const char* typeName, const ImVec4& typeColor, bool isSelected, float width, float height, bool* outDoubleClicked, const std::string& path) {
     bool clicked = false;
     if (outDoubleClicked) *outDoubleClicked = false;
     const auto& pal = Theme::GetPalette();
@@ -63,39 +66,28 @@ bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, c
 
     // Render Thumbnail Preview Graphics according to Asset Category
     if (itemType == AssetItemType::Material) {
-        // --- Real PBR Material Sphere Preview ---
         float radius = 20.0f;
         ImU32 matColor = GetMaterialBaseColor(name);
-        
-        // Base material sphere
         dl->AddCircleFilled(center, radius, matColor, 32);
-        
-        // High-specular specular light highlight
         dl->AddCircleFilled(ImVec2(center.x - 5.0f, center.y - 5.0f), radius * 0.40f, IM_COL32(255, 255, 255, 220), 16);
-        
-        // Ambient rim light shadow
         dl->AddCircle(center, radius, IM_COL32(10, 10, 15, 180), 32, 1.5f);
     }
     else if (itemType == AssetItemType::Mesh) {
-        // --- Static Mesh Wireframe/Cube Graphic ---
         float sz = 14.0f;
         dl->AddRect(ImVec2(center.x - sz, center.y - sz), ImVec2(center.x + sz, center.y + sz), IM_COL32(49, 130, 206, 255), 0.0f, 0, 1.5f);
         dl->AddLine(ImVec2(center.x - sz, center.y - sz), ImVec2(center.x - 5.0f, center.y - 5.0f), IM_COL32(49, 130, 206, 200), 1.5f);
         dl->AddLine(ImVec2(center.x + sz, center.y - sz), ImVec2(center.x + 5.0f, center.y - 5.0f), IM_COL32(49, 130, 206, 200), 1.5f);
     }
     else if (itemType == AssetItemType::Texture) {
-        // --- Texture Image Canvas Graphic ---
         float w = 16.0f, h = 12.0f;
         dl->AddRectFilled(ImVec2(center.x - w, center.y - h), ImVec2(center.x + w, center.y + h), IM_COL32(35, 38, 45, 255), 2.0f);
         dl->AddRect(ImVec2(center.x - w, center.y - h), ImVec2(center.x + w, center.y + h), IM_COL32(214, 158, 46, 255), 2.0f, 0, 1.5f);
         dl->AddCircleFilled(ImVec2(center.x - 7.0f, center.y - 3.0f), 3.0f, IM_COL32(214, 158, 46, 255));
     }
     else if (itemType == AssetItemType::Script) {
-        // --- Source Code Bracket Graphic ---
         dl->AddText(ImVec2(center.x - 12.0f, center.y - 9.0f), IM_COL32(128, 90, 213, 255), "{ ZLN }");
     }
     else if (itemType == AssetItemType::Audio) {
-        // --- Soundwave Waveform Graphic ---
         float bars[] = { 5.0f, 12.0f, 18.0f, 8.0f, 14.0f, 6.0f };
         for (int b = 0; b < 6; ++b) {
             float bx = center.x - 15.0f + b * 6.0f;
@@ -103,17 +95,14 @@ bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, c
         }
     }
     else if (itemType == AssetItemType::Level) {
-        // --- Level Map Grid Graphic ---
         dl->AddRect(ImVec2(center.x - 14.0f, center.y - 10.0f), ImVec2(center.x + 14.0f, center.y + 10.0f), IM_COL32(229, 62, 62, 255), 2.0f, 0, 1.5f);
         dl->AddLine(ImVec2(center.x - 14.0f, center.y), ImVec2(center.x + 14.0f, center.y), IM_COL32(229, 62, 62, 180), 1.0f);
     }
     else if (itemType == AssetItemType::VFX) {
-        // --- Sparkle Particle Graphic ---
         dl->AddLine(ImVec2(center.x - 10.0f, center.y), ImVec2(center.x + 10.0f, center.y), IM_COL32(221, 107, 32, 255), 2.0f);
         dl->AddLine(ImVec2(center.x, center.y - 10.0f), ImVec2(center.x, center.y + 10.0f), IM_COL32(221, 107, 32, 255), 2.0f);
     }
     else {
-        // --- Generic Category Badge ---
         dl->AddRectFilled(ImVec2(center.x - 16.0f, center.y - 10.0f), ImVec2(center.x + 16.0f, center.y + 10.0f), IM_COL32(40, 45, 55, 255), 3.0f);
         dl->AddText(ImVec2(center.x - 12.0f, center.y - 7.0f), IM_COL32(200, 205, 215, 255), typeName);
     }
@@ -122,7 +111,6 @@ bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, c
     ImU32 badgeCol = ImGui::ColorConvertFloat4ToU32(typeColor);
     dl->AddRectFilled(ImVec2(thumbMax.x - 34.0f, thumbMin.y + 2.0f), ImVec2(thumbMax.x - 2.0f, thumbMin.y + 14.0f), badgeCol, 2.0f);
     
-    // Short type badge string
     const char* badgeStr = (itemType == AssetItemType::Material) ? "MAT" :
                            (itemType == AssetItemType::Mesh) ? "MESH" :
                            (itemType == AssetItemType::Texture) ? "TEX" :
@@ -134,10 +122,7 @@ bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, c
 
     // 2. Color-Coded Underline Stripe below Thumbnail
     float stripeY = thumbMax.y + 2.0f;
-    dl->AddLine(
-        ImVec2(thumbMin.x, stripeY),
-        ImVec2(thumbMax.x, stripeY),
-        badgeCol, 2.0f);
+    dl->AddLine(ImVec2(thumbMin.x, stripeY), ImVec2(thumbMax.x, stripeY), badgeCol, 2.0f);
 
     // 3. Asset Name Label with Truncation (...)
     ImGui::SetCursorScreenPos(ImVec2(thumbMin.x, stripeY + 4.0f));
@@ -148,30 +133,71 @@ bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, c
         displayName = displayName.substr(0, 10) + "...";
     }
     ImGui::TextUnformatted(displayName.c_str());
-
     ImGui::PopStyleColor();
 
-    ImGui::EndChild();
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(2);
+    // 4. Full Card Invisible Selectable for Drag & Drop + Right-Click Context Menu
+    ImGui::SetCursorPos(ImVec2(0, 0));
+    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0,0,0,0));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.05f));
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0f, 1.0f, 1.0f, 0.10f));
+    ImGui::Selectable("##FullCardSelectable", isSelected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(width, height));
+    ImGui::PopStyleColor(3);
 
-    // Click & Double-Click Detection
-    if (ImGui::IsItemClicked()) {
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         clicked = true;
     }
     if (outDoubleClicked && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         *outDoubleClicked = true;
     }
 
-    // 4. Hover Tooltip for Full Asset Name & Path
+    // Drag and Drop Source directly on Selectable
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+        std::string payloadPath = path.empty() ? ("Z:\\Blueman Cooked Assets\\" + std::string(name)) : path;
+        ImGui::SetDragDropPayload("CONTENT_BROWSER_ASSET_PATH", payloadPath.c_str(), payloadPath.size() + 1);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.95f, 1.00f, 1.00f));
+        ImGui::Text("Drop asset '%s' into 3D Viewport", name);
+        ImGui::PopStyleColor();
+        ImGui::EndDragDropSource();
+    }
+
+    // Right-Click Context Menu directly on Selectable
+    if (ImGui::BeginPopupContextItem("TileContextMenu")) {
+        if (ImGui::MenuItem("+ Add to 3D Scene")) {
+            std::string assetPath = path.empty() ? ("Z:\\Blueman Cooked Assets\\" + std::string(name)) : path;
+            SceneNode newNode;
+            newNode.id = SceneGraph::Get().GenerateNodeId();
+            newNode.name = std::string(name) + "_" + std::to_string(rand() % 1000);
+            newNode.type = SceneNodeType::Actor;
+            newNode.meshPath = assetPath;
+            newNode.location[0] = 0.0f;
+            newNode.location[1] = 0.5f;
+            newNode.location[2] = 0.0f;
+
+            SceneGraph::Get().AddNode(newNode);
+            EditorState::Get().SetSelection(newNode.name, "StaticMeshActor", assetPath);
+            Logger::Get().Info("[ContentBrowser] Right-click -> Added asset '" + std::string(name) + "' to 3D Scene!");
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Select Asset Details")) {
+            std::string assetPath = path.empty() ? ("Z:\\Blueman Cooked Assets\\" + std::string(name)) : path;
+            EditorState::Get().SetSelection(name, typeName, assetPath);
+        }
+        ImGui::EndPopup();
+    }
+
+    // 5. Hover Tooltip for Full Asset Name & Path
     if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
         ImGui::TextColored(pal.textPrimary, "Asset: %s", name);
         ImGui::TextColored(pal.textSecondary, "Type: %s", typeName);
         ImGui::Separator();
-        ImGui::TextColored(pal.textDisabled, "Path: ZeGFX Workspace/Content/%s", name);
+        ImGui::TextColored(pal.textDisabled, "Path: %s", path.empty() ? name : path.c_str());
         ImGui::EndTooltip();
     }
+
+    ImGui::EndChild();
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
 
     ImGui::EndGroup();
     ImGui::PopID();

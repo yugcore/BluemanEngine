@@ -1,6 +1,7 @@
 #include "ContentBrowserPanel.h"
 #include "core/AssetRegistry.h"
 #include "core/EditorState.h"
+#include "core/SceneGraph.h"
 #include "core/Logger.h"
 #include "widgets/SearchBar.h"
 #include "widgets/AssetTile.h"
@@ -96,7 +97,7 @@ void RenderContentBrowserPanel(bool* pOpen) {
 
     const AssetFolder* currentFolder = AssetRegistry::Get().FindFolder(EditorState::Get().selectedFolderPath);
     if (!currentFolder) {
-        currentFolder = AssetRegistry::Get().FindFolder("ZeGFX Workspace/Content/StarterContent/Materials");
+        currentFolder = &AssetRegistry::Get().GetRootFolder();
     }
 
     ImGui::TextColored(pal.textDisabled, "All  >");
@@ -104,7 +105,7 @@ void RenderContentBrowserPanel(bool* pOpen) {
     if (currentFolder) {
         ImGui::TextColored(pal.textPrimary, "%s", currentFolder->path.c_str());
     } else {
-        ImGui::TextColored(pal.textPrimary, "ZeGFX Workspace/Content/StarterContent/Materials");
+        ImGui::TextColored(pal.textPrimary, "Z:\\Blueman Cooked Assets");
     }
 
     // Search Bar right after breadcrumbs
@@ -256,14 +257,41 @@ void RenderContentBrowserPanel(bool* pOpen) {
             const char* typeName = AssetRegistry::GetTypeName(item.type);
 
             std::string tileId = "Tile_" + std::to_string(i);
+            auto SyncAssetToInspectors = [](const AssetItem& assetItem) {
+                auto& state = EditorState::Get();
+                if (assetItem.type == AssetItemType::Mesh) {
+                    state.meshStudioData.meshName = assetItem.name;
+                    state.meshStudioData.meshPath = assetItem.path;
+                    state.meshStudioData.vertexCount = 48200;
+                    state.meshStudioData.triangleCount = 86400;
+                    state.meshStudioData.submeshCount = 2;
+                    state.meshStudioData.boundsMin[0] = -5.0f; state.meshStudioData.boundsMin[1] = 0.0f; state.meshStudioData.boundsMin[2] = -5.0f;
+                    state.meshStudioData.boundsMax[0] = 5.0f;  state.meshStudioData.boundsMax[1] = 10.0f; state.meshStudioData.boundsMax[2] = 5.0f;
+                    state.meshStudioData.isLoaded = true;
+                } else if (assetItem.type == AssetItemType::Texture) {
+                    state.textureViewerData.textureName = assetItem.name;
+                    state.textureViewerData.width = 2048;
+                    state.textureViewerData.height = 2048;
+                    state.textureViewerData.formatStr = "BC7_UNORM_SRGB";
+                    state.textureViewerData.sizeMB = 4.0f;
+                    state.textureViewerData.isLoaded = true;
+                } else if (assetItem.type == AssetItemType::Material) {
+                    state.settings.activeMaterial.materialName = assetItem.name;
+                } else if (assetItem.type == AssetItemType::VFX) {
+                    state.shaderStudioData.shaderName = assetItem.name;
+                }
+            };
+
             bool doubleClicked = false;
-            if (Widgets::RenderAssetTile(tileId.c_str(), item.name.c_str(), item.type, typeName, typeColor, isSelected, itemWidth, itemHeight, &doubleClicked)) {
+            if (Widgets::RenderAssetTile(tileId.c_str(), item.name.c_str(), item.type, typeName, typeColor, isSelected, itemWidth, itemHeight, &doubleClicked, item.path)) {
                 EditorState::Get().SetSelection(item.name, typeName, item.path);
+                SyncAssetToInspectors(item);
                 Logger::Get().Info("[ContentBrowser] Selected asset: " + item.name);
             }
 
             if (doubleClicked) {
                 EditorState::Get().SetSelection(item.name, typeName, item.path);
+                SyncAssetToInspectors(item);
                 auto& state = EditorState::Get();
                 if (item.type == AssetItemType::Material) {
                     state.showMaterialEditorPanel = true;

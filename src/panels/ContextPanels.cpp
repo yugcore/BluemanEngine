@@ -30,29 +30,25 @@ void RenderMaterialEditorPanel(bool* pOpen) {
     const auto& pal = Theme::GetPalette();
     RenderPanelPlaceholderHeader("Material Graph & PBR Node Editor", "Shader / Material Workflow", pal.accent);
 
-    const std::string& asset = EditorState::Get().selectedAssetName;
-    if (!asset.empty()) {
-        ImGui::TextColored(pal.textPrimary, "Editing Material Asset: %s", asset.c_str());
-    } else {
-        ImGui::TextColored(pal.textSecondary, "Editing Material: Default_PBR_Material.zmat");
-    }
+    auto& mat = EditorState::Get().settings.activeMaterial;
+    ImGui::TextColored(pal.textPrimary, "Editing Material: %s", mat.materialName.c_str());
 
     ImGui::Spacing();
     if (ImGui::BeginTabBar("MaterialGraphTabs")) {
         if (ImGui::BeginTabItem("Graph Canvas")) {
             ImGui::Spacing();
             ImGui::TextDisabled("[ Base Color ] ----> ( PBR Master Node ) <---- [ Normal Map ]");
-            ImGui::TextDisabled("[ Roughness  ] ----> ( Metallic 0.85   )");
+            ImGui::TextDisabled("[ Roughness  ] ----> ( Metallic %.2f )", mat.metallic);
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Material Parameters")) {
             ImGui::Spacing();
-            static float baseColor[3] = { 0.8f, 0.2f, 0.2f };
-            static float roughness = 0.35f;
-            static float metallic = 0.90f;
-            ImGui::ColorEdit3("Base Color", baseColor);
-            ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f);
-            ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f);
+            ImGui::ColorEdit4("Base Color", mat.baseColor);
+            ImGui::SliderFloat("Roughness", &mat.roughness, 0.0f, 1.0f);
+            ImGui::SliderFloat("Metallic", &mat.metallic, 0.0f, 1.0f);
+            ImGui::SliderFloat("Specular", &mat.specular, 0.0f, 1.0f);
+            ImGui::SliderFloat("Emissive Intensity", &mat.emissiveIntensity, 0.0f, 10.0f);
+            ImGui::ColorEdit3("Emissive Color", mat.emissiveColor);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();

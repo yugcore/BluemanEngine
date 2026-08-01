@@ -138,6 +138,12 @@ void RenderObjectPalettePanel(bool* pOpen) {
             SceneNode newNode;
             newNode.name = item.name + "_" + std::to_string(rand() % 1000);
             newNode.type = item.type;
+            if (item.name.find("Cube") != std::string::npos) newNode.meshPath = "primitives/cube.zmesh";
+            else if (item.name.find("Sphere") != std::string::npos) newNode.meshPath = "primitives/sphere.zmesh";
+            else if (item.name.find("Cylinder") != std::string::npos) newNode.meshPath = "primitives/cylinder.zmesh";
+            else if (item.name.find("Plane") != std::string::npos) newNode.meshPath = "primitives/plane.zmesh";
+            else if (item.name.find("Cone") != std::string::npos) newNode.meshPath = "primitives/cone.zmesh";
+
             SceneGraph::Get().AddNode(newNode);
 
             EditorState::Get().SetSelection(newNode.name, SceneGraph::GetTypeIconTag(item.type));

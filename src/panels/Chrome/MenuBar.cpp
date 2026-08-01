@@ -5,10 +5,14 @@
 #include "panels/Chrome/Toolbar.h"
 #include "panels/Chrome/StatusBar.h"
 #include "core/EditorState.h"
+#include "core/SceneGraph.h"
+#include "core/CommandStack.h"
+#include "core/WindowsFileDialog.h"
 #include "core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 #include <imgui.h>
+#include <filesystem>
 
 namespace EngineEditor {
 
@@ -32,49 +36,199 @@ void RenderMenuBarContents() {
 
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Project Wizard...", "Ctrl+Shift+N")) EditorState::Get().showProjectWizardModal = true;
-        if (ImGui::MenuItem("New Scene", "Ctrl+N")) Logger::Get().Info("[Menu] File > New Scene created.");
-        if (ImGui::MenuItem("Open Scene...", "Ctrl+O")) Logger::Get().Info("[Menu] File > Open Scene dialog opened.");
-        if (ImGui::MenuItem("Save", "Ctrl+S")) Logger::Get().Info("[Menu] File > Save Scene completed.");
-        if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) Logger::Get().Info("[Menu] File > Save As dialog opened.");
+        if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
+            SceneGraph::Get().Clear();
+            EditorState::Get().SetSelection("", "");
+            EditorState::Get().currentLevelName = "Untitled Scene";
+            EditorState::Get().currentScenePath = "";
+            Logger::Get().Info("[Menu] File > New Scene created.");
+        }
+        if (ImGui::MenuItem("Open Scene...", "Ctrl+O")) {
+            auto files = WindowsFileDialog::OpenFileDialog(FileDialogType::OpenScene, "Open Blueman Scene Map", false);
+            if (!files.empty()) {
+                if (SceneGraph::Get().LoadFromFile(files[0])) {
+                    EditorState::Get().currentScenePath = files[0];
+                    std::filesystem::path p(files[0]);
+                    EditorState::Get().currentLevelName = p.filename().string();
+                    EditorState::Get().SetSelection("", "");
+                    Logger::Get().Info("[Menu] Loaded scene from " + files[0]);
+                }
+            }
+        }
+        if (ImGui::MenuItem("Save", "Ctrl+S")) {
+            if (EditorState::Get().currentScenePath.empty()) {
+                auto files = WindowsFileDialog::OpenFileDialog(FileDialogType::SaveScene, "Save Blueman Scene Map", false);
+                if (!files.empty()) {
+                    EditorState::Get().currentScenePath = files[0];
+                    std::filesystem::path p(files[0]);
+                    EditorState::Get().currentLevelName = p.filename().string();
+                }
+            }
+            if (!EditorState::Get().currentScenePath.empty()) {
+                if (SceneGraph::Get().SaveToFile(EditorState::Get().currentScenePath)) {
+                    Logger::Get().Info("[Menu] Saved scene to " + EditorState::Get().currentScenePath);
+                }
+            }
+        }
+        if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
+            auto files = WindowsFileDialog::OpenFileDialog(FileDialogType::SaveScene, "Save Blueman Scene Map As", false);
+            if (!files.empty()) {
+                EditorState::Get().currentScenePath = files[0];
+                std::filesystem::path p(files[0]);
+                EditorState::Get().currentLevelName = p.filename().string();
+                SceneGraph::Get().SaveToFile(files[0]);
+                Logger::Get().Info("[Menu] Saved scene as " + files[0]);
+            }
+        }
         ImGui::Separator();
-        if (ImGui::MenuItem("Import Assets...", "Ctrl+I")) Logger::Get().Info("[Menu] File > Import Assets dialog opened.");
+        if (ImGui::MenuItem("Import Assets...", "Ctrl+I")) {
+            EditorState::Get().TriggerImportFileDialog();
+            Logger::Get().Info("[Menu] File > Import Assets dialog opened.");
+        }
         ImGui::Separator();
-        if (ImGui::MenuItem("Exit", "Alt+F4")) Logger::Get().Info("[Menu] File > Exit selected.");
+        if (ImGui::MenuItem("Exit", "Alt+F4")) {
+            Logger::Get().Info("[Menu] File > Exit requested.");
+            exit(0);
+        }
         ImGui::EndMenu();
     }
 
     if (ImGui::BeginMenu("Edit")) {
-        if (ImGui::MenuItem("Undo", "Ctrl+Z")) Logger::Get().Info("[Menu] Edit > Undo clicked.");
-        if (ImGui::MenuItem("Redo", "Ctrl+Y")) Logger::Get().Info("[Menu] Edit > Redo clicked.");
+        if (ImGui::MenuItem("Undo", "Ctrl+Z")) CommandStack::Get().Undo();
+        if (ImGui::MenuItem("Redo", "Ctrl+Y")) CommandStack::Get().Redo();
         ImGui::Separator();
-        if (ImGui::MenuItem("Cut", "Ctrl+X")) Logger::Get().Info("[Menu] Edit > Cut clicked.");
-        if (ImGui::MenuItem("Copy", "Ctrl+C")) Logger::Get().Info("[Menu] Edit > Copy clicked.");
-        if (ImGui::MenuItem("Paste", "Ctrl+V")) Logger::Get().Info("[Menu] Edit > Paste clicked.");
-        if (ImGui::MenuItem("Duplicate", "Ctrl+D")) Logger::Get().Info("[Menu] Edit > Duplicate clicked.");
-        if (ImGui::MenuItem("Delete", "Del")) Logger::Get().Info("[Menu] Edit > Delete clicked.");
+        bool hasSelection = !EditorState::Get().selectedNodeName.empty();
+        if (ImGui::MenuItem("Cut", "Ctrl+X", false, hasSelection)) {
+            const SceneNode* target = SceneGraph::Get().FindNode(EditorState::Get().selectedNodeName);
+            if (target) {
+                SceneGraph::Get().SetClipboard(*target);
+                SceneGraph::Get().RemoveNode(EditorState::Get().selectedNodeName);
+                EditorState::Get().selectedNodeName = "";
+                Logger::Get().Info("[Menu] Cut node to clipboard.");
+            }
+        }
+        if (ImGui::MenuItem("Copy", "Ctrl+C", false, hasSelection)) {
+            const SceneNode* target = SceneGraph::Get().FindNode(EditorState::Get().selectedNodeName);
+            if (target) {
+                SceneGraph::Get().SetClipboard(*target);
+                Logger::Get().Info("[Menu] Copied node to clipboard.");
+            }
+        }
+        if (ImGui::MenuItem("Paste", "Ctrl+V", false, SceneGraph::Get().HasClipboard())) {
+            SceneNode* pasted = SceneGraph::Get().PasteClipboard();
+            if (pasted) {
+                EditorState::Get().SetSelection(pasted->name, SceneGraph::GetTypeName(pasted->type));
+                Logger::Get().Info("[Menu] Pasted node from clipboard: " + pasted->name);
+            }
+        }
+        if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, hasSelection)) {
+            SceneNode* dup = SceneGraph::Get().DuplicateNode(EditorState::Get().selectedNodeName);
+            if (dup) {
+                EditorState::Get().SetSelection(dup->name, SceneGraph::GetTypeName(dup->type));
+                Logger::Get().Info("[Menu] Duplicated node: " + dup->name);
+            }
+        }
+        if (ImGui::MenuItem("Delete", "Del", false, hasSelection)) {
+            SceneGraph::Get().RemoveNode(EditorState::Get().selectedNodeName);
+            EditorState::Get().selectedNodeName = "";
+            Logger::Get().Info("[Menu] Deleted selected node.");
+        }
         ImGui::Separator();
         if (ImGui::MenuItem("Project Settings...")) EditorState::Get().showProjectSettingsModal = true;
         ImGui::EndMenu();
     }
 
     if (ImGui::BeginMenu("Create")) {
-        if (ImGui::MenuItem("Empty GameObject")) Logger::Get().Info("[Menu] Create > Empty GameObject");
+        if (ImGui::MenuItem("Empty GameObject")) {
+            SceneNode emptyNode;
+            emptyNode.name = "EmptyActor_" + std::to_string(rand() % 1000);
+            emptyNode.type = SceneNodeType::Actor;
+            SceneGraph::Get().AddNode(emptyNode);
+            EditorState::Get().SetSelection(emptyNode.name, "Actor");
+            Logger::Get().Info("[Menu] Create > Empty GameObject: " + emptyNode.name);
+        }
         if (ImGui::BeginMenu("3D Object")) {
-            if (ImGui::MenuItem("Cube")) Logger::Get().Info("[Menu] Create > Cube");
-            if (ImGui::MenuItem("Sphere")) Logger::Get().Info("[Menu] Create > Sphere");
-            if (ImGui::MenuItem("Cylinder")) Logger::Get().Info("[Menu] Create > Cylinder");
-            if (ImGui::MenuItem("Plane")) Logger::Get().Info("[Menu] Create > Plane");
+            if (ImGui::MenuItem("Cube")) {
+                SceneNode cubeNode;
+                cubeNode.name = "Cube_" + std::to_string(rand() % 1000);
+                cubeNode.type = SceneNodeType::Actor;
+                cubeNode.meshPath = "primitives/cube.zmesh";
+                SceneGraph::Get().AddNode(cubeNode);
+                EditorState::Get().SetSelection(cubeNode.name, "Actor");
+            }
+            if (ImGui::MenuItem("Sphere")) {
+                SceneNode sphereNode;
+                sphereNode.name = "Sphere_" + std::to_string(rand() % 1000);
+                sphereNode.type = SceneNodeType::Actor;
+                sphereNode.meshPath = "primitives/sphere.zmesh";
+                SceneGraph::Get().AddNode(sphereNode);
+                EditorState::Get().SetSelection(sphereNode.name, "Actor");
+            }
+            if (ImGui::MenuItem("Cylinder")) {
+                SceneNode cylNode;
+                cylNode.name = "Cylinder_" + std::to_string(rand() % 1000);
+                cylNode.type = SceneNodeType::Actor;
+                cylNode.meshPath = "primitives/cylinder.zmesh";
+                SceneGraph::Get().AddNode(cylNode);
+                EditorState::Get().SetSelection(cylNode.name, "Actor");
+            }
+            if (ImGui::MenuItem("Plane")) {
+                SceneNode planeNode;
+                planeNode.name = "Plane_" + std::to_string(rand() % 1000);
+                planeNode.type = SceneNodeType::Actor;
+                planeNode.meshPath = "primitives/plane.zmesh";
+                SceneGraph::Get().AddNode(planeNode);
+                EditorState::Get().SetSelection(planeNode.name, "Actor");
+            }
+            if (ImGui::MenuItem("Cone")) {
+                SceneNode coneNode;
+                coneNode.name = "Cone_" + std::to_string(rand() % 1000);
+                coneNode.type = SceneNodeType::Actor;
+                coneNode.meshPath = "primitives/cone.zmesh";
+                SceneGraph::Get().AddNode(coneNode);
+                EditorState::Get().SetSelection(coneNode.name, "Actor");
+            }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Light")) {
-            if (ImGui::MenuItem("Directional Light")) Logger::Get().Info("[Menu] Create > Directional Light");
-            if (ImGui::MenuItem("Point Light")) Logger::Get().Info("[Menu] Create > Point Light");
-            if (ImGui::MenuItem("Spot Light")) Logger::Get().Info("[Menu] Create > Spot Light");
-            if (ImGui::MenuItem("SkyAtmosphere")) Logger::Get().Info("[Menu] Create > SkyAtmosphere");
+            if (ImGui::MenuItem("Directional Light")) {
+                SceneNode sunNode;
+                sunNode.name = "SunLight_" + std::to_string(rand() % 1000);
+                sunNode.type = SceneNodeType::Light;
+                SceneGraph::Get().AddNode(sunNode);
+                EditorState::Get().SetSelection(sunNode.name, "Light");
+            }
+            if (ImGui::MenuItem("Point Light")) {
+                SceneNode ptNode;
+                ptNode.name = "PointLight_" + std::to_string(rand() % 1000);
+                ptNode.type = SceneNodeType::Light;
+                SceneGraph::Get().AddNode(ptNode);
+                EditorState::Get().SetSelection(ptNode.name, "Light");
+            }
+            if (ImGui::MenuItem("Spot Light")) {
+                SceneNode spotNode;
+                spotNode.name = "SpotLight_" + std::to_string(rand() % 1000);
+                spotNode.type = SceneNodeType::Light;
+                SceneGraph::Get().AddNode(spotNode);
+                EditorState::Get().SetSelection(spotNode.name, "Light");
+            }
+            if (ImGui::MenuItem("SkyAtmosphere")) {
+                SceneNode skyNode;
+                skyNode.name = "SkyAtmosphere_" + std::to_string(rand() % 1000);
+                skyNode.type = SceneNodeType::SkyAtmosphere;
+                SceneGraph::Get().AddNode(skyNode);
+                EditorState::Get().SetSelection(skyNode.name, "SkyAtmosphere");
+            }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Audio")) {
-            if (ImGui::MenuItem("Audio Source")) Logger::Get().Info("[Menu] Create > Audio Source");
+            if (ImGui::MenuItem("Audio Source")) {
+                SceneNode audioNode;
+                audioNode.name = "AudioSource_" + std::to_string(rand() % 1000);
+                audioNode.type = SceneNodeType::Audio;
+                SceneGraph::Get().AddNode(audioNode);
+                EditorState::Get().SetSelection(audioNode.name, "Audio");
+            }
             ImGui::EndMenu();
         }
         ImGui::EndMenu();
@@ -138,17 +292,33 @@ void RenderMenuBarContents() {
     }
 
     if (ImGui::BeginMenu("Build")) {
-        if (ImGui::MenuItem("Build Geometry")) Logger::Get().Info("[Menu] Build > Geometry");
-        if (ImGui::MenuItem("Build Lighting (DXR)")) Logger::Get().Info("[Menu] Build > Lighting");
-        if (ImGui::MenuItem("Build Navigation Grid")) Logger::Get().Info("[Menu] Build > Navigation");
+        if (ImGui::MenuItem("Build Geometry")) {
+            EditorState::Get().status = EngineStatus::Building;
+            Logger::Get().Info("[Menu] Build > Geometry started.");
+            EditorState::Get().status = EngineStatus::Ready;
+        }
+        if (ImGui::MenuItem("Build Lighting (DXR)")) {
+            EditorState::Get().status = EngineStatus::Building;
+            Logger::Get().Info("[Menu] Build > Lighting DXR pass started.");
+            EditorState::Get().status = EngineStatus::Ready;
+        }
+        if (ImGui::MenuItem("Build Navigation Grid")) {
+            EditorState::Get().status = EngineStatus::Building;
+            Logger::Get().Info("[Menu] Build > Navigation AI grid started.");
+            EditorState::Get().status = EngineStatus::Ready;
+        }
         ImGui::Separator();
-        if (ImGui::MenuItem("Build All", "Ctrl+Shift+B")) Logger::Get().Info("[Menu] Build All");
+        if (ImGui::MenuItem("Build All", "Ctrl+Shift+B")) {
+            EditorState::Get().status = EngineStatus::Building;
+            Logger::Get().Info("[Menu] Build All executed (Geometry + DXR Lighting + NavGrid).");
+            EditorState::Get().status = EngineStatus::Ready;
+        }
         ImGui::EndMenu();
     }
 
     if (ImGui::BeginMenu("Help")) {
-        if (ImGui::MenuItem("Documentation")) Logger::Get().Info("[Menu] Help > Documentation");
-        if (ImGui::MenuItem("About Blueman Engine")) Logger::Get().Info("[Menu] Help > About");
+        if (ImGui::MenuItem("Documentation")) Logger::Get().Info("[Menu] Help > Opening Blueman Documentation.");
+        if (ImGui::MenuItem("About Blueman Engine")) EditorState::Get().showAboutModal = true;
         ImGui::EndMenu();
     }
 

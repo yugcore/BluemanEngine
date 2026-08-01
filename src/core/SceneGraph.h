@@ -27,6 +27,7 @@ struct SceneNode {
     SceneNodeType type;
     std::string world = "DefaultWorld";
     std::string panel = "MainPanel";
+    std::string meshPath = "";
     float location[3] = { 0.0f, 0.0f, 0.0f };
     float rotation[3] = { 0.0f, 0.0f, 0.0f };
     float scale[3]    = { 1.0f, 1.0f, 1.0f };
@@ -57,8 +58,19 @@ public:
     void AddNode(const SceneNode& node);
     bool RemoveNode(const std::string& name);
     bool RemoveNodeById(uint64_t id);
+    SceneNode* DuplicateNode(const std::string& name);
     void Clear();
     void SetRootNodes(const std::vector<SceneNode>& nodes);
+
+    // Serialization & Persistence
+    bool SaveToFile(const std::string& filepath) const;
+    bool LoadFromFile(const std::string& filepath);
+
+    // Clipboard
+    void SetClipboard(const SceneNode& node) { m_ClipboardNode = node; m_HasClipboard = true; }
+    bool HasClipboard() const { return m_HasClipboard; }
+    const SceneNode& GetClipboard() const { return m_ClipboardNode; }
+    SceneNode* PasteClipboard();
 
     // ID generation
     uint64_t GenerateNodeId();
@@ -66,6 +78,8 @@ public:
 private:
     std::vector<SceneNode> m_RootNodes;
     uint64_t m_NextNodeId = 1;
+    SceneNode m_ClipboardNode;
+    bool m_HasClipboard = false;
 
     // Recursive removal helper
     bool RemoveNodeRecursive(std::vector<SceneNode>& nodes, const std::string& name);

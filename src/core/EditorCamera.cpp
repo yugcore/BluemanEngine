@@ -114,7 +114,11 @@ void EditorCamera::Update(float deltaTime, const ViewportInputState& input) {
         }
 
         // WASDQE Keyboard Movement
-        float currentSpeed = m_MoveSpeed * (input.shiftHeld ? m_SpeedBoostMultiplier : 1.0f);
+        float speedMultiplier = 1.0f;
+        if (input.shiftHeld) speedMultiplier = m_SpeedBoostMultiplier;
+        else if (input.ctrlHeld) speedMultiplier = m_SlowSpeedMultiplier;
+
+        float currentSpeed = m_MoveSpeed * speedMultiplier;
         Vec3f targetVel(0.0f, 0.0f, 0.0f);
 
         if (input.keyW) { targetVel.x += m_Front.x * currentSpeed; targetVel.y += m_Front.y * currentSpeed; targetVel.z += m_Front.z * currentSpeed; }
@@ -227,18 +231,84 @@ void EditorCamera::GetViewMatrix(float outMatrix[16]) const {
     outMatrix[15] = 1.0f;
 }
 
-void EditorCamera::GetProjectionMatrix(float aspectRatio, float outMatrix[16]) const {
-    // D3D12 / Left-Handed perspective projection matrix (Z range [0, 1])
-    float fovRad = m_Fov * kDegToRad;
-    float tanHalfFov = std::tan(fovRad / 2.0f);
+void EditorCamera::SetPositionAndOrientation(const Vec3f& pos, float yaw, float pitch) {
+    m_Position = pos;
+    m_Yaw = yaw;
+    m_Pitch = pitch;
+    UpdateVectors();
+}
 
+void EditorCamera::SetProjectionMode(CameraProjectionMode mode) {
+    m_ProjMode = mode;
+    switch (mode) {
+        case CameraProjectionMode::Top:
+            m_Yaw = -90.0f; m_Pitch = -89.0f; break;
+        case CameraProjectionMode::Bottom:
+            m_Yaw = -90.0f; m_Pitch = 89.0f; break;
+        case CameraProjectionMode::Front:
+            m_Yaw = -90.0f; m_Pitch = 0.0f; break;
+        case CameraProjectionMode::Back:
+            m_Yaw = 90.0f; m_Pitch = 0.0f; break;
+        case CameraProjectionMode::Left:
+            m_Yaw = 0.0f; m_Pitch = 0.0f; break;
+        case CameraProjectionMode::Right:
+            m_Yaw = 180.0f; m_Pitch = 0.0f; break;
+        case CameraProjectionMode::Perspective:
+        default:
+            break;
+    }
+    UpdateVectors();
+}
+
+void EditorCamera::SaveBookmark(int slot, const std::string& name) {
+    if (slot < 0 || slot >= 10) return;
+    m_Bookmarks[slot].isSet = true;
+    m_Bookmarks[slot].name = name.empty() ? ("Bookmark " + std::to_string(slot)) : name;
+    m_Bookmarks[slot].position = m_Position;
+    m_Bookmarks[slot].yaw = m_Yaw;
+    m_Bookmarks[slot].pitch = m_Pitch;
+    m_Bookmarks[slot].fov = m_Fov;
+}
+
+bool EditorCamera::LoadBookmark(int slot) {
+    if (slot < 0 || slot >= 10 || !m_Bookmarks[slot].isSet) return false;
+    m_Position = m_Bookmarks[slot].position;
+    m_Yaw = m_Bookmarks[slot].yaw;
+    m_Pitch = m_Bookmarks[slot].pitch;
+    m_Fov = m_Bookmarks[slot].fov;
+    UpdateVectors();
+    return true;
+}
+
+const CameraBookmark* EditorCamera::GetBookmark(int slot) const {
+    if (slot < 0 || slot >= 10) return nullptr;
+    return &m_Bookmarks[slot];
+}
+
+void EditorCamera::GetProjectionMatrix(float aspectRatio, float outMatrix[16]) const {
     for (int i = 0; i < 16; ++i) outMatrix[i] = 0.0f;
 
-    outMatrix[0]  = 1.0f / (aspectRatio * tanHalfFov);
-    outMatrix[5]  = 1.0f / tanHalfFov;
-    outMatrix[10] = m_FarPlane / (m_NearPlane - m_FarPlane);
-    outMatrix[11] = -1.0f;
-    outMatrix[14] = (m_NearPlane * m_FarPlane) / (m_NearPlane - m_FarPlane);
+    if (m_ProjMode == CameraProjectionMode::Perspective) {
+        // D3D12 / Left-Handed perspective projection matrix (Z range [0, 1])
+        float fovRad = m_Fov * kDegToRad;
+        float tanHalfFov = std::tan(fovRad / 2.0f);
+
+        outMatrix[0]  = 1.0f / (aspectRatio * tanHalfFov);
+        outMatrix[5]  = 1.0f / tanHalfFov;
+        outMatrix[10] = m_FarPlane / (m_NearPlane - m_FarPlane);
+        outMatrix[11] = -1.0f;
+        outMatrix[14] = (m_NearPlane * m_FarPlane) / (m_NearPlane - m_FarPlane);
+    } else {
+        // Orthographic projection matrix
+        float orthoHeight = m_OrbitDistance * 1.5f;
+        float orthoWidth = orthoHeight * aspectRatio;
+
+        outMatrix[0]  = 2.0f / orthoWidth;
+        outMatrix[5]  = 2.0f / orthoHeight;
+        outMatrix[10] = 1.0f / (m_FarPlane - m_NearPlane);
+        outMatrix[14] = -m_NearPlane / (m_FarPlane - m_NearPlane);
+        outMatrix[15] = 1.0f;
+    }
 }
 
 } // namespace EngineEditor

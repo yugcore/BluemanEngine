@@ -335,6 +335,22 @@ void RenderOutlinerPanel(bool* pOpen) {
             }
         }
 
+        // Hotkey shortcuts for Outliner: Del (Delete), Ctrl+D (Duplicate)
+        if (ImGui::IsWindowFocused() && !EditorState::Get().selectedNodeName.empty()) {
+            if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
+                SceneGraph::Get().RemoveNode(EditorState::Get().selectedNodeName);
+                Logger::Get().Info("[Outliner] Deleted actor via Del key: " + EditorState::Get().selectedNodeName);
+                EditorState::Get().selectedNodeName = "";
+            }
+            if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D)) {
+                SceneNode* dup = SceneGraph::Get().DuplicateNode(EditorState::Get().selectedNodeName);
+                if (dup) {
+                    EditorState::Get().SetSelection(dup->name, SceneGraph::GetTypeName(dup->type));
+                    Logger::Get().Info("[Outliner] Duplicated actor via Ctrl+D: " + dup->name);
+                }
+            }
+        }
+
         // Right-Click Context Menu for Outliner
         if (ImGui::BeginPopupContextWindow("OutlinerContextMenu")) {
             if (ImGui::BeginMenu("+ Add Actor")) {
@@ -343,6 +359,7 @@ void RenderOutlinerPanel(bool* pOpen) {
                     sunNode.name = "SunLight_" + std::to_string(rand() % 1000);
                     sunNode.type = SceneNodeType::Light;
                     SceneGraph::Get().AddNode(sunNode);
+                    EditorState::Get().SetSelection(sunNode.name, "Light");
                     Logger::Get().Info("[Outliner] Added Directional Sun Light actor");
                 }
                 if (ImGui::MenuItem("Point Light")) {
@@ -350,6 +367,7 @@ void RenderOutlinerPanel(bool* pOpen) {
                     ptNode.name = "PointLight_" + std::to_string(rand() % 1000);
                     ptNode.type = SceneNodeType::Light;
                     SceneGraph::Get().AddNode(ptNode);
+                    EditorState::Get().SetSelection(ptNode.name, "Light");
                     Logger::Get().Info("[Outliner] Added Point Light actor");
                 }
                 if (ImGui::MenuItem("Spot Light")) {
@@ -357,6 +375,7 @@ void RenderOutlinerPanel(bool* pOpen) {
                     spotNode.name = "SpotLight_" + std::to_string(rand() % 1000);
                     spotNode.type = SceneNodeType::Light;
                     SceneGraph::Get().AddNode(spotNode);
+                    EditorState::Get().SetSelection(spotNode.name, "Light");
                     Logger::Get().Info("[Outliner] Added Spot Light actor");
                 }
                 ImGui::Separator();
@@ -365,6 +384,7 @@ void RenderOutlinerPanel(bool* pOpen) {
                     physNode.name = "RigidBody_" + std::to_string(rand() % 1000);
                     physNode.type = SceneNodeType::Actor;
                     SceneGraph::Get().AddNode(physNode);
+                    EditorState::Get().SetSelection(physNode.name, "Actor");
                     Logger::Get().Info("[Outliner] Added ZePhysics RigidBody actor");
                 }
                 if (ImGui::MenuItem("Static Mesh Actor")) {
@@ -372,6 +392,7 @@ void RenderOutlinerPanel(bool* pOpen) {
                     meshNode.name = "StaticMesh_" + std::to_string(rand() % 1000);
                     meshNode.type = SceneNodeType::Actor;
                     SceneGraph::Get().AddNode(meshNode);
+                    EditorState::Get().SetSelection(meshNode.name, "Actor");
                     Logger::Get().Info("[Outliner] Added Static Mesh actor");
                 }
                 if (ImGui::MenuItem("Folder")) {
@@ -379,18 +400,23 @@ void RenderOutlinerPanel(bool* pOpen) {
                     folderNode.name = "NewFolder_" + std::to_string(rand() % 1000);
                     folderNode.type = SceneNodeType::Folder;
                     SceneGraph::Get().AddNode(folderNode);
+                    EditorState::Get().SetSelection(folderNode.name, "Folder");
                     Logger::Get().Info("[Outliner] Added Folder node");
                 }
                 ImGui::EndMenu();
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Delete Selected Actor", nullptr, false, !EditorState::Get().selectedNodeName.empty())) {
+            if (ImGui::MenuItem("Duplicate Selected Actor", "Ctrl+D", false, !EditorState::Get().selectedNodeName.empty())) {
+                SceneNode* dup = SceneGraph::Get().DuplicateNode(EditorState::Get().selectedNodeName);
+                if (dup) {
+                    EditorState::Get().SetSelection(dup->name, SceneGraph::GetTypeName(dup->type));
+                    Logger::Get().Info("[Outliner] Duplicated actor: " + dup->name);
+                }
+            }
+            if (ImGui::MenuItem("Delete Selected Actor", "Del", false, !EditorState::Get().selectedNodeName.empty())) {
                 SceneGraph::Get().RemoveNode(EditorState::Get().selectedNodeName);
                 Logger::Get().Info("[Outliner] Deleted actor: " + EditorState::Get().selectedNodeName);
                 EditorState::Get().selectedNodeName = "";
-            }
-            if (ImGui::MenuItem("Duplicate Selected Actor", nullptr, false, !EditorState::Get().selectedNodeName.empty())) {
-                Logger::Get().Info("[Outliner] Duplicated actor: " + EditorState::Get().selectedNodeName);
             }
             ImGui::EndPopup();
         }

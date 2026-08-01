@@ -88,6 +88,9 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
     AssetItemType itemType = AssetItemType::Unknown;
     bool success = true;
     std::string statusMsg = "";
+    std::string projectDir = "Z:\\Blueman Cooked Assets";
+    std::error_code ec;
+    fs::create_directories(projectDir, ec);
 
     if (ext == ".fbx" || ext == ".gltf" || ext == ".glb" || ext == ".obj" || ext == ".vox") {
         itemType = AssetItemType::Mesh;
@@ -97,7 +100,7 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
         }
         m_CurrentProgress.store(0.35f);
 
-        // Invoke ZeGFX Asset Importer backend
+        // Invoke ZeGFX Asset Importer backend & cook to binary packages
         zegfx::asset::ImportOptions options = {};
         options.allowAssimpFallback = true;
         options.generateMissingTangents = true;
@@ -108,11 +111,12 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
 
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
-            m_CurrentStatusText = "Compiling .zmesh binary geometry cache...";
+            m_CurrentStatusText = "Cooking binary .zasset & .zmat packages to project folder...";
         }
+        bool cookedOk = zegfx::asset::cookAssetToZAsset(filePath, projectDir, options);
         std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
-        if (importRes.success) {
+        if (importRes.success || cookedOk) {
             statusMsg = "Mesh asset cooked successfully (" + std::to_string(importRes.asset.diagnostics.vertexCount) + " verts)";
         } else {
             statusMsg = "Import processed with fallbacks: " + importRes.error;
@@ -128,7 +132,7 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
         std::this_thread::sleep_for(std::chrono::milliseconds(150));
         statusMsg = "Texture compressed into .ztex payload successfully";
 
-    } else if (ext == ".zmesh") {
+    } else if (ext == ".zmesh" || ext == ".zasset") {
         itemType = AssetItemType::Mesh;
         m_CurrentProgress.store(0.80f);
         statusMsg = "Pre-compiled ZeGFX mesh registered";
@@ -152,21 +156,18 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
         m_CurrentStatusText = "Finalizing asset registration...";
     }
 
-    // Copy cooked output artifact to project folder "Z:\Blueman Cooked Assets"
-    std::string projectDir = "Z:\\Blueman Cooked Assets";
-    std::error_code ec;
-    fs::create_directories(projectDir, ec);
-
+    // Copy original or cooked file into project folder "Z:\Blueman Cooked Assets"
     std::string targetPath = (fs::path(projectDir) / fileName).string();
     fs::copy_file(filePath, targetPath, fs::copy_options::overwrite_existing, ec);
 
-    // Thread-safe dispatch to AssetRegistry
+    // Thread-safe dispatch to AssetRegistry & full rescan
     AssetItem item;
     item.name = fileName;
     item.type = itemType;
     item.path = targetPath.empty() ? filePath : targetPath;
 
     AssetRegistry::Get().RegisterAsset(item, projectDir);
+    AssetRegistry::Get().ScanProjectFolder(projectDir);
 
     // Add completion notification
     {

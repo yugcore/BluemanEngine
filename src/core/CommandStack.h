@@ -37,6 +37,53 @@ private:
     void ApplyTransformToNode(const TransformData& transform);
 };
 
+class SelectionChangeCommand : public ICommand {
+public:
+    SelectionChangeCommand(const std::vector<std::string>& oldSel, const std::vector<std::string>& newSel)
+        : m_OldSelection(oldSel), m_NewSelection(newSel) {}
+
+    void Execute() override {
+        EditorState::Get().selectedNodeNames = m_NewSelection;
+        EditorState::Get().selectedNodeName = m_NewSelection.empty() ? "" : m_NewSelection.back();
+    }
+
+    void Undo() override {
+        EditorState::Get().selectedNodeNames = m_OldSelection;
+        EditorState::Get().selectedNodeName = m_OldSelection.empty() ? "" : m_OldSelection.back();
+    }
+
+    const char* GetName() const override { return "Selection Change"; }
+
+private:
+    std::vector<std::string> m_OldSelection;
+    std::vector<std::string> m_NewSelection;
+};
+
+class CameraMoveCommand : public ICommand {
+public:
+    CameraMoveCommand(const Vec3f& oldPos, float oldYaw, float oldPitch, const Vec3f& newPos, float newYaw, float newPitch)
+        : m_OldPos(oldPos), m_OldYaw(oldYaw), m_OldPitch(oldPitch),
+          m_NewPos(newPos), m_NewYaw(newYaw), m_NewPitch(newPitch) {}
+
+    void Execute() override {
+        auto& cam = EditorState::Get().camera;
+        cam.SetPositionAndOrientation(m_NewPos, m_NewYaw, m_NewPitch);
+    }
+
+    void Undo() override {
+        auto& cam = EditorState::Get().camera;
+        cam.SetPositionAndOrientation(m_OldPos, m_OldYaw, m_OldPitch);
+    }
+
+    const char* GetName() const override { return "Camera Move"; }
+
+private:
+    Vec3f m_OldPos;
+    float m_OldYaw, m_OldPitch;
+    Vec3f m_NewPos;
+    float m_NewYaw, m_NewPitch;
+};
+
 class CommandStack {
 public:
     static CommandStack& Get();

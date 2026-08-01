@@ -1,8 +1,12 @@
 #include "AssetRegistry.h"
 #include "third_party/IconsFontAwesome6.h"
 #include <algorithm>
+#include <filesystem>
+#include <cctype>
 
 namespace EngineEditor {
+
+namespace fs = std::filesystem;
 
 AssetRegistry& AssetRegistry::Get() {
     static AssetRegistry instance;
@@ -12,15 +16,112 @@ AssetRegistry& AssetRegistry::Get() {
 AssetRegistry::AssetRegistry() {
     m_RootFolder.name = "Blueman Cooked Assets";
     m_RootFolder.path = "Z:\\Blueman Cooked Assets";
+    ScanProjectFolder("Z:\\Blueman Cooked Assets");
+}
+
+AssetFolder AssetRegistry::GetRootFolderCopy() const {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    return m_RootFolder;
+}
+
+AssetItemType AssetRegistry::DetectItemType(const std::string& extension) {
+    std::string ext = extension;
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+
+    if (ext == ".fbx" || ext == ".gltf" || ext == ".glb" || ext == ".obj" || ext == ".vox" || ext == ".zmesh" || ext == ".zasset") {
+        return AssetItemType::Mesh;
+    }
+    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga" || ext == ".dds" || ext == ".bmp" || ext == ".hdr" || ext == ".exr" || ext == ".ztex") {
+        return AssetItemType::Texture;
+    }
+    if (ext == ".zmat" || ext == ".mat" || ext == ".material") {
+        return AssetItemType::Material;
+    }
+    if (ext == ".zelyn" || ext == ".lua" || ext == ".cpp" || ext == ".cs") {
+        return AssetItemType::Script;
+    }
+    if (ext == ".zscene" || ext == ".json" || ext == ".map") {
+        return AssetItemType::Level;
+    }
+    if (ext == ".wav" || ext == ".mp3" || ext == ".ogg") {
+        return AssetItemType::Audio;
+    }
+    if (ext == ".hlsl" || ext == ".zeshader" || ext == ".vfx") {
+        return AssetItemType::VFX;
+    }
+    return AssetItemType::Unknown;
+}
+
+void AssetRegistry::ScanProjectFolder(const std::string& folderPath) {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+
+    m_RootFolder.name = "Blueman Cooked Assets";
+    m_RootFolder.path = folderPath;
+    m_RootFolder.items.clear();
+    m_RootFolder.subfolders.clear();
+
+    std::error_code ec;
+    if (!fs::exists(folderPath, ec)) {
+        fs::create_directories(folderPath, ec);
+    }
+
+    if (!fs::exists(folderPath, ec) || !fs::is_directory(folderPath, ec)) {
+        return;
+    }
+
+    for (const auto& entry : fs::directory_iterator(folderPath, ec)) {
+        if (ec) break;
+        if (entry.is_regular_file()) {
+            std::string ext = entry.path().extension().string();
+            AssetItem item;
+            item.name = entry.path().filename().string();
+            item.path = entry.path().string();
+            item.type = DetectItemType(ext);
+            m_RootFolder.items.push_back(item);
+        } else if (entry.is_directory()) {
+            AssetFolder subFolder;
+            subFolder.name = entry.path().filename().string();
+            subFolder.path = entry.path().string();
+
+            for (const auto& subEntry : fs::directory_iterator(entry.path(), ec)) {
+                if (subEntry.is_regular_file()) {
+                    std::string ext = subEntry.path().extension().string();
+                    AssetItem subItem;
+                    subItem.name = subEntry.path().filename().string();
+                    subItem.path = subEntry.path().string();
+                    subItem.type = DetectItemType(ext);
+                    subFolder.items.push_back(subItem);
+                }
+            }
+            m_RootFolder.subfolders.push_back(subFolder);
+        }
+    }
 }
 
 void AssetRegistry::RegisterAsset(const AssetItem& item, const std::string& folderPath) {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+
+    // Check if asset already exists in root folder to avoid duplicate entries
+    for (auto& existing : m_RootFolder.items) {
+        if (existing.path == item.path || existing.name == item.name) {
+            existing = item;
+            return;
+        }
+    }
+
     if (folderPath.empty() || folderPath == m_RootFolder.path) {
         m_RootFolder.items.push_back(item);
         return;
     }
-    AssetFolder* folder = const_cast<AssetFolder*>(FindFolder(folderPath));
+
+    AssetFolder* folder = const_cast<AssetFolder*>(FindFolder(folderPath, &m_RootFolder));
     if (folder) {
+        for (auto& existing : folder->items) {
+            if (existing.path == item.path || existing.name == item.name) {
+                existing = item;
+                return;
+            }
+        }
         folder->items.push_back(item);
     } else {
         m_RootFolder.items.push_back(item);
@@ -28,15 +129,18 @@ void AssetRegistry::RegisterAsset(const AssetItem& item, const std::string& fold
 }
 
 void AssetRegistry::RegisterFolder(const AssetFolder& folder) {
+    std::lock_guard<std::mutex> lock(m_Mutex);
     m_RootFolder.subfolders.push_back(folder);
 }
 
 void AssetRegistry::Clear() {
+    std::lock_guard<std::mutex> lock(m_Mutex);
     m_RootFolder.items.clear();
     m_RootFolder.subfolders.clear();
 }
 
 void AssetRegistry::SetRootFolder(const AssetFolder& folder) {
+    std::lock_guard<std::mutex> lock(m_Mutex);
     m_RootFolder = folder;
 }
 

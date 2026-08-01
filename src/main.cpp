@@ -21,6 +21,7 @@
 #include "render/ZeGFXAdapter.h"
 #include "render/SplashScreen.h"
 #include "core/BackgroundAssetCooker.h"
+#include "core/AssetRegistry.h"
 #include "core/WindowsFileDialog.h"
 
 using Microsoft::WRL::ComPtr;
@@ -191,6 +192,8 @@ static void RenderFrame() {
         else EngineEditor::CommandStack::Get().Undo();
     } else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false)) {
         EngineEditor::CommandStack::Get().Redo();
+    } else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_I, false)) {
+        EngineEditor::EditorState::Get().TriggerImportFileDialog();
     }
 
     // Render Editor Application Shell (includes Viewport & ZeGFX Adapter rendering)
@@ -246,6 +249,50 @@ static void RenderFrame() {
     g_fenceLastSignaledValue = fenceValue;
     frameCtx->fenceValue = fenceValue;
     s_InFrameRender = false;
+
+    // --- High-Resolution Profiling Instrumentation ---
+    auto tEnd = std::chrono::high_resolution_clock::now();
+    double tTotalMs = std::chrono::duration<double, std::milli>(tEnd - tFrameStart).count();
+    double tPresentMs = std::chrono::duration<double, std::milli>(tEnd - t5).count();
+
+    static uint64_t s_ProfileFrameCount = 0;
+    static double s_AccTotalMs = 0.0;
+    static double s_AccWaitMs = 0.0;
+    static double s_AccLayoutMs = 0.0;
+    static double s_AccImGuiDrawMs = 0.0;
+    static double s_AccExecuteMs = 0.0;
+    static double s_AccPresentMs = 0.0;
+
+    s_ProfileFrameCount++;
+    s_AccTotalMs += tTotalMs;
+    s_AccWaitMs += tWait;
+    s_AccLayoutMs += tLayout;
+    s_AccImGuiDrawMs += tImGuiDraw;
+    s_AccExecuteMs += tExecute;
+    s_AccPresentMs += tPresentMs;
+
+    if (s_ProfileFrameCount % 120 == 0) {
+        double avgTotal = s_AccTotalMs / 120.0;
+        double avgWait = s_AccWaitMs / 120.0;
+        double avgLayout = s_AccLayoutMs / 120.0;
+        double avgImGuiDraw = s_AccImGuiDrawMs / 120.0;
+        double avgExecute = s_AccExecuteMs / 120.0;
+        double avgPresent = s_AccPresentMs / 120.0;
+        double avgFps = (avgTotal > 0.001) ? (1000.0 / avgTotal) : 0.0;
+
+        std::cout << "[PROFILE METRICS] Frames: " << s_ProfileFrameCount
+                  << " | FPS: " << avgFps
+                  << " | TotalFrame: " << avgTotal << " ms"
+                  << " | WaitNextFrameRes: " << avgWait << " ms"
+                  << " | Layout&ZeGFX: " << avgLayout << " ms"
+                  << " | ImGuiRender: " << avgImGuiDraw << " ms"
+                  << " | ExecuteCmds: " << avgExecute << " ms"
+                  << " | Present: " << avgPresent << " ms"
+                  << std::endl;
+
+        s_AccTotalMs = 0.0; s_AccWaitMs = 0.0; s_AccLayoutMs = 0.0;
+        s_AccImGuiDrawMs = 0.0; s_AccExecuteMs = 0.0; s_AccPresentMs = 0.0;
+    }
 }
 
 static LRESULT CALLBACK EditorWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -468,6 +515,23 @@ int main(int argc, char** argv) {
         1280,
         720
     );
+
+    // Initial scan of cooked asset directory
+    EngineEditor::AssetRegistry::Get().ScanProjectFolder("Z:\\Blueman Cooked Assets");
+
+    // Register GLFW drag-and-drop file import callback
+    glfwSetDropCallback(window, [](GLFWwindow* w, int count, const char** paths) {
+        (void)w;
+        std::vector<std::string> filePaths;
+        for (int i = 0; i < count; i++) {
+            if (paths[i] && paths[i][0] != '\0') {
+                filePaths.push_back(paths[i]);
+            }
+        }
+        if (!filePaths.empty()) {
+            EngineEditor::BackgroundAssetCooker::Get().QueueFilesForCooking(filePaths);
+        }
+    });
 
     // Main Loop
     while (!glfwWindowShouldClose(window)) {

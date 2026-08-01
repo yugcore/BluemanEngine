@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <mutex>
 #include <imgui.h>
 
 namespace EngineEditor {
@@ -41,14 +42,19 @@ public:
 
     AssetRegistry();
 
+    AssetFolder GetRootFolderCopy() const;
     const AssetFolder& GetRootFolder() const { return m_RootFolder; }
     
-    // Find folder by path (e.g. "ZeGFX Workspace/Blueman Cooked Assets/Meshes")
+    // Find folder by path (e.g. "Z:\Blueman Cooked Assets")
     const AssetFolder* FindFolder(const std::string& path, const AssetFolder* current = nullptr) const;
 
     // Helper functions for asset metadata
     static const char* GetTypeName(AssetItemType type);
     static ImVec4 GetTypeColor(AssetItemType type);
+    static AssetItemType DetectItemType(const std::string& extension);
+
+    // Dynamic scanning of cooked asset directory
+    void ScanProjectFolder(const std::string& folderPath = "Z:\\Blueman Cooked Assets");
 
     // Runtime Ports for Engine Integration
     void RegisterAsset(const AssetItem& item, const std::string& folderPath = "");
@@ -57,6 +63,7 @@ public:
     void SetRootFolder(const AssetFolder& folder);
 
 private:
+    mutable std::mutex m_Mutex;
     AssetFolder m_RootFolder;
 };
 

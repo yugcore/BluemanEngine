@@ -1,6 +1,9 @@
 #include "SceneGraph.h"
 #include "third_party/IconsFontAwesome6.h"
+#include "core/Logger.h"
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 
 namespace EngineEditor {
 
@@ -58,6 +61,121 @@ void SceneGraph::AddNode(const SceneNode& node) {
         n.id = GenerateNodeId();
     }
     m_RootNodes.push_back(n);
+}
+
+SceneNode* SceneGraph::DuplicateNode(const std::string& name) {
+    const SceneNode* target = FindNode(name);
+    if (!target) return nullptr;
+
+    SceneNode dup = *target;
+    dup.id = GenerateNodeId();
+    dup.name = target->name + "_Copy";
+    dup.location[0] += 1.0f;
+    dup.location[2] += 1.0f;
+
+    // Helper to fix child IDs recursively
+    auto fixChildIds = [this](auto& self, SceneNode& n) -> void {
+        for (auto& child : n.children) {
+            child.id = this->GenerateNodeId();
+            self(self, child);
+        }
+    };
+    fixChildIds(fixChildIds, dup);
+
+    m_RootNodes.push_back(dup);
+    return &m_RootNodes.back();
+}
+
+SceneNode* SceneGraph::PasteClipboard() {
+    if (!m_HasClipboard) return nullptr;
+    SceneNode pasted = m_ClipboardNode;
+    pasted.id = GenerateNodeId();
+    pasted.name = m_ClipboardNode.name + "_Pasted";
+    pasted.location[0] += 0.5f;
+    pasted.location[2] += 0.5f;
+
+    m_RootNodes.push_back(pasted);
+    return &m_RootNodes.back();
+}
+
+bool SceneGraph::SaveToFile(const std::string& filepath) const {
+    std::ofstream out(filepath);
+    if (!out.is_open()) return false;
+
+    auto serializeNode = [&out](auto& self, const SceneNode& node, int indent) -> void {
+        std::string ind(indent * 2, ' ');
+        out << ind << "NODE " << node.id << " " << static_cast<int>(node.type) << " \"" << node.name << "\"\n";
+        out << ind << "POS " << node.location[0] << " " << node.location[1] << " " << node.location[2] << "\n";
+        out << ind << "ROT " << node.rotation[0] << " " << node.rotation[1] << " " << node.rotation[2] << "\n";
+        out << ind << "SCL " << node.scale[0] << " " << node.scale[1] << " " << node.scale[2] << "\n";
+        out << ind << "MESH \"" << node.meshPath << "\"\n";
+        out << ind << "CHILDREN " << node.children.size() << "\n";
+        for (const auto& child : node.children) {
+            self(self, child, indent + 1);
+        }
+    };
+
+    out << "SCENE_GRAPH " << m_RootNodes.size() << "\n";
+    for (const auto& node : m_RootNodes) {
+        serializeNode(serializeNode, node, 1);
+    }
+
+    return true;
+}
+
+bool SceneGraph::LoadFromFile(const std::string& filepath) {
+    std::ifstream in(filepath);
+    if (!in.is_open()) return false;
+
+    std::string tag;
+    size_t rootCount = 0;
+    if (!(in >> tag >> rootCount) || tag != "SCENE_GRAPH") return false;
+
+    Clear();
+
+    auto parseNode = [&in](auto& self) -> SceneNode {
+        SceneNode n;
+        std::string lineTag;
+        int typeInt = 0;
+        in >> lineTag >> n.id >> typeInt;
+        n.type = static_cast<SceneNodeType>(typeInt);
+
+        // Read name in quotes
+        in >> std::ws;
+        char quote = in.get();
+        if (quote == '"') {
+            std::getline(in, n.name, '"');
+        } else {
+            in.unget();
+            in >> n.name;
+        }
+
+        in >> lineTag >> n.location[0] >> n.location[1] >> n.location[2];
+        in >> lineTag >> n.rotation[0] >> n.rotation[1] >> n.rotation[2];
+        in >> lineTag >> n.scale[0] >> n.scale[1] >> n.scale[2];
+
+        in >> lineTag >> std::ws;
+        quote = in.get();
+        if (quote == '"') {
+            std::getline(in, n.meshPath, '"');
+        } else {
+            in.unget();
+            in >> n.meshPath;
+        }
+
+        size_t childCount = 0;
+        in >> lineTag >> childCount;
+        for (size_t i = 0; i < childCount; ++i) {
+            n.children.push_back(self(self));
+        }
+        return n;
+    };
+
+    for (size_t i = 0; i < rootCount; ++i) {
+        m_RootNodes.push_back(parseNode(parseNode));
+    }
+
+    return true;
 }
 
 bool SceneGraph::RemoveNodeRecursive(std::vector<SceneNode>& nodes, const std::string& name) {

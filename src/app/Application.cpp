@@ -8,6 +8,7 @@
 #include "core/BackgroundAssetCooker.h"
 #include "core/CommandStack.h"
 #include "render/SplashScreen.h"
+#include "theme/Colors.h"
 
 #include "panels/Chrome/CustomTitleBar.h"
 #include "panels/Chrome/MenuBar.h"
@@ -132,6 +133,29 @@ void RenderApplicationLayout() {
     // Render Modals
     RenderProjectWizardModal(&state.showProjectWizardModal);
     RenderProjectSettingsModal(&state.showProjectSettingsModal);
+
+    if (state.showAboutModal) {
+        ImGui::OpenPopup("About Blueman Engine");
+        if (ImGui::BeginPopupModal("About Blueman Engine", &state.showAboutModal, ImGuiWindowFlags_AlwaysAutoResize)) {
+            const auto& pal = Theme::GetPalette();
+            ImGui::TextColored(pal.accent, "Blueman Engine v3.5 Enterprise Edition");
+            ImGui::TextColored(pal.textSecondary, "Next-Generation DirectX 12 High-Performance Rendering Suite");
+            ImGui::Separator();
+            ImGui::Spacing();
+            ImGui::BulletText("Renderer: DirectX 12 Agility SDK (DXR 1.1 / Mesh Shaders)");
+            ImGui::BulletText("Asset Pipeline: Background Asset Cooker & Virtual File System");
+            ImGui::BulletText("Scripting Architecture: Zelyn Language Compiler Integration");
+            ImGui::BulletText("Engine Architecture: Lock-Free Multithreaded Subsystem Graph");
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            if (ImGui::Button("Close", ImVec2(120.0f, 26.0f))) {
+                state.showAboutModal = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+    }
 
     // 7. Render Fixed Bottom Status Bar
     RenderStatusBar();
