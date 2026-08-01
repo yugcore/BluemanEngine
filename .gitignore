@@ -57,7 +57,23 @@ Desktop.ini
 ehthumbs.db
 .DS_Store
 
-# Temporary & Log Files
+# Temporary, Log & Output Files
 *.log
+*.out.log
+*.out
 *.tmp
 *.bak
+*.dmp
+
+# Frame & Render Captures
+*_Captures/
+*Captures/
+
+# Cache & Build Directories
+.cache/
+Cache/
+
+# Temporary Reports & Draft Plans
+RELEASE_REPORT.txt
+implementation_plan*
+
