@@ -92,6 +92,145 @@ void WaitForGPU() {
     FlushCommandQueue();
 }
 
+static GLFWwindow* g_Window = nullptr;
+static WNDPROC g_PrevWndProc = NULL;
+static bool s_InFrameRender = false;
+
+static void RenderFrame() {
+    if (s_InFrameRender || !g_Window || !g_pSwapChain) return;
+    s_InFrameRender = true;
+
+    int display_w = 0, display_h = 0;
+    glfwGetFramebufferSize(g_Window, &display_w, &display_h);
+
+    if (display_w == 0 || display_h == 0 || glfwGetWindowAttrib(g_Window, GLFW_ICONIFIED)) {
+        s_InFrameRender = false;
+        return;
+    }
+
+    // Handle SwapChain Resizing
+    if (g_SwapChainWidth != (UINT)display_w || g_SwapChainHeight != (UINT)display_h) {
+        FlushCommandQueue();
+        CleanupRenderTarget();
+        HRESULT hr = g_pSwapChain->ResizeBuffers(
+            0,
+            (UINT)display_w,
+            (UINT)display_h,
+            DXGI_FORMAT_UNKNOWN,
+            DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
+        );
+        g_SwapChainWidth = (UINT)display_w;
+        g_SwapChainHeight = (UINT)display_h;
+        if (SUCCEEDED(hr)) {
+            CreateRenderTarget();
+        } else {
+            std::cerr << "[DX12] ResizeBuffers failed (hr = 0x" << std::hex << hr << ")" << std::endl;
+        }
+    }
+
+    // 1. BeginFrame & Wait for Next Frame Resources
+    FrameContext* frameCtx = WaitForNextFrameResources();
+    g_FrameIndex = g_pSwapChain->GetCurrentBackBufferIndex();
+
+    // 2. Reset Command Allocator & List
+    frameCtx->commandAllocator->Reset();
+    g_pd3dCommandList->Reset(frameCtx->commandAllocator.Get(), nullptr);
+
+    // 3. Transition Backbuffer to RENDER_TARGET
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = g_mainRenderTargetResource[g_FrameIndex].Get();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    g_pd3dCommandList->ResourceBarrier(1, &barrier);
+
+    // 4. Bind Descriptor Heaps & Set Command List on ViewportRenderer
+    ID3D12DescriptorHeap* heaps[] = { g_pd3dSrvDescHeap.Get() };
+    g_pd3dCommandList->SetDescriptorHeaps(1, heaps);
+    EngineEditor::ViewportRenderer::Get().SetCommandList(g_pd3dCommandList.Get());
+
+    // 5. Clear Render Target View Unconditionally
+    const float clear_color_with_alpha[4] = { 0.08f, 0.08f, 0.09f, 1.00f };
+    g_pd3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[g_FrameIndex], clear_color_with_alpha, 0, nullptr);
+    g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[g_FrameIndex], FALSE, nullptr);
+
+    // 6. Start ImGui Frame
+    ImGui_ImplDX12_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
+        if (io.KeyShift) EngineEditor::CommandStack::Get().Redo();
+        else EngineEditor::CommandStack::Get().Undo();
+    } else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false)) {
+        EngineEditor::CommandStack::Get().Redo();
+    }
+
+    // Render Editor Application Shell
+    EngineEditor::RenderApplicationLayout();
+
+    // 7. Render ImGui Draw Data
+    ImGui::Render();
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_pd3dCommandList.Get());
+
+    // 8. Transition Backbuffer to PRESENT & Close Command List
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+    g_pd3dCommandList->ResourceBarrier(1, &barrier);
+    g_pd3dCommandList->Close();
+
+    // 9. Execute Command Lists
+    g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)g_pd3dCommandList.GetAddressOf());
+
+    // Multi-viewport Platform Windows
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault(nullptr, (void*)g_pd3dCommandList.Get());
+    }
+
+    // 10. Present & EndFrame
+    g_pSwapChain->Present(1, 0);
+
+    UINT64 fenceValue = g_fenceLastSignaledValue + 1;
+    g_pd3dCommandQueue->Signal(g_pFence.Get(), fenceValue);
+    g_fenceLastSignaledValue = fenceValue;
+    frameCtx->fenceValue = fenceValue;
+
+    s_InFrameRender = false;
+}
+
+static LRESULT CALLBACK EditorWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_PAINT:
+    case WM_MOVE:
+    case WM_SIZE:
+    case WM_MOVING:
+    case WM_SIZING:
+    case WM_ENTERSIZEMOVE:
+        RenderFrame();
+        break;
+    case WM_EXITSIZEMOVE:
+        FlushCommandQueue();
+        RenderFrame();
+        break;
+    case WM_NCHITTEST: {
+        POINT pt = { (SHORT)LOWORD(lParam), (SHORT)HIWORD(lParam) };
+        ScreenToClient(hwnd, &pt);
+        float titleHeight = EngineEditor::GetTitleBarTotalHeight();
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        if (pt.y >= 0 && pt.y <= titleHeight && pt.x >= 0 && pt.x < (rect.right - 132)) {
+            return HTCAPTION;
+        }
+        break;
+    }
+    }
+    return CallWindowProc(g_PrevWndProc, hwnd, uMsg, wParam, lParam);
+}
+
 int main(int argc, char** argv) {
     glfwSetErrorCallback(glfw_error_callback);
 
@@ -110,7 +249,10 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    g_Window = window;
     HWND hwnd = glfwGetWin32Window(window);
+    g_PrevWndProc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)EditorWndProc);
+
     if (!CreateDeviceD3D(hwnd)) {
         std::cerr << "Failed to initialize Direct3D 12 device!" << std::endl;
         CleanupDeviceD3D();
@@ -167,105 +309,7 @@ int main(int argc, char** argv) {
     // Main Loop
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-
-        int display_w = 0, display_h = 0;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-
-        if (display_w == 0 || display_h == 0) {
-            ImGui_ImplGlfw_Sleep(10);
-            continue;
-        }
-
-        if (glfwGetWindowAttrib(window, GLFW_ICONIFIED)) {
-            ImGui_ImplGlfw_Sleep(10);
-            continue;
-        }
-
-        // Handle SwapChain Resizing (e.g. Maximize / Fullscreen)
-        if (g_pSwapChain != nullptr && (g_SwapChainWidth != (UINT)display_w || g_SwapChainHeight != (UINT)display_h)) {
-            FlushCommandQueue();
-            CleanupRenderTarget();
-            HRESULT hr = g_pSwapChain->ResizeBuffers(
-                0,
-                (UINT)display_w,
-                (UINT)display_h,
-                DXGI_FORMAT_UNKNOWN,
-                DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
-            );
-            g_SwapChainWidth = (UINT)display_w;
-            g_SwapChainHeight = (UINT)display_h;
-            if (SUCCEEDED(hr)) {
-                CreateRenderTarget();
-            } else {
-                std::cerr << "[DX12] ResizeBuffers failed (hr = 0x" << std::hex << hr << ")" << std::endl;
-            }
-        }
-
-
-        FrameContext* frameCtx = WaitForNextFrameResources();
-        g_FrameIndex = g_pSwapChain->GetCurrentBackBufferIndex();
-        frameCtx->commandAllocator->Reset();
-
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        barrier.Transition.pResource = g_mainRenderTargetResource[g_FrameIndex].Get();
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-        g_pd3dCommandList->Reset(frameCtx->commandAllocator.Get(), nullptr);
-        g_pd3dCommandList->ResourceBarrier(1, &barrier);
-
-        // Bind descriptor heap & set command list on ViewportRenderer
-        ID3D12DescriptorHeap* heaps[] = { g_pd3dSrvDescHeap.Get() };
-        g_pd3dCommandList->SetDescriptorHeaps(1, heaps);
-        EngineEditor::ViewportRenderer::Get().SetCommandList(g_pd3dCommandList.Get());
-
-        ImGui_ImplDX12_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-
-        // Keyboard Shortcuts (Ctrl+Z = Undo, Ctrl+Y / Ctrl+Shift+Z = Redo)
-        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
-            if (io.KeyShift) EngineEditor::CommandStack::Get().Redo();
-            else EngineEditor::CommandStack::Get().Undo();
-        } else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false)) {
-            EngineEditor::CommandStack::Get().Redo();
-        }
-
-        // Render Editor Application Shell
-        EngineEditor::RenderApplicationLayout();
-
-        // Rendering
-        ImGui::Render();
-
-        const float clear_color_with_alpha[4] = { 0.08f, 0.08f, 0.09f, 1.00f };
-        g_pd3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[g_FrameIndex], clear_color_with_alpha, 0, nullptr);
-        g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[g_FrameIndex], FALSE, nullptr);
-
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_pd3dCommandList.Get());
-
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-        g_pd3dCommandList->ResourceBarrier(1, &barrier);
-        g_pd3dCommandList->Close();
-
-        g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)g_pd3dCommandList.GetAddressOf());
-
-        // Update and Render additional Platform Windows (Multi-viewport)
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault(nullptr, (void*)g_pd3dCommandList.Get());
-        }
-
-        g_pSwapChain->Present(1, 0); // Present with vsync
-
-        UINT64 fenceValue = g_fenceLastSignaledValue + 1;
-        g_pd3dCommandQueue->Signal(g_pFence.Get(), fenceValue);
-        g_fenceLastSignaledValue = fenceValue;
-        frameCtx->fenceValue = fenceValue;
+        RenderFrame();
     }
 
     WaitForLastSubmittedFrame();

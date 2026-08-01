@@ -27,12 +27,22 @@
 #include "panels/Run/RunViewportPanel.h"
 #include "panels/Run/RunBottomDockPanel.h"
 
+// New Code-First Modules
+#include "panels/ObjectPalette/ObjectPalettePanel.h"
+#include "panels/MeshStudio/MeshStudioPanel.h"
+#include "panels/ShaderStudio/ShaderStudioPanel.h"
+#include "panels/TextureViewer/TextureViewerPanel.h"
+#include "panels/ProjectWizard/ProjectWizardModal.h"
+#include "panels/ProjectSettings/ProjectSettingsModal.h"
+
 namespace EngineEditor {
 
 void InitializeApplication() {
 }
 
 void RenderApplicationLayout() {
+    auto& state = EditorState::Get();
+
     // 1. Render unified title bar (includes menu bar inline)
     RenderCustomTitleBar();
 
@@ -51,15 +61,19 @@ void RenderApplicationLayout() {
     Layout::SetupDefaultLayout(dockspaceId, bounds);
 
     // 6. Render active workspace panels
-    WorkspaceMode mode = EditorState::Get().activeWorkspace;
+    WorkspaceMode mode = state.activeWorkspace;
 
     if (mode == WorkspaceMode::Editor) {
+        if (state.showObjectPalettePanel) RenderObjectPalettePanel(&state.showObjectPalettePanel);
         RenderContentBrowserPanel();
         RenderViewportPanel();
         RenderOutlinerPanel();
         RenderDetailsPanel();
         RenderOutputLogPanel();
         RenderRenderControlStripPanel();
+        if (state.showMeshStudioPanel) RenderMeshStudioPanel(&state.showMeshStudioPanel);
+        if (state.showShaderStudioPanel) RenderShaderStudioPanel(&state.showShaderStudioPanel);
+        if (state.showTextureViewerPanel) RenderTextureViewerPanel(&state.showTextureViewerPanel);
     }
     else if (mode == WorkspaceMode::Codebase) {
         RenderProjectExplorerPanel();
@@ -71,6 +85,10 @@ void RenderApplicationLayout() {
         RenderRunViewportPanel();
         RenderRunBottomDockPanel();
     }
+
+    // Render Modals
+    RenderProjectWizardModal(&state.showProjectWizardModal);
+    RenderProjectSettingsModal(&state.showProjectSettingsModal);
 
     // 7. Render Fixed Bottom Status Bar
     RenderStatusBar();

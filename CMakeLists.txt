@@ -64,6 +64,12 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/panels/OutputLog/*.cpp"
     "src/panels/RenderControlStrip/*.cpp"
     "src/panels/Viewport/*.cpp"
+    "src/panels/ObjectPalette/*.cpp"
+    "src/panels/MeshStudio/*.cpp"
+    "src/panels/ShaderStudio/*.cpp"
+    "src/panels/TextureViewer/*.cpp"
+    "src/panels/ProjectWizard/*.cpp"
+    "src/panels/ProjectSettings/*.cpp"
 )
 
 add_executable(engine_editor ${SOURCES})

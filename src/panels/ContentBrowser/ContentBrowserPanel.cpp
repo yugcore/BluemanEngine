@@ -123,37 +123,32 @@ void RenderContentBrowserPanel(bool* pOpen) {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 3.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6.0f, 0.0f));
 
-    ImGui::TextDisabled("Folders:");
+    static int s_ActiveTypeFilter = 0; // 0: All, 1: Material, 2: Mesh, 3: Texture, 4: Script, 5: Audio, 6: Level, 7: VFX
+    static int s_SortMode = 0;         // 0: Name (A-Z), 1: Name (Z-A), 2: Type
+
+    // Category Type Filter Bar
+    ImGui::TextDisabled("Filter:");
     ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
 
-    struct FolderChoice { const char* label; const char* path; };
-    FolderChoice choices[] = {
-        { "Materials", "ZeGFX Workspace/Content/StarterContent/Materials" },
-        { "Architecture", "ZeGFX Workspace/Content/StarterContent/Architecture" },
-        { "Blueprints", "ZeGFX Workspace/Content/StarterContent/Blueprints" },
-        { "Textures", "ZeGFX Workspace/Content/StarterContent/Textures" },
-        { "Audio", "ZeGFX Workspace/Content/StarterContent/Audio" },
-        { "Shapes", "ZeGFX Workspace/Content/StarterContent/Shapes" },
-        { "Props", "ZeGFX Workspace/Content/StarterContent/Props" }
-    };
-
-    std::string& selectedFolderPath = EditorState::Get().selectedFolderPath;
-    for (size_t i = 0; i < 7; ++i) {
-        bool isSel = (selectedFolderPath == choices[i].path);
-        if (isSel) {
-            ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
-            ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
-        } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
-            ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
-        }
-        if (ImGui::Button(choices[i].label)) {
-            selectedFolderPath = choices[i].path;
-            EditorState::Get().selectedFolderPath = choices[i].path;
+    const char* filterLabels[] = { "All", "Materials", "Meshes", "Textures", "Scripts", "Audio", "Levels", "VFX" };
+    for (int f = 0; f < 8; ++f) {
+        if (f > 0) ImGui::SameLine(0.0f, 4.0f);
+        bool isSel = (s_ActiveTypeFilter == f);
+        ImGui::PushStyleColor(ImGuiCol_Button, isSel ? pal.accent : pal.bgHeader);
+        ImGui::PushStyleColor(ImGuiCol_Text, isSel ? pal.bgBase : pal.textPrimary);
+        if (ImGui::Button(filterLabels[f])) {
+            s_ActiveTypeFilter = f;
         }
         ImGui::PopStyleColor(2);
-        ImGui::SameLine();
     }
+
+    // Sort Dropdown Combo on the right side
+    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
+    ImGui::TextDisabled("Sort:");
+    ImGui::SameLine(0.0f, 4.0f);
+    ImGui::SetNextItemWidth(120.0f);
+    const char* sortModes[] = { "Name (A-Z)", "Name (Z-A)", "Type" };
+    ImGui::Combo("##SortCombo", &s_SortMode, sortModes, 3);
 
     ImGui::PopStyleVar(3);
     ImGui::Spacing();
@@ -189,12 +184,45 @@ void RenderContentBrowserPanel(bool* pOpen) {
         itemsToDisplay = currentFolder->items;
     }
 
+    // Filter items by active category filter
+    if (s_ActiveTypeFilter > 0) {
+        AssetItemType targetType = AssetItemType::Unknown;
+        if (s_ActiveTypeFilter == 1) targetType = AssetItemType::Material;
+        else if (s_ActiveTypeFilter == 2) targetType = AssetItemType::Mesh;
+        else if (s_ActiveTypeFilter == 3) targetType = AssetItemType::Texture;
+        else if (s_ActiveTypeFilter == 4) targetType = AssetItemType::Script;
+        else if (s_ActiveTypeFilter == 5) targetType = AssetItemType::Audio;
+        else if (s_ActiveTypeFilter == 6) targetType = AssetItemType::Level;
+        else if (s_ActiveTypeFilter == 7) targetType = AssetItemType::VFX;
+
+        std::vector<AssetItem> filtered;
+        for (const auto& item : itemsToDisplay) {
+            if (item.type == targetType) filtered.push_back(item);
+        }
+        itemsToDisplay = std::move(filtered);
+    }
+
+    // Sort items
+    if (s_SortMode == 0) {
+        std::sort(itemsToDisplay.begin(), itemsToDisplay.end(), [](const AssetItem& a, const AssetItem& b) {
+            return a.name < b.name;
+        });
+    } else if (s_SortMode == 1) {
+        std::sort(itemsToDisplay.begin(), itemsToDisplay.end(), [](const AssetItem& a, const AssetItem& b) {
+            return a.name > b.name;
+        });
+    } else if (s_SortMode == 2) {
+        std::sort(itemsToDisplay.begin(), itemsToDisplay.end(), [](const AssetItem& a, const AssetItem& b) {
+            return static_cast<int>(a.type) < static_cast<int>(b.type);
+        });
+    }
+
     if (itemsToDisplay.empty()) {
-        ImGui::TextDisabled("No assets found in this folder.");
+        ImGui::TextDisabled("No assets found matching the selected criteria.");
     } else {
-        float itemWidth = Theme::Metrics::tileWidth;   // 104.0f
-        float itemHeight = Theme::Metrics::tileHeight; // 118.0f
-        float cellGap = Theme::Metrics::tileGap;       // 10.0f
+        float itemWidth = Theme::Metrics::tileWidth;   // 124.0f
+        float itemHeight = 128.0f;                      // Generous vertical headroom for text
+        float cellGap = Theme::Metrics::tileGap;       // 16.0f
         float windowWidth = ImGui::GetContentRegionAvail().x;
         int columnsCount = (int)((windowWidth + cellGap) / (itemWidth + cellGap));
         if (columnsCount < 1) columnsCount = 1;
@@ -208,7 +236,7 @@ void RenderContentBrowserPanel(bool* pOpen) {
             const char* typeName = AssetRegistry::GetTypeName(item.type);
 
             std::string tileId = "Tile_" + std::to_string(i);
-            if (Widgets::RenderAssetTile(tileId.c_str(), item.name.c_str(), typeName, typeColor, isSelected, itemWidth, itemHeight)) {
+            if (Widgets::RenderAssetTile(tileId.c_str(), item.name.c_str(), item.type, typeName, typeColor, isSelected, itemWidth, itemHeight)) {
                 EditorState::Get().SetSelection(item.name, typeName, item.path);
                 Logger::Get().Info("[ContentBrowser] Selected asset: " + item.name);
             }

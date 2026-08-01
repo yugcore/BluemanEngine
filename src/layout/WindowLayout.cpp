@@ -63,7 +63,11 @@ void SetupDefaultLayout(ImGuiID dockspaceId, const DockspaceBounds& bounds, bool
         ImGui::DockBuilderDockWindow("Output Log", dockBottomRight);
         ImGui::DockBuilderDockWindow("Viewport", dockViewport);
         ImGui::DockBuilderDockWindow("Outliner", dockRightTop);
+        ImGui::DockBuilderDockWindow("Object Palette", dockRightTop);
         ImGui::DockBuilderDockWindow("Details", dockRightBottom);
+        ImGui::DockBuilderDockWindow("Mesh Studio", dockRightBottom);
+        ImGui::DockBuilderDockWindow("Shader Studio", dockRightBottom);
+        ImGui::DockBuilderDockWindow("Texture Viewer", dockRightBottom);
         ImGui::DockBuilderDockWindow("Render Control Strip", dockRightBottom);
     }
     else if (mode == WorkspaceMode::Codebase) {

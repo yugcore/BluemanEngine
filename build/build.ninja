@@ -293,6 +293,22 @@ build CMakeFiles/engine_editor.dir/src/panels/Details/DetailsPanel.cpp.obj: CXX_
   OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\Details
   TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
 
+build CMakeFiles/engine_editor.dir/src/panels/MeshStudio/MeshStudioPanel.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/MeshStudio/MeshStudioPanel.cpp || cmake_object_order_depends_target_engine_editor
+  DEP_FILE = CMakeFiles\engine_editor.dir\src\panels\MeshStudio\MeshStudioPanel.cpp.obj.d
+  FLAGS = -std=gnu++17
+  INCLUDES = -IZ:/BluemanEditor/src -IZ:/BluemanEditor/src/third_party -IZ:/BluemanEditor/build/_deps/imgui-src -IZ:/BluemanEditor/build/_deps/imgui-src/backends -IZ:/BluemanEditor/build/_deps/glfw-src/include
+  OBJECT_DIR = CMakeFiles\engine_editor.dir
+  OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\MeshStudio
+  TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
+
+build CMakeFiles/engine_editor.dir/src/panels/ObjectPalette/ObjectPalettePanel.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/ObjectPalette/ObjectPalettePanel.cpp || cmake_object_order_depends_target_engine_editor
+  DEP_FILE = CMakeFiles\engine_editor.dir\src\panels\ObjectPalette\ObjectPalettePanel.cpp.obj.d
+  FLAGS = -std=gnu++17
+  INCLUDES = -IZ:/BluemanEditor/src -IZ:/BluemanEditor/src/third_party -IZ:/BluemanEditor/build/_deps/imgui-src -IZ:/BluemanEditor/build/_deps/imgui-src/backends -IZ:/BluemanEditor/build/_deps/glfw-src/include
+  OBJECT_DIR = CMakeFiles\engine_editor.dir
+  OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\ObjectPalette
+  TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
+
 build CMakeFiles/engine_editor.dir/src/panels/Outliner/OutlinerPanel.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/Outliner/OutlinerPanel.cpp || cmake_object_order_depends_target_engine_editor
   DEP_FILE = CMakeFiles\engine_editor.dir\src\panels\Outliner\OutlinerPanel.cpp.obj.d
   FLAGS = -std=gnu++17
@@ -307,6 +323,22 @@ build CMakeFiles/engine_editor.dir/src/panels/OutputLog/OutputLogPanel.cpp.obj: 
   INCLUDES = -IZ:/BluemanEditor/src -IZ:/BluemanEditor/src/third_party -IZ:/BluemanEditor/build/_deps/imgui-src -IZ:/BluemanEditor/build/_deps/imgui-src/backends -IZ:/BluemanEditor/build/_deps/glfw-src/include
   OBJECT_DIR = CMakeFiles\engine_editor.dir
   OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\OutputLog
+  TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
+
+build CMakeFiles/engine_editor.dir/src/panels/ProjectSettings/ProjectSettingsModal.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/ProjectSettings/ProjectSettingsModal.cpp || cmake_object_order_depends_target_engine_editor
+  DEP_FILE = CMakeFiles\engine_editor.dir\src\panels\ProjectSettings\ProjectSettingsModal.cpp.obj.d
+  FLAGS = -std=gnu++17
+  INCLUDES = -IZ:/BluemanEditor/src -IZ:/BluemanEditor/src/third_party -IZ:/BluemanEditor/build/_deps/imgui-src -IZ:/BluemanEditor/build/_deps/imgui-src/backends -IZ:/BluemanEditor/build/_deps/glfw-src/include
+  OBJECT_DIR = CMakeFiles\engine_editor.dir
+  OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\ProjectSettings
+  TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
+
+build CMakeFiles/engine_editor.dir/src/panels/ProjectWizard/ProjectWizardModal.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/ProjectWizard/ProjectWizardModal.cpp || cmake_object_order_depends_target_engine_editor
+  DEP_FILE = CMakeFiles\engine_editor.dir\src\panels\ProjectWizard\ProjectWizardModal.cpp.obj.d
+  FLAGS = -std=gnu++17
+  INCLUDES = -IZ:/BluemanEditor/src -IZ:/BluemanEditor/src/third_party -IZ:/BluemanEditor/build/_deps/imgui-src -IZ:/BluemanEditor/build/_deps/imgui-src/backends -IZ:/BluemanEditor/build/_deps/glfw-src/include
+  OBJECT_DIR = CMakeFiles\engine_editor.dir
+  OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\ProjectWizard
   TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
 
 build CMakeFiles/engine_editor.dir/src/panels/RenderControlStrip/RenderControlStripPanel.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/RenderControlStrip/RenderControlStripPanel.cpp || cmake_object_order_depends_target_engine_editor
@@ -331,6 +363,22 @@ build CMakeFiles/engine_editor.dir/src/panels/Run/RunViewportPanel.cpp.obj: CXX_
   INCLUDES = -IZ:/BluemanEditor/src -IZ:/BluemanEditor/src/third_party -IZ:/BluemanEditor/build/_deps/imgui-src -IZ:/BluemanEditor/build/_deps/imgui-src/backends -IZ:/BluemanEditor/build/_deps/glfw-src/include
   OBJECT_DIR = CMakeFiles\engine_editor.dir
   OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\Run
+  TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
+
+build CMakeFiles/engine_editor.dir/src/panels/ShaderStudio/ShaderStudioPanel.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/ShaderStudio/ShaderStudioPanel.cpp || cmake_object_order_depends_target_engine_editor
+  DEP_FILE = CMakeFiles\engine_editor.dir\src\panels\ShaderStudio\ShaderStudioPanel.cpp.obj.d
+  FLAGS = -std=gnu++17
+  INCLUDES = -IZ:/BluemanEditor/src -IZ:/BluemanEditor/src/third_party -IZ:/BluemanEditor/build/_deps/imgui-src -IZ:/BluemanEditor/build/_deps/imgui-src/backends -IZ:/BluemanEditor/build/_deps/glfw-src/include
+  OBJECT_DIR = CMakeFiles\engine_editor.dir
+  OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\ShaderStudio
+  TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
+
+build CMakeFiles/engine_editor.dir/src/panels/TextureViewer/TextureViewerPanel.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/TextureViewer/TextureViewerPanel.cpp || cmake_object_order_depends_target_engine_editor
+  DEP_FILE = CMakeFiles\engine_editor.dir\src\panels\TextureViewer\TextureViewerPanel.cpp.obj.d
+  FLAGS = -std=gnu++17
+  INCLUDES = -IZ:/BluemanEditor/src -IZ:/BluemanEditor/src/third_party -IZ:/BluemanEditor/build/_deps/imgui-src -IZ:/BluemanEditor/build/_deps/imgui-src/backends -IZ:/BluemanEditor/build/_deps/glfw-src/include
+  OBJECT_DIR = CMakeFiles\engine_editor.dir
+  OBJECT_FILE_DIR = CMakeFiles\engine_editor.dir\src\panels\TextureViewer
   TARGET_SUPPORT_DIR = CMakeFiles\engine_editor.dir
 
 build CMakeFiles/engine_editor.dir/src/panels/Viewport/Gizmos.cpp.obj: CXX_COMPILER__engine_editor_unscanned_ Z$:/BluemanEditor/src/panels/Viewport/Gizmos.cpp || cmake_object_order_depends_target_engine_editor
@@ -437,7 +485,7 @@ build CMakeFiles/engine_editor.dir/src/widgets/SearchBar.cpp.obj: CXX_COMPILER__
 #############################################
 # Link the executable engine_editor.exe
 
-build engine_editor.exe: CXX_EXECUTABLE_LINKER__engine_editor_ CMakeFiles/engine_editor.dir/src/app/Application.cpp.obj CMakeFiles/engine_editor.dir/src/app/Theme.cpp.obj CMakeFiles/engine_editor.dir/src/core/AssetRegistry.cpp.obj CMakeFiles/engine_editor.dir/src/core/CommandStack.cpp.obj CMakeFiles/engine_editor.dir/src/core/Logger.cpp.obj CMakeFiles/engine_editor.dir/src/core/SceneGraph.cpp.obj CMakeFiles/engine_editor.dir/src/layout/Dockspace.cpp.obj CMakeFiles/engine_editor.dir/src/layout/WindowLayout.cpp.obj CMakeFiles/engine_editor.dir/src/main.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/CustomTitleBar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/MenuBar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/StatusBar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/Toolbar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/WorkspaceBar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeBottomDockPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeEditorPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeHighlighter.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeSymbolsPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/ProjectExplorerPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/ContentBrowser/ContentBrowserPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Details/DetailsPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Outliner/OutlinerPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/OutputLog/OutputLogPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/RenderControlStrip/RenderControlStripPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Run/RunBottomDockPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Run/RunViewportPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Viewport/Gizmos.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Viewport/Overlay.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Viewport/ViewportPanel.cpp.obj CMakeFiles/engine_editor.dir/src/render/ViewportRenderer.cpp.obj CMakeFiles/engine_editor.dir/src/theme/Colors.cpp.obj CMakeFiles/engine_editor.dir/src/theme/Fonts.cpp.obj CMakeFiles/engine_editor.dir/src/theme/Metrics.cpp.obj CMakeFiles/engine_editor.dir/src/theme/Style.cpp.obj CMakeFiles/engine_editor.dir/src/third_party/ImGuizmo/ImGuizmo.cpp.obj CMakeFiles/engine_editor.dir/src/widgets/AssetTile.cpp.obj CMakeFiles/engine_editor.dir/src/widgets/PropertyRow.cpp.obj CMakeFiles/engine_editor.dir/src/widgets/SearchBar.cpp.obj | libimgui_lib.a _deps/glfw-build/src/libglfw3.a || _deps/glfw-build/src/libglfw3.a libimgui_lib.a
+build engine_editor.exe: CXX_EXECUTABLE_LINKER__engine_editor_ CMakeFiles/engine_editor.dir/src/app/Application.cpp.obj CMakeFiles/engine_editor.dir/src/app/Theme.cpp.obj CMakeFiles/engine_editor.dir/src/core/AssetRegistry.cpp.obj CMakeFiles/engine_editor.dir/src/core/CommandStack.cpp.obj CMakeFiles/engine_editor.dir/src/core/Logger.cpp.obj CMakeFiles/engine_editor.dir/src/core/SceneGraph.cpp.obj CMakeFiles/engine_editor.dir/src/layout/Dockspace.cpp.obj CMakeFiles/engine_editor.dir/src/layout/WindowLayout.cpp.obj CMakeFiles/engine_editor.dir/src/main.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/CustomTitleBar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/MenuBar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/StatusBar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/Toolbar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Chrome/WorkspaceBar.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeBottomDockPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeEditorPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeHighlighter.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeSymbolsPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Codebase/ProjectExplorerPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/ContentBrowser/ContentBrowserPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Details/DetailsPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/MeshStudio/MeshStudioPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/ObjectPalette/ObjectPalettePanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Outliner/OutlinerPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/OutputLog/OutputLogPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/ProjectSettings/ProjectSettingsModal.cpp.obj CMakeFiles/engine_editor.dir/src/panels/ProjectWizard/ProjectWizardModal.cpp.obj CMakeFiles/engine_editor.dir/src/panels/RenderControlStrip/RenderControlStripPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Run/RunBottomDockPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Run/RunViewportPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/ShaderStudio/ShaderStudioPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/TextureViewer/TextureViewerPanel.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Viewport/Gizmos.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Viewport/Overlay.cpp.obj CMakeFiles/engine_editor.dir/src/panels/Viewport/ViewportPanel.cpp.obj CMakeFiles/engine_editor.dir/src/render/ViewportRenderer.cpp.obj CMakeFiles/engine_editor.dir/src/theme/Colors.cpp.obj CMakeFiles/engine_editor.dir/src/theme/Fonts.cpp.obj CMakeFiles/engine_editor.dir/src/theme/Metrics.cpp.obj CMakeFiles/engine_editor.dir/src/theme/Style.cpp.obj CMakeFiles/engine_editor.dir/src/third_party/ImGuizmo/ImGuizmo.cpp.obj CMakeFiles/engine_editor.dir/src/widgets/AssetTile.cpp.obj CMakeFiles/engine_editor.dir/src/widgets/PropertyRow.cpp.obj CMakeFiles/engine_editor.dir/src/widgets/SearchBar.cpp.obj | libimgui_lib.a _deps/glfw-build/src/libglfw3.a || _deps/glfw-build/src/libglfw3.a libimgui_lib.a
   LINK_LIBRARIES = libimgui_lib.a  _deps/glfw-build/src/libglfw3.a  -ld3d12  -ldxgi  -ld3dcompiler  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\engine_editor.dir
   POST_BUILD = cd .

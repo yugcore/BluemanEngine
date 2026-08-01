@@ -148,7 +148,7 @@ std::vector<CodeToken> CodeHighlighter::TokenizeLine(const std::string& line, La
                line[i] != '#' && (line[i] != '/' || (i + 1 < n && line[i + 1] != '/'))) {
             i++;
         }
-        tokens.push_back({ line.substr(start, i - start), isZelyn ? ZELYN_TYPE : ImVec4(0.7f, 0.7f, 0.7f, 1.0f) });
+        tokens.push_back({ line.substr(start, i - start), isZelyn ? ZELYN_PLAIN : CPP_PLAIN });
     }
 
     return tokens;
@@ -172,7 +172,7 @@ void CodeHighlighter::RenderHighlightedLine(const std::string& line, LanguageTyp
                 ImGui::TextColored(GetLanguageBadgeColor(lang), "[%s Doc]", doc.language.c_str());
                 ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", doc.symbol.c_str());
                 ImGui::Separator();
-                ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.4f, 1.0f), "Signature: %s", doc.signature.c_str());
+                ImGui::TextColored(ImVec4(0.85f, 0.85f, 0.85f, 1.0f), "Signature: %s", doc.signature.c_str());
                 ImGui::TextUnformatted(doc.description.c_str());
                 ImGui::EndTooltip();
             }

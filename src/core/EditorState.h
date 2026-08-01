@@ -137,6 +137,14 @@ struct EditorState {
     int activeCodeErrorsCount = 2;
     bool showNewFileDialog = false;
 
+    // Modal & Panel Visibility Toggles
+    bool showProjectWizardModal = false;
+    bool showProjectSettingsModal = false;
+    bool showObjectPalettePanel = true;
+    bool showMeshStudioPanel = true;
+    bool showShaderStudioPanel = true;
+    bool showTextureViewerPanel = true;
+
     void SetSelection(const std::string& name, const std::string& type, const std::string& path = "") {
         selectedNodeName = name;
         selectedNodeType = type;

@@ -112,24 +112,6 @@ void RenderCustomTitleBar() {
         bool mouseInTitleBar = mousePos.x >= windowPos.x && mousePos.x <= windowPos.x + chromeBtnZoneX &&
                                mousePos.y >= windowPos.y && mousePos.y <= windowPos.y + windowSize.y;
 
-        bool menuActive = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
-        if (mouseInTitleBar && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !menuActive) {
-            s_Dragging = true;
-            glfwGetCursorPos(s_Window, &s_DragStartX, &s_DragStartY);
-            glfwGetWindowPos(s_Window, &s_WinStartX, &s_WinStartY);
-        }
-        if (s_Dragging) {
-            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                double curX, curY;
-                glfwGetCursorPos(s_Window, &curX, &curY);
-                double dx = curX - s_DragStartX;
-                double dy = curY - s_DragStartY;
-                glfwSetWindowPos(s_Window, s_WinStartX + (int)dx, s_WinStartY + (int)dy);
-            } else {
-                s_Dragging = false;
-            }
-        }
-
         if (mouseInTitleBar && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
             if (glfwGetWindowAttrib(s_Window, GLFW_MAXIMIZED)) {
                 glfwRestoreWindow(s_Window);
@@ -144,7 +126,7 @@ void RenderCustomTitleBar() {
             ImGui::AlignTextToFramePadding();
             if (Theme::GetFontAtlas().panelTitleFont)
                 ImGui::PushFont(Theme::GetFontAtlas().panelTitleFont);
-            ImGui::TextColored(pal.accent, "BLUEMAN ENGINE");
+            ImGui::TextColored(ImVec4(0.22f, 0.58f, 1.00f, 1.00f), "BLUEMAN ENGINE");
             if (Theme::GetFontAtlas().panelTitleFont)
                 ImGui::PopFont();
 

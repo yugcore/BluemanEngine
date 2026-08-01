@@ -322,7 +322,7 @@ void RenderCodeEditorPanel(bool* pOpen) {
                     for (size_t l = 0; l < lines.size(); ++l) {
                         float len = std::min((float)lines[l].length() * 1.5f, minimapWidth - 8.0f);
                         if (len > 0.0f) {
-                            ImU32 mmColor = (lang == LanguageType::Zelyn) ? IM_COL32(199, 146, 234, 180) : IM_COL32(100, 160, 240, 180);
+                            ImU32 mmColor = IM_COL32(180, 180, 180, 180);
                             if (doc.breakpoints.count((int)l + 1)) mmColor = IM_COL32(235, 65, 65, 255);
 
                             mmDrawList->AddRectFilled(

@@ -8,12 +8,17 @@
 namespace EngineEditor {
 
 enum class AssetItemType {
-    Mesh,
     Material,
+    Mesh,
     Texture,
-    Blueprint,
-    AI,
-    LevelScript,
+    Script,
+    Animation,
+    Audio,
+    Level,
+    VFX,
+    Physics,
+    UI,
+    Folder,
     Unknown
 };
 

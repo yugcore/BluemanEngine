@@ -79,30 +79,44 @@ void AssetRegistry::SeedDummyData() {
     AssetFolder audioFolder;
     audioFolder.name = "Audio";
     audioFolder.path = "ZeGFX Workspace/Content/StarterContent/Audio";
-
-    // 4. Blueprints
-    AssetFolder blueprintsFolder;
-    blueprintsFolder.name = "Blueprints";
-    blueprintsFolder.path = "ZeGFX Workspace/Content/StarterContent/Blueprints";
-    blueprintsFolder.items = {
-        { "BP_GameController", AssetItemType::Blueprint, blueprintsFolder.path + "/BP_GameController" },
-        { "BP_LightStudio", AssetItemType::Blueprint, blueprintsFolder.path + "/BP_LightStudio" }
+    audioFolder.items = {
+        { "A_Ambient_Wind_Loop", AssetItemType::Audio, audioFolder.path + "/A_Ambient_Wind_Loop" },
+        { "A_Explosion_Heavy", AssetItemType::Audio, audioFolder.path + "/A_Explosion_Heavy" },
+        { "A_Footstep_Concrete", AssetItemType::Audio, audioFolder.path + "/A_Footstep_Concrete" }
     };
 
-    // 5. HDRI
+    // 4. Scripts (Zelyn & C++)
+    AssetFolder scriptsFolder;
+    scriptsFolder.name = "Scripts";
+    scriptsFolder.path = "ZeGFX Workspace/Content/StarterContent/Scripts";
+    scriptsFolder.items = {
+        { "PlayerController.zyn", AssetItemType::Script, scriptsFolder.path + "/PlayerController.zyn" },
+        { "CameraRig.zl", AssetItemType::Script, scriptsFolder.path + "/CameraRig.zl" },
+        { "InventorySystem.cpp", AssetItemType::Script, scriptsFolder.path + "/InventorySystem.cpp" }
+    };
+
+    // 5. HDRI & Textures
     AssetFolder hdriFolder;
     hdriFolder.name = "HDRI";
     hdriFolder.path = "ZeGFX Workspace/Content/StarterContent/HDRI";
 
-    // 6. Maps
+    // 6. Maps / Levels
     AssetFolder mapsFolder;
     mapsFolder.name = "Maps";
     mapsFolder.path = "ZeGFX Workspace/Content/StarterContent/Maps";
+    mapsFolder.items = {
+        { "L_Main_Showcase", AssetItemType::Level, mapsFolder.path + "/L_Main_Showcase" },
+        { "L_Lighting_Studio", AssetItemType::Level, mapsFolder.path + "/L_Lighting_Studio" }
+    };
 
-    // 7. Particles
+    // 7. Particles & VFX
     AssetFolder particlesFolder;
     particlesFolder.name = "Particles";
     particlesFolder.path = "ZeGFX Workspace/Content/StarterContent/Particles";
+    particlesFolder.items = {
+        { "P_Fire_Sparks", AssetItemType::VFX, particlesFolder.path + "/P_Fire_Sparks" },
+        { "P_Smoke_Dense", AssetItemType::VFX, particlesFolder.path + "/P_Smoke_Dense" }
+    };
 
     // 8. Props
     AssetFolder propsFolder;
@@ -118,11 +132,16 @@ void AssetRegistry::SeedDummyData() {
     AssetFolder texturesFolder;
     texturesFolder.name = "Textures";
     texturesFolder.path = "ZeGFX Workspace/Content/StarterContent/Textures";
+    texturesFolder.items = {
+        { "T_Concrete_Normal_2K", AssetItemType::Texture, texturesFolder.path + "/T_Concrete_Normal_2K" },
+        { "T_Brick_Albedo_4K", AssetItemType::Texture, texturesFolder.path + "/T_Brick_Albedo_4K" },
+        { "T_Skybox_HDRI_Cubemap", AssetItemType::Texture, texturesFolder.path + "/T_Skybox_HDRI_Cubemap" }
+    };
 
     starterFolder.subfolders = {
         archFolder,
         audioFolder,
-        blueprintsFolder,
+        scriptsFolder,
         hdriFolder,
         mapsFolder,
         materialsFolder,
@@ -158,24 +177,34 @@ const AssetFolder* AssetRegistry::FindFolder(const std::string& path, const Asse
 
 const char* AssetRegistry::GetTypeName(AssetItemType type) {
     switch (type) {
-        case AssetItemType::Mesh:        return ICON_FA_CUBE " StaticMesh";
-        case AssetItemType::Material:    return ICON_FA_PALETTE " Material";
-        case AssetItemType::Texture:     return ICON_FA_IMAGE " Texture2D";
-        case AssetItemType::Blueprint:   return ICON_FA_CODE " Blueprint";
-        case AssetItemType::AI:          return ICON_FA_SLIDERS " BehaviorTree";
-        case AssetItemType::LevelScript: return ICON_FA_CODE " LevelScript";
-        default:                         return ICON_FA_CUBE " Asset";
+        case AssetItemType::Material:    return "Material";
+        case AssetItemType::Mesh:        return "StaticMesh";
+        case AssetItemType::Texture:     return "Texture2D";
+        case AssetItemType::Script:      return "ZelynScript";
+        case AssetItemType::Animation:   return "AnimSequence";
+        case AssetItemType::Audio:       return "SoundWave";
+        case AssetItemType::Level:       return "Map";
+        case AssetItemType::VFX:         return "NiagaraVFX";
+        case AssetItemType::Physics:     return "PhysicsAsset";
+        case AssetItemType::UI:          return "WidgetBlueprint";
+        case AssetItemType::Folder:      return "Folder";
+        default:                         return "Asset";
     }
 }
 
 ImVec4 AssetRegistry::GetTypeColor(AssetItemType type) {
     switch (type) {
-        case AssetItemType::Mesh:        return ImVec4(0.20f, 0.70f, 0.90f, 1.00f); // Cyan/Blue
-        case AssetItemType::Material:    return ImVec4(0.25f, 0.80f, 0.40f, 1.00f); // Green (UE5 Material)
-        case AssetItemType::Texture:     return ImVec4(0.95f, 0.75f, 0.20f, 1.00f); // Amber/Yellow
-        case AssetItemType::Blueprint:   return ImVec4(0.65f, 0.40f, 0.90f, 1.00f); // Purple
-        case AssetItemType::AI:          return ImVec4(0.95f, 0.50f, 0.20f, 1.00f); // Orange
-        case AssetItemType::LevelScript: return ImVec4(0.90f, 0.30f, 0.50f, 1.00f); // Pink
+        case AssetItemType::Material:    return ImVec4(0.22f, 0.63f, 0.41f, 1.00f); // Green (#38A169)
+        case AssetItemType::Mesh:        return ImVec4(0.19f, 0.51f, 0.81f, 1.00f); // Blue (#3182CE)
+        case AssetItemType::Texture:     return ImVec4(0.84f, 0.62f, 0.18f, 1.00f); // Amber/Gold (#D69E2E)
+        case AssetItemType::Script:      return ImVec4(0.50f, 0.35f, 0.84f, 1.00f); // Purple (#805AD5)
+        case AssetItemType::Animation:   return ImVec4(0.84f, 0.25f, 0.55f, 1.00f); // Pink (#D53F8C)
+        case AssetItemType::Audio:       return ImVec4(0.19f, 0.59f, 0.58f, 1.00f); // Teal (#319795)
+        case AssetItemType::Level:       return ImVec4(0.90f, 0.24f, 0.24f, 1.00f); // Red (#E53E3E)
+        case AssetItemType::VFX:         return ImVec4(0.87f, 0.42f, 0.13f, 1.00f); // Orange (#DD6B20)
+        case AssetItemType::Physics:     return ImVec4(0.18f, 0.52f, 0.35f, 1.00f); // Emerald (#2F855A)
+        case AssetItemType::UI:          return ImVec4(0.30f, 0.32f, 0.75f, 1.00f); // Indigo (#4C51BF)
+        case AssetItemType::Folder:      return ImVec4(0.44f, 0.50f, 0.59f, 1.00f); // Warm Gray (#718096)
         default:                         return ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
     }
 }

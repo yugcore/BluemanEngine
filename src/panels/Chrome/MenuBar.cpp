@@ -31,6 +31,7 @@ void RenderMenuBarContents() {
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
 
     if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("New Project Wizard...", "Ctrl+Shift+N")) EditorState::Get().showProjectWizardModal = true;
         if (ImGui::MenuItem("New Scene", "Ctrl+N")) Logger::Get().Info("[Menu] File > New Scene created.");
         if (ImGui::MenuItem("Open Scene...", "Ctrl+O")) Logger::Get().Info("[Menu] File > Open Scene dialog opened.");
         if (ImGui::MenuItem("Save", "Ctrl+S")) Logger::Get().Info("[Menu] File > Save Scene completed.");
@@ -51,6 +52,8 @@ void RenderMenuBarContents() {
         if (ImGui::MenuItem("Paste", "Ctrl+V")) Logger::Get().Info("[Menu] Edit > Paste clicked.");
         if (ImGui::MenuItem("Duplicate", "Ctrl+D")) Logger::Get().Info("[Menu] Edit > Duplicate clicked.");
         if (ImGui::MenuItem("Delete", "Del")) Logger::Get().Info("[Menu] Edit > Delete clicked.");
+        ImGui::Separator();
+        if (ImGui::MenuItem("Project Settings...")) EditorState::Get().showProjectSettingsModal = true;
         ImGui::EndMenu();
     }
 
@@ -78,11 +81,16 @@ void RenderMenuBarContents() {
     }
 
     if (ImGui::BeginMenu("Window")) {
-        auto& settings = EditorState::Get().settings;
+        auto& state = EditorState::Get();
 
-        ImGui::MenuItem("Content Browser", nullptr, &settings.showContentBrowser);
-        ImGui::MenuItem("Output Log", nullptr, &settings.showOutputLog);
-        ImGui::MenuItem("Render Control Strip", nullptr, &settings.showRenderControlStrip);
+        ImGui::MenuItem("Object Palette", nullptr, &state.showObjectPalettePanel);
+        ImGui::MenuItem("Mesh Studio", nullptr, &state.showMeshStudioPanel);
+        ImGui::MenuItem("Shader Studio", nullptr, &state.showShaderStudioPanel);
+        ImGui::MenuItem("Texture Viewer", nullptr, &state.showTextureViewerPanel);
+        ImGui::Separator();
+        ImGui::MenuItem("Content Browser", nullptr, &state.settings.showContentBrowser);
+        ImGui::MenuItem("Output Log", nullptr, &state.settings.showOutputLog);
+        ImGui::MenuItem("Render Control Strip", nullptr, &state.settings.showRenderControlStrip);
         ImGui::Separator();
         if (ImGui::MenuItem("Reset Layout")) {
             Layout::RequestLayoutReset();
