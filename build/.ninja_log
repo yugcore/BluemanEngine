@@ -91,3 +91,11 @@
 56	607	8072227792734117	CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeHighlighter.cpp.obj	b7c21ea6057be825
 52	721	8072227792693801	CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeEditorPanel.cpp.obj	b60955af64e323e8
 722	991	8072227799390933	engine_editor.exe	b564e2ba40a029b6
+37	71	8072565349391398	Z:/BluemanEditor/build/CMakeFiles/cmake.verify_globs	c714bc3567cb63f2
+163	1372	8072565350658362	CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeSymbolsPanel.cpp.obj	ce713d819800f255
+153	1387	8072565350552540	CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeBottomDockPanel.cpp.obj	ff41623771634a67
+167	1388	8072565350698645	CMakeFiles/engine_editor.dir/src/panels/Codebase/ProjectExplorerPanel.cpp.obj	a160977661b83c6c
+160	1580	8072565350613024	CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeHighlighter.cpp.obj	b7c21ea6057be825
+156	1930	8072565350582814	CMakeFiles/engine_editor.dir/src/panels/Codebase/CodeEditorPanel.cpp.obj	b60955af64e323e8
+81	2509	8072565349830771	CMakeFiles/engine_editor.dir/src/layout/WindowLayout.cpp.obj	9c91a3b615cd1dc5
+2510	3033	8072565374114763	engine_editor.exe	b564e2ba40a029b6

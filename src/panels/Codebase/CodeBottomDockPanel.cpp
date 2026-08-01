@@ -38,17 +38,11 @@ void RenderCodeBottomDockPanel(bool* pOpen) {
             // Terminal Output Window
             ImGui::BeginChild("TerminalOutputPane", ImVec2(0, -32.0f), false, ImGuiWindowFlags_HorizontalScrollbar);
             for (const auto& line : s_TerminalHistory) {
-                if (line.rfind("zelyn>", 0) == 0) {
-                    // Prompt in system accent purple
-                    ImGui::TextColored(pal.accent, "%s", line.c_str());
-                } else if (line.find("Error") != std::string::npos) {
+                bool isError = (line.find("Error") != std::string::npos || line.find("error") != std::string::npos) && line.find("0 Severe Errors") == std::string::npos;
+                if (isError) {
                     ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "%s", line.c_str());
-                } else if (line.find("Warning") != std::string::npos) {
-                    ImGui::TextColored(ImVec4(0.95f, 0.70f, 0.25f, 1.0f), "%s", line.c_str());
-                } else if (line.find("successfully") != std::string::npos || line.find("Built with") != std::string::npos) {
-                    ImGui::TextColored(ImVec4(0.35f, 0.85f, 0.45f, 1.0f), "%s", line.c_str());
                 } else {
-                    ImGui::TextColored(pal.textPrimary, "%s", line.c_str());
+                    ImGui::TextColored(ImVec4(0.95f, 0.95f, 0.95f, 1.0f), "%s", line.c_str());
                 }
             }
             // Auto scroll to bottom
@@ -59,8 +53,8 @@ void RenderCodeBottomDockPanel(bool* pOpen) {
 
             ImGui::Separator();
 
-            // Prompt Line & Blinking Cursor
-            ImGui::TextColored(pal.accent, "zelyn>");
+            // Prompt Line & Blinking Cursor in white alone
+            ImGui::TextColored(ImVec4(0.95f, 0.95f, 0.95f, 1.0f), "zelyn>");
             ImGui::SameLine(0.0f, 6.0f);
 
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
@@ -85,12 +79,12 @@ void RenderCodeBottomDockPanel(bool* pOpen) {
             }
             if (reclaimFocus) ImGui::SetKeyboardFocusHere(-1);
 
-            // Blinking cursor representation
+            // Blinking cursor representation in white
             static float cursorTimer = 0.0f;
             cursorTimer += ImGui::GetIO().DeltaTime;
             if (((int)(cursorTimer * 2.0f) % 2) == 0) {
                 ImGui::SameLine(0.0f, 0.0f);
-                ImGui::TextColored(pal.accent, "_");
+                ImGui::TextColored(ImVec4(0.95f, 0.95f, 0.95f, 1.0f), "_");
             }
 
             ImGui::PopStyleColor(2);

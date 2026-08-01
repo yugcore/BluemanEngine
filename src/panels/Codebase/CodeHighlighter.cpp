@@ -30,10 +30,10 @@ const char* CodeHighlighter::GetLanguageDisplayName(LanguageType lang) {
 
 const char* CodeHighlighter::GetLanguageBadgeText(LanguageType lang) {
     switch (lang) {
-        case LanguageType::Zelyn: return "📜";
-        case LanguageType::Cpp: return "📄";
-        case LanguageType::Header: return "⚙️";
-        default: return "📄";
+        case LanguageType::Zelyn: return "";
+        case LanguageType::Cpp: return "";
+        case LanguageType::Header: return "";
+        default: return "";
     }
 }
 

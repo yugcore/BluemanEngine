@@ -51,14 +51,18 @@ static void RenderFileTreeNode(const FileNode& node, float indentX = 0.0f) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
     if (node.isFolder) {
-        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
         
         ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.06f));
         ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0f, 1.0f, 1.0f, 0.10f));
 
         ImVec2 nodePos = ImGui::GetCursorScreenPos();
-        bool isOpen = ImGui::TreeNodeEx((void*)&node, flags, "📁 %s", node.name.c_str());
+        ImGuiID nodeID = ImGui::GetID((void*)&node);
+        bool isOpenState = ImGui::GetStateStorage()->GetBool(nodeID, false);
+        const char* arrowSymbol = isOpenState ? "v" : ">";
+
+        bool isOpen = ImGui::TreeNodeEx((void*)&node, flags, "%s  %s", arrowSymbol, node.name.c_str());
 
         ImGui::PopStyleColor(3);
 
@@ -86,15 +90,13 @@ static void RenderFileTreeNode(const FileNode& node, float indentX = 0.0f) {
         bool isSelected = (EditorState::Get().activeCodeFileName == node.name);
         if (isSelected) flags |= ImGuiTreeNodeFlags_Selected;
 
-        const char* badge = CodeHighlighter::GetLanguageBadgeText(node.lang);
-
         // System Accent color for selection state
         ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(pal.accent.x, pal.accent.y, pal.accent.z, 0.25f));
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(pal.accent.x, pal.accent.y, pal.accent.z, 0.18f));
         ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(pal.accent.x, pal.accent.y, pal.accent.z, 0.35f));
         ImGui::PushStyleColor(ImGuiCol_Text, isSelected ? pal.textPrimary : pal.textSecondary);
 
-        bool nodeClicked = ImGui::TreeNodeEx((void*)&node, flags, "%s  %s", badge, node.name.c_str());
+        bool nodeClicked = ImGui::TreeNodeEx((void*)&node, flags, "   %s", node.name.c_str());
 
         ImGui::PopStyleColor(4);
 
@@ -160,7 +162,7 @@ void RenderProjectExplorerPanel(bool* pOpen) {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 8.0f);
 
     if (Theme::GetFontAtlas().sectionHeaderFont) ImGui::PushFont(Theme::GetFontAtlas().sectionHeaderFont);
-    ImGui::TextColored(pal.textPrimary, "🗂️  ZeGFX Project Workspace");
+    ImGui::TextColored(pal.textPrimary, "ZeGFX Project Workspace");
     if (Theme::GetFontAtlas().sectionHeaderFont) ImGui::PopFont();
 
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 8.0f);
@@ -186,11 +188,11 @@ void RenderProjectExplorerPanel(bool* pOpen) {
 
         // Language Selector Buttons with Neutral Monochrome Styling
         const struct { const char* name; const char* badge; const char* ext; } langs[] = {
-            { "Zelyn Script", "📜", ".zl" },
-            { "Zelyn Module", "📜", ".zyn" },
-            { "C++ Source", "📄", ".cpp" },
-            { "C++ Header", "⚙️", ".h" },
-            { "Lua Script", "📄", ".lua" }
+            { "Zelyn Script", "", ".zl" },
+            { "Zelyn Module", "", ".zyn" },
+            { "C++ Source", "", ".cpp" },
+            { "C++ Header", "", ".h" },
+            { "Lua Script", "", ".lua" }
         };
 
         for (int i = 0; i < 5; ++i) {

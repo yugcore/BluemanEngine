@@ -154,17 +154,17 @@ void RenderCodeEditorPanel(bool* pOpen) {
 
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 24.0f);
 
-    // Render Tab Strip with Monochrome Icons, Neutral Colors & Single Purple Accent Underline
+    // Render Tab Strip with Clean Colors & Accent Underline
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
     if (ImGui::BeginTabBar("CodeEditorTabBar", ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_AutoSelectNewTabs)) {
         for (int i = 0; i < (int)s_Documents.size(); ++i) {
             auto& doc = s_Documents[i];
             if (!doc.isOpen) continue;
 
             LanguageType lang = CodeHighlighter::GetLanguageFromExtension(doc.filename);
-            const char* badge = CodeHighlighter::GetLanguageBadgeText(lang);
 
-            // Neutral tab label with monochrome icon
-            std::string tabLabel = std::string(badge) + " " + doc.filename + "##Tab" + std::to_string(i);
+            // Clean tab label without emojis or badges
+            std::string tabLabel = doc.filename + "##Tab" + std::to_string(i);
             
             ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
             bool isSelected = ImGui::BeginTabItem(tabLabel.c_str(), &doc.isOpen);
@@ -191,6 +191,7 @@ void RenderCodeEditorPanel(bool* pOpen) {
                 
                 std::vector<std::string> lines = SplitLines(doc.content);
                 float fontHeight = ImGui::GetTextLineHeightWithSpacing();
+                float lineTextHeight = ImGui::GetTextLineHeight();
 
                 // Setup Child Viewport for Editor with Scrollbars & Minimap
                 float fullAvailWidth = ImGui::GetContentRegionAvail().x;
@@ -208,13 +209,14 @@ void RenderCodeEditorPanel(bool* pOpen) {
                         int lineNum = (int)l + 1;
                         bool isCurrentLine = (lineNum == doc.cursorLine);
 
-                        // Line Row Background Highlight for active line
+                        // Line Row Background Highlight for active line - centered in Y axis
                         ImVec2 linePos = ImGui::GetCursorScreenPos();
                         if (isCurrentLine) {
+                            float yCenterOffset = (fontHeight - lineTextHeight) * 0.5f;
                             drawList->AddRectFilled(
-                                ImVec2(linePos.x, linePos.y),
-                                ImVec2(linePos.x + ImGui::GetContentRegionAvail().x, linePos.y + fontHeight),
-                                ImGui::ColorConvertFloat4ToU32(ImVec4(pal.accent.x, pal.accent.y, pal.accent.z, 0.12f))
+                                ImVec2(linePos.x, linePos.y - yCenterOffset),
+                                ImVec2(linePos.x + ImGui::GetContentRegionAvail().x, linePos.y + fontHeight - yCenterOffset),
+                                ImGui::ColorConvertFloat4ToU32(ImVec4(pal.accent.x, pal.accent.y, pal.accent.z, 0.14f))
                             );
                         }
 
@@ -242,22 +244,22 @@ void RenderCodeEditorPanel(bool* pOpen) {
                         ImGui::SameLine(0.0f, 4.0f);
                         ImGui::PopID();
 
-                        // 2. Line Number Gutter Column (36px, Dim Gray)
+                        // 2. Line Number Gutter Column with generous spacing
                         char lineStr[16];
                         snprintf(lineStr, sizeof(lineStr), "%3d", lineNum);
                         ImVec4 lineNumColor = isCurrentLine ? pal.textPrimary : pal.textDisabled;
                         ImGui::TextColored(lineNumColor, "%s", lineStr);
-                        ImGui::SameLine(0.0f, 10.0f);
 
-                        // Separator line between gutter and code
+                        // Separator line between gutter and code with clean gap
+                        float separatorX = linePos.x + 78.0f;
                         drawList->AddLine(
-                            ImVec2(linePos.x + 62.0f, linePos.y),
-                            ImVec2(linePos.x + 62.0f, linePos.y + fontHeight),
+                            ImVec2(separatorX, linePos.y - 1.0f),
+                            ImVec2(separatorX, linePos.y + fontHeight - 1.0f),
                             ImGui::ColorConvertFloat4ToU32(pal.borderSubtle), 1.0f
                         );
 
-                        ImGui::Dummy(ImVec2(4.0f, 0.0f));
-                        ImGui::SameLine(0.0f, 0.0f);
+                        // Set code cursor X with spacious gap after separator
+                        ImGui::SetCursorScreenPos(ImVec2(separatorX + 16.0f, linePos.y));
 
                         // 3. Syntax Highlighted Line Rendering & Diagnostics
                         std::string diagError;
@@ -349,6 +351,7 @@ void RenderCodeEditorPanel(bool* pOpen) {
         }
         ImGui::EndTabBar();
     }
+    ImGui::PopStyleVar(); // FramePadding for tabs
 
     ImGui::End();
 }

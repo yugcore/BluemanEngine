@@ -85,7 +85,7 @@ void SetupDefaultLayout(ImGuiID dockspaceId, const DockspaceBounds& bounds, bool
         // Assign Windows to Dock Nodes
         ImGui::DockBuilderDockWindow("Project Explorer", dockLeft);
         ImGui::DockBuilderDockWindow("Code Editor", dockCenter);
-        ImGui::DockBuilderDockWindow("Symbols", dockRight);
+        ImGui::DockBuilderDockWindow("API Library", dockRight);
         ImGui::DockBuilderDockWindow("Terminal", dockBottom);
     }
     else if (mode == WorkspaceMode::Run) {
