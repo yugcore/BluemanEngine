@@ -5,8 +5,6 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-using Microsoft::WRL::ComPtr;
-
 namespace EngineEditor {
 
 class ViewportRenderer {
@@ -41,8 +39,8 @@ private:
     UINT m_SrvDescriptorIndex = 0;
     ID3D12GraphicsCommandList* m_ActiveCmdList = nullptr;
 
-    ComPtr<ID3D12Resource> m_ColorTexture;
-    ComPtr<ID3D12DescriptorHeap> m_RtvHeap;
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_ColorTexture;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_RtvHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_RtvHandle{};
     D3D12_CPU_DESCRIPTOR_HANDLE m_SRVCpuHandle{};
     D3D12_GPU_DESCRIPTOR_HANDLE m_SRVGpuHandle{};
@@ -60,4 +58,3 @@ private:
 } // namespace EngineEditor
 
 #endif // VIEWPORT_RENDERER_H
-

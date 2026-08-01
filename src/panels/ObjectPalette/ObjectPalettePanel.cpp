@@ -26,6 +26,10 @@ struct PaletteItem {
 static char s_PaletteSearch[128] = "";
 
 static const std::vector<PaletteItem> s_PaletteItems = {
+    { "1KM Terrain Chunk", "Environment", "1024m x 1024m heightmap ground terrain", SceneNodeType::Terrain, "[Terrain]" },
+    { "Foliage Cluster", "Environment", "High-density instanced trees, bushes & grass", SceneNodeType::FoliageCluster, "[Foliage]" },
+    { "Trail Path Waypoint", "Environment", "Forest trail path marker node", SceneNodeType::PathPoint, "[Path]" },
+
     { "Cube Mesh", "Primitives", "Standard 3D unit cube mesh", SceneNodeType::Actor, "[Cube]" },
     { "Sphere Mesh", "Primitives", "UV sphere mesh primitive", SceneNodeType::Actor, "[Sphere]" },
     { "Cylinder Mesh", "Primitives", "Subdivided cylinder mesh primitive", SceneNodeType::Actor, "[Cyl]" },
@@ -63,10 +67,10 @@ void RenderObjectPalettePanel(bool* pOpen) {
     ImGui::Spacing();
 
     // Category Tabs / Filter Buttons
-    static int s_SelectedCategoryIndex = 0; // 0: All, 1: Primitives, 2: Lighting, 3: Cameras, 4: Volumes
-    const char* categories[] = { "All", "Primitives", "Lighting", "Cameras", "Volumes" };
+    static int s_SelectedCategoryIndex = 0; // 0: All, 1: Environment, 2: Primitives, 3: Lighting, 4: Cameras, 5: Volumes
+    const char* categories[] = { "All", "Environment", "Primitives", "Lighting", "Cameras", "Volumes" };
 
-    for (int c = 0; c < 5; ++c) {
+    for (int c = 0; c < 6; ++c) {
         if (c > 0) ImGui::SameLine(0.0f, 4.0f);
         bool isSel = (s_SelectedCategoryIndex == c);
         ImGui::PushStyleColor(ImGuiCol_Button, isSel ? pal.accent : pal.bgHeader);
@@ -131,8 +135,13 @@ void RenderObjectPalettePanel(bool* pOpen) {
 
         // Click to spawn/select item
         if (isHovered && ImGui::IsMouseClicked(0)) {
-            EditorState::Get().SetSelection(item.name, SceneGraph::GetTypeIconTag(item.type));
-            Logger::Get().Info("[Palette] Selected '" + item.name + "' for placement.");
+            SceneNode newNode;
+            newNode.name = item.name + "_" + std::to_string(rand() % 1000);
+            newNode.type = item.type;
+            SceneGraph::Get().AddNode(newNode);
+
+            EditorState::Get().SetSelection(newNode.name, SceneGraph::GetTypeIconTag(item.type));
+            Logger::Get().Info("[Palette] Spawned node '" + newNode.name + "' into SceneGraph.");
         }
     }
 

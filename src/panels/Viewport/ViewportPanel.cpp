@@ -3,6 +3,7 @@
 #include "Gizmos.h"
 #include "render/ViewportRenderer.h"
 #include "core/EditorState.h"
+#include "core/SceneGraph.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 
@@ -18,8 +19,8 @@ static int s_ShowFlags = 7;
 
 static void RenderStatusPill(const char* label, const ImVec4& color) {
     const auto& pal = Theme::GetPalette();
-    ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(28, 34, 44, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(40, 48, 60, 255));
     ImGui::PushStyleColor(ImGuiCol_Text, color);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
@@ -47,7 +48,67 @@ void RenderViewportPanel(bool* pOpen) {
         ViewportRenderer::Get().Resize(width, height);
     }
 
-    float deltaTime = ImGui::GetIO().DeltaTime;
+    bool isHovered = ImGui::IsWindowHovered();
+    bool isFocused = ImGui::IsWindowFocused();
+    ImGuiIO& io = ImGui::GetIO();
+
+    ViewportInputState inputState = {};
+    inputState.isHovered = isHovered;
+    inputState.isFocused = isFocused;
+    inputState.rmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+    inputState.lmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    inputState.mmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+    inputState.altHeld = io.KeyAlt;
+    inputState.shiftHeld = io.KeyShift;
+    inputState.ctrlHeld = io.KeyCtrl;
+    inputState.mouseDeltaX = io.MouseDelta.x;
+    inputState.mouseDeltaY = io.MouseDelta.y;
+    inputState.scrollDelta = io.MouseWheel;
+
+    inputState.keyW = ImGui::IsKeyDown(ImGuiKey_W);
+    inputState.keyA = ImGui::IsKeyDown(ImGuiKey_A);
+    inputState.keyS = ImGui::IsKeyDown(ImGuiKey_S);
+    inputState.keyD = ImGui::IsKeyDown(ImGuiKey_D);
+    inputState.keyQ = ImGui::IsKeyDown(ImGuiKey_Q);
+    inputState.keyE = ImGui::IsKeyDown(ImGuiKey_E);
+
+    float deltaTime = io.DeltaTime;
+
+    // Update Camera
+    auto& camera = EditorState::Get().camera;
+    camera.Update(deltaTime, inputState);
+
+    // Handle Viewport Hotkeys when in Idle Camera Mode & Viewport is Hovered/Focused
+    if (camera.GetMode() == CameraMode::Idle && (isHovered || isFocused) && !io.WantTextInput) {
+        if (ImGui::IsKeyPressed(ImGuiKey_W)) EditorState::Get().gizmoOp = GizmoOperation::Translate;
+        if (ImGui::IsKeyPressed(ImGuiKey_E)) EditorState::Get().gizmoOp = GizmoOperation::Rotate;
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) EditorState::Get().gizmoOp = GizmoOperation::Scale;
+
+        // Space key: Cycle World/Local space
+        if (ImGui::IsKeyPressed(ImGuiKey_Space)) {
+            if (EditorState::Get().activeTransformSpace == TransformSpace::World) {
+                EditorState::Get().activeTransformSpace = TransformSpace::Local;
+            } else {
+                EditorState::Get().activeTransformSpace = TransformSpace::World;
+            }
+        }
+
+        // F key: Frame selection
+        if (ImGui::IsKeyPressed(ImGuiKey_F)) {
+            std::vector<AABB> bounds;
+            AABB b;
+            b.minBounds = Vec3f(-1.0f, -1.0f, -1.0f);
+            b.maxBounds = Vec3f(1.0f, 1.0f, 1.0f);
+            bounds.push_back(b);
+            camera.FrameSelection(bounds);
+        }
+
+        // Home key: Reset camera
+        if (ImGui::IsKeyPressed(ImGuiKey_Home)) {
+            camera.ResetToDefault();
+        }
+    }
+
     ViewportRenderer::Get().RenderScene(deltaTime);
 
     uint64_t textureID = ViewportRenderer::Get().GetTextureID();
@@ -60,7 +121,16 @@ void RenderViewportPanel(bool* pOpen) {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const auto& pal = Theme::GetPalette();
 
-    // === In-Viewport Control Strip (docked FLUSH to top edge, no floating gap/seam) ===
+    // Render Speed Readout HUD Overlay when Fly Mode or Speed Tuning is Active
+    if (camera.IsSpeedTuningActive() || camera.GetMode() == CameraMode::Fly) {
+        char speedBuf[64];
+        snprintf(speedBuf, sizeof(speedBuf), "Cam Speed: %.1f m/s", camera.GetMoveSpeed());
+        float overlayY = cursorPos.y + Theme::Metrics::headerHeight + 12.0f;
+        drawList->AddRectFilled(ImVec2(cursorPos.x + 16.0f, overlayY), ImVec2(cursorPos.x + 175.0f, overlayY + 26.0f), IM_COL32(15, 20, 28, 240), 4.0f);
+        drawList->AddText(ImVec2(cursorPos.x + 24.0f, overlayY + 5.0f), IM_COL32(70, 180, 255, 255), speedBuf);
+    }
+
+    // === In-Viewport Control Strip (100% Solid Opaque Top Bar) ===
     float toolbarH = Theme::Metrics::headerHeight;
     {
         float toolbarY = cursorPos.y;
@@ -70,11 +140,11 @@ void RenderViewportPanel(bool* pOpen) {
         drawList->AddRectFilled(
             ImVec2(toolbarX, toolbarY),
             ImVec2(toolbarX + toolbarW, toolbarY + toolbarH),
-            ImGui::ColorConvertFloat4ToU32(pal.bgHeader));
+            IM_COL32(18, 22, 28, 255));
         drawList->AddLine(
             ImVec2(toolbarX, toolbarY + toolbarH),
             ImVec2(toolbarX + toolbarW, toolbarY + toolbarH),
-            ImGui::ColorConvertFloat4ToU32(pal.borderSubtle), 1.0f);
+            IM_COL32(45, 52, 65, 255), 1.0f);
     }
     
     ImGui::SetCursorScreenPos(ImVec2(cursorPos.x + Theme::Metrics::panelLeftMargin, cursorPos.y + (toolbarH - 24.0f) * 0.5f));
@@ -82,17 +152,17 @@ void RenderViewportPanel(bool* pOpen) {
 
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 4.0f));
-    ImGui::PushStyleColor(ImGuiCol_Button, pal.bgPanel);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(28, 34, 44, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(42, 50, 64, 255));
 
-    // --- Group 1: Perspective / 1:2 / Show ---
+    // --- Group 1: Perspective / 1:2 / Show / Shading Mode ---
     const char* persNames[] = { "Perspective", "Top", "Front", "Side" };
     if (ImGui::Button(persNames[s_PerspectiveIdx])) ImGui::OpenPopup("ViewportPerspPopup");
     if (ImGui::BeginPopup("ViewportPerspPopup")) {
-        if (ImGui::MenuItem("Perspective", nullptr, s_PerspectiveIdx == 0)) s_PerspectiveIdx = 0;
-        if (ImGui::MenuItem("Top", nullptr, s_PerspectiveIdx == 1)) s_PerspectiveIdx = 1;
-        if (ImGui::MenuItem("Front", nullptr, s_PerspectiveIdx == 2)) s_PerspectiveIdx = 2;
-        if (ImGui::MenuItem("Side", nullptr, s_PerspectiveIdx == 3)) s_PerspectiveIdx = 3;
+        if (ImGui::MenuItem("Perspective", nullptr, s_PerspectiveIdx == 0)) { s_PerspectiveIdx = 0; camera.ResetToDefault(); }
+        if (ImGui::MenuItem("Top", nullptr, s_PerspectiveIdx == 1)) { s_PerspectiveIdx = 1; }
+        if (ImGui::MenuItem("Front", nullptr, s_PerspectiveIdx == 2)) { s_PerspectiveIdx = 2; }
+        if (ImGui::MenuItem("Side", nullptr, s_PerspectiveIdx == 3)) { s_PerspectiveIdx = 3; }
         ImGui::EndPopup();
     }
 
@@ -100,9 +170,18 @@ void RenderViewportPanel(bool* pOpen) {
     const char* qualNames[] = { "1:2", "1:1", "4K" };
     if (ImGui::Button(qualNames[s_QualityIdx])) ImGui::OpenPopup("ViewportQualPopup");
     if (ImGui::BeginPopup("ViewportQualPopup")) {
-        if (ImGui::MenuItem("1:2 (Half Res)", nullptr, s_QualityIdx == 0)) s_QualityIdx = 0;
-        if (ImGui::MenuItem("1:1 (Full Res)", nullptr, s_QualityIdx == 1)) s_QualityIdx = 1;
-        if (ImGui::MenuItem("4K (Ultra HD)", nullptr, s_QualityIdx == 2)) s_QualityIdx = 2;
+        if (ImGui::MenuItem("1:2 (Half Res)", nullptr, s_QualityIdx == 0)) {
+            s_QualityIdx = 0;
+            EditorState::Get().settings.dsrScale = 0.5f;
+        }
+        if (ImGui::MenuItem("1:1 (Full Res)", nullptr, s_QualityIdx == 1)) {
+            s_QualityIdx = 1;
+            EditorState::Get().settings.dsrScale = 1.0f;
+        }
+        if (ImGui::MenuItem("4K (Ultra HD)", nullptr, s_QualityIdx == 2)) {
+            s_QualityIdx = 2;
+            EditorState::Get().settings.dsrScale = 2.0f;
+        }
         ImGui::EndPopup();
     }
 
@@ -118,47 +197,32 @@ void RenderViewportPanel(bool* pOpen) {
         ImGui::EndPopup();
     }
 
-    // Inter-group separator (groupGap = 18px)
-    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
-
-    // --- Group 2: Transform Tools (Move / Rotate / Scale) ---
-    auto& gizmo = EditorState::Get().gizmoOp;
-    bool mvActive = (gizmo == GizmoOperation::Translate);
-    bool rtActive = (gizmo == GizmoOperation::Rotate);
-    bool scActive = (gizmo == GizmoOperation::Scale);
-
-    if (mvActive) {
-        ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
-        ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
-    }
-    if (ImGui::Button("Move")) gizmo = GizmoOperation::Translate;
-    if (mvActive) ImGui::PopStyleColor(2);
+    static int s_RenderPassMode = 0;
+    const char* renderPassNames[] = { "Lit (PBR)", "Unlit", "Depth Buffer", "World Normals", "Roughness & Metallic", "Volumetric Fog Grid", "Cascaded Shadow Atlas" };
 
     ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-    if (rtActive) {
-        ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
-        ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
+    if (ImGui::Button(renderPassNames[s_RenderPassMode])) ImGui::OpenPopup("ViewportRenderPassPopup");
+    if (ImGui::BeginPopup("ViewportRenderPassPopup")) {
+        for (int r = 0; r < 7; ++r) {
+            if (ImGui::MenuItem(renderPassNames[r], nullptr, s_RenderPassMode == r)) {
+                s_RenderPassMode = r;
+            }
+        }
+        ImGui::EndPopup();
     }
-    if (ImGui::Button("Rotate")) gizmo = GizmoOperation::Rotate;
-    if (rtActive) ImGui::PopStyleColor(2);
 
-    ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-    if (scActive) {
-        ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
-        ImGui::PushStyleColor(ImGuiCol_Text, pal.bgBase);
-    }
-    if (ImGui::Button("Scale")) gizmo = GizmoOperation::Scale;
-    if (scActive) ImGui::PopStyleColor(2);
-
-    // --- Right-Aligned Status Pills ---
+    // --- Right-Aligned Live Engine Status Readouts (Unlocked Dynamic FPS) ---
     const auto& stats = EditorState::Get().stats;
+    uint32_t entCount = (uint32_t)SceneGraph::Get().GetRootNodes().size();
     
-    char fpsBuf[32]; snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.1f", stats.fps);
-    char msBuf[32]; snprintf(msBuf, sizeof(msBuf), "Frame: %.2f ms", stats.frameTimeMs);
+    float realFps = (io.DeltaTime > 0.00001f) ? (1.0f / io.DeltaTime) : 60.0f;
+    float realMs = io.DeltaTime * 1000.0f;
+
+    char fpsBuf[32]; snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.1f", realFps);
+    char msBuf[32]; snprintf(msBuf, sizeof(msBuf), "Frame: %.2f ms", realMs);
+    char drrBuf[32]; snprintf(drrBuf, sizeof(drrBuf), "DRR: %s", qualNames[s_QualityIdx]);
     char wpBuf[48]; snprintf(wpBuf, sizeof(wpBuf), "WP: 2 Cells");
-    char entBuf[32]; snprintf(entBuf, sizeof(entBuf), "Entities: %u", stats.entityCount);
+    char entBuf[32]; snprintf(entBuf, sizeof(entBuf), "Entities: %u", entCount);
 
     const float pillPaddingX = 16.0f;
     const float gap = Theme::Metrics::intraGroupGap;
@@ -166,7 +230,7 @@ void RenderViewportPanel(bool* pOpen) {
     actualPillsWidth += ImGui::CalcTextSize(stats.apiTag.c_str()).x + pillPaddingX + gap;
     actualPillsWidth += ImGui::CalcTextSize(fpsBuf).x + pillPaddingX + gap;
     actualPillsWidth += ImGui::CalcTextSize(msBuf).x + pillPaddingX + gap;
-    actualPillsWidth += ImGui::CalcTextSize("DRR: 1:1").x + pillPaddingX + gap;
+    actualPillsWidth += ImGui::CalcTextSize(drrBuf).x + pillPaddingX + gap;
     actualPillsWidth += ImGui::CalcTextSize(wpBuf).x + pillPaddingX + gap;
     actualPillsWidth += ImGui::CalcTextSize(entBuf).x + pillPaddingX;
 
@@ -189,7 +253,7 @@ void RenderViewportPanel(bool* pOpen) {
     RenderStatusPill(msBuf, pal.textSecondary);
     ImGui::SameLine(0.0f, gap);
 
-    RenderStatusPill("DRR: 1:1", pal.accent);
+    RenderStatusPill(drrBuf, pal.accent);
     ImGui::SameLine(0.0f, gap);
 
     RenderStatusPill(wpBuf, pal.textSecondary);
@@ -197,7 +261,7 @@ void RenderViewportPanel(bool* pOpen) {
 
     if (ImGui::Button(entBuf)) ImGui::OpenPopup("EntitiesPopup");
     if (ImGui::BeginPopup("EntitiesPopup")) {
-        ImGui::Text("Active Scene Entities: %u", stats.entityCount);
+        ImGui::Text("Active Scene Entities: %u", entCount);
         ImGui::Separator();
         ImGui::MenuItem("Select All Entities");
         ImGui::MenuItem("Hide Unselected Entities");
@@ -208,11 +272,17 @@ void RenderViewportPanel(bool* pOpen) {
     ImGui::PopStyleVar(2);
     ImGui::EndGroup();
 
-    // Render Stats Overlay
-    Panels::RenderViewportStatsHUD(ImVec2(cursorPos.x, cursorPos.y + toolbarH));
+    // Render 3D Floor Grid, Sun Light & Gizmo Overlays clipped strictly BELOW top bar
+    drawList->PushClipRect(
+        ImVec2(cursorPos.x, cursorPos.y + toolbarH),
+        ImVec2(cursorPos.x + viewportAvail.x, cursorPos.y + viewportAvail.y),
+        true
+    );
 
-    // Render ImGuizmo
+    Panels::RenderViewport3DOverlays(drawList, cursorPos, viewportAvail, s_ShowFlags);
     Panels::RenderViewportGizmos(drawList, cursorPos, viewportAvail);
+
+    drawList->PopClipRect();
 
     ImGui::End();
     ImGui::PopStyleVar();

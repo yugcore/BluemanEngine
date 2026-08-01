@@ -1,8 +1,10 @@
 #include "ViewportRenderer.h"
+#include "ZeGFXAdapter.h"
+#include "DX12Host.h"
 #include <iostream>
 #include <cmath>
 
-extern void WaitForGPU();
+using Microsoft::WRL::ComPtr;
 
 namespace EngineEditor {
 
@@ -128,9 +130,7 @@ void ViewportRenderer::RenderScene(float deltaTime, ID3D12GraphicsCommandList* c
 
     if (!m_ColorTexture) return;
 
-    m_RotationAngle += deltaTime * 45.0f;
-    if (m_RotationAngle > 360.0f) m_RotationAngle -= 360.0f;
-
+    // Transition offscreen target to RENDER_TARGET state
     if (m_CurrentState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -143,16 +143,14 @@ void ViewportRenderer::RenderScene(float deltaTime, ID3D12GraphicsCommandList* c
         m_CurrentState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
-    float pulse = (std::sin(m_RotationAngle * 0.05f) + 1.0f) * 0.5f;
-    float clearColor[4] = {
-        0.10f + pulse * 0.04f,
-        0.12f + pulse * 0.05f,
-        0.16f + pulse * 0.06f,
-        1.00f
-    };
+    // Clear offscreen render target with atmospheric Blue Sky clear color
+    float skyClearColor[4] = { 0.38f, 0.62f, 0.92f, 1.00f };
+    cl->ClearRenderTargetView(m_RtvHandle, skyClearColor, 0, nullptr);
 
-    cl->ClearRenderTargetView(m_RtvHandle, clearColor, 0, nullptr);
+    // Execute ZeGFX Engine Rendering Pipeline
+    ZeGFXAdapter::Get().Render(cl, m_Width, m_Height, deltaTime);
 
+    // Transition offscreen target back to PIXEL_SHADER_RESOURCE state for ImGui composition
     if (m_CurrentState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;

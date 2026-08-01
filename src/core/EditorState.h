@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cstdint>
+#include "EditorCamera.h"
 
 namespace EngineEditor {
 
@@ -16,6 +17,20 @@ enum class GizmoOperation {
     Translate,
     Rotate,
     Scale
+};
+
+enum class TransformSpace {
+    World,
+    Local
+};
+
+struct SnapSettings {
+    bool enableTranslate = true;
+    float translateSnap = 1.0f;
+    bool enableRotate = true;
+    float rotateSnap = 5.0f;
+    bool enableScale = true;
+    float scaleSnap = 0.25f;
 };
 
 enum class EngineStatus {
@@ -39,16 +54,102 @@ struct SkyAtmosphereProperties {
     float aerialPerspectiveDistanceScale = 1.00f;
 };
 
+struct ZeGFXFogSettings {
+    bool enableVolumetric = true;
+    float density = 0.02f;
+    float anisotropy = 0.5f; // G-factor
+    float maxDistance = 128.0f;
+    float color[3] = { 0.50f, 0.60f, 0.70f };
+};
+
+struct ZeGFXShadowSettings {
+    int cascadeResolution = 2048;
+    int cascadeCount = 4;
+    float maxDistance = 150.0f;
+    float constantBias = 0.0002f;
+    float slopeBias = 0.0008f;
+    float normalBias = 0.40f;
+    float filterSoftness = 1.00f;
+};
+
+struct ZeGFXAOSettings {
+    int mode = 1; // 0: SSAO, 1: GTAO, 2: DXR Raytraced AO
+    float radius = 1.50f;
+    float intensity = 1.00f;
+    bool temporalFiltering = true;
+};
+
+struct ZeGFXPostFXSettings {
+    int tonemapOperator = 0; // 0: ACES, 1: Reinhard, 2: Uncharted2, 3: Linear
+    float exposureEV = 0.00f;
+    bool autoExposure = true;
+    float contrast = 1.00f;
+    float saturation = 1.00f;
+    float temperature = 6500.0f;
+    float tint = 0.00f;
+    float bloomIntensity = 0.50f;
+    float bloomThreshold = 1.00f;
+};
+
+struct ZeGFXMaterialData {
+    std::string materialName = "Default_PBR_Material";
+    float baseColor[4] = { 0.80f, 0.80f, 0.80f, 1.00f };
+    float roughness = 0.40f;
+    float metallic = 0.00f;
+    float specular = 0.50f;
+    float emissiveIntensity = 0.00f;
+    float emissiveColor[3] = { 1.00f, 1.00f, 1.00f };
+
+    std::string albedoMap = "textures/default_albedo.ztex";
+    std::string normalMap = "textures/default_normal.ztex";
+    std::string roughnessMap = "textures/default_roughness.ztex";
+    std::string metallicMap = "textures/default_metallic.ztex";
+    std::string emissiveMap = "textures/default_emissive.ztex";
+    std::string occlusionMap = "textures/default_ao.ztex";
+};
+
+struct ZeGFXTerrainSettings {
+    int gridWidth = 512;
+    int gridHeight = 512;
+    float cellSize = 2.0f; // 512 * 2.0 = 1024m x 1024m (1KM Playable Area)
+    float heightScale = 45.0f;
+    bool centerPivot = true;
+    int maxLodLevel = 4;
+};
+
+struct ZeGFXFoliageSettings {
+    bool enableGPUCulling = true;
+    bool enableExecuteIndirect = true;
+    int maxFoliageInstances = 250000;
+    float cullDistanceMeters = 800.0f;
+    float treeDensity = 1.0f;
+    float grassDensity = 2.5f;
+};
+
 struct RenderSettings {
     // Quality Presets (0: Low, 1: Medium, 2: High)
-    int qualityPreset = 2;
+    int qualityPreset = 1;
 
-    // Hardware Ray Tracing (DXR)
-    bool rtGI = true;
-    bool rtAO = true;
+    // Presentation & VSync Controls
+    bool enableVSync = false;
+
+    // Hardware Ray Tracing (DXR) & Probe GI (Disabled by default for 100+ FPS)
+    bool rtGI = false;
+    int giRaysPerProbe = 64;
+    int giProbesUpdatedPerFrame = 32;
+    bool rtAO = false;
     bool rtReflections = true;
     float dsrScale = 1.00f;
     bool dsrEnabled = true;
+
+    // ZeGFX Engine Specific Feature Options
+    ZeGFXFogSettings fog;
+    ZeGFXShadowSettings shadow;
+    ZeGFXAOSettings ao;
+    ZeGFXPostFXSettings postFX;
+    ZeGFXTerrainSettings terrain;
+    ZeGFXFoliageSettings foliage;
+    ZeGFXMaterialData activeMaterial;
 
     // World Partition & Spatial Grid
     float cellSizeMeters = 150.0f;
@@ -90,10 +191,29 @@ struct MeshStudioData {
     bool isLoaded = false;
 };
 
+struct ShaderStudioDiagnostic {
+    std::string severity = "ERROR"; // "ERROR", "WARNING", "NOTE"
+    int line = 0;
+    int column = 0;
+    std::string message = "";
+};
+
 struct ShaderStudioData {
-    std::string shaderName = "";
+    std::string shaderName = "CustomSurfaceShader.hlsl";
     std::string shaderSource = "";
+    std::string entryPoint = "PSMain";
+    std::string targetProfile = "ps_6_0";
+    int targetProfileIdx = 0; // 0: ps_6_0, 1: vs_6_0, 2: cs_6_0
+
     bool isCompiled = false;
+    bool lastCompileSucceeded = false;
+    std::string compileStatusMsg = "Ready for live compilation";
+    uint64_t compileTimeMs = 0;
+    size_t dxilBytecodeSize = 0;
+    std::string compilerVersion = "DXC";
+
+    std::vector<ShaderStudioDiagnostic> diagnostics;
+    bool autoCompileOnEdit = false;
     std::string compileErrorStr = "";
 };
 
@@ -148,6 +268,9 @@ struct EditorState {
     TextureViewerData textureViewerData;
 
     // Active Selection Transform & Details
+    EditorCamera camera;
+    TransformSpace activeTransformSpace = TransformSpace::World;
+    SnapSettings snapSettings;
     TransformData activeTransform;
     SkyAtmosphereProperties skyAtmosphereProps;
     GizmoOperation gizmoOp = GizmoOperation::Translate;
@@ -172,6 +295,9 @@ struct EditorState {
     // Modal & Panel Visibility Toggles
     bool showProjectWizardModal = false;
     bool showProjectSettingsModal = false;
+    bool requestImportFileDialog = false;
+
+    void TriggerImportFileDialog() { requestImportFileDialog = true; }
 
     // Always Visible (Default)
     bool showViewportPanel = true;

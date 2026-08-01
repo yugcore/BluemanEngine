@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <imgui.h>
 
 namespace EngineEditor {
@@ -14,14 +15,21 @@ enum class SceneNodeType {
     Camera,
     Audio,
     SkyAtmosphere,
-    Component
+    Component,
+    Terrain,
+    FoliageCluster,
+    PathPoint
 };
 
 struct SceneNode {
+    uint64_t id = 0;       // Unique node ID (monotonic counter)
     std::string name;
     SceneNodeType type;
     std::string world = "DefaultWorld";
     std::string panel = "MainPanel";
+    float location[3] = { 0.0f, 0.0f, 0.0f };
+    float rotation[3] = { 0.0f, 0.0f, 0.0f };
+    float scale[3]    = { 1.0f, 1.0f, 1.0f };
     std::vector<SceneNode> children;
 };
 
@@ -35,6 +43,11 @@ public:
     
     // Find node by name
     const SceneNode* FindNode(const std::string& name, const std::vector<SceneNode>* nodes = nullptr) const;
+    SceneNode* FindNodeMutable(const std::string& name, std::vector<SceneNode>* nodes = nullptr);
+
+    // Find node by unique ID
+    const SceneNode* FindNodeById(uint64_t id, const std::vector<SceneNode>* nodes = nullptr) const;
+    SceneNode* FindNodeByIdMutable(uint64_t id, std::vector<SceneNode>* nodes = nullptr);
 
     static const char* GetTypeName(SceneNodeType type);
     static ImVec4 GetTypeColor(SceneNodeType type);
@@ -43,11 +56,20 @@ public:
     // Runtime Ports for Engine Integration
     void AddNode(const SceneNode& node);
     bool RemoveNode(const std::string& name);
+    bool RemoveNodeById(uint64_t id);
     void Clear();
     void SetRootNodes(const std::vector<SceneNode>& nodes);
 
+    // ID generation
+    uint64_t GenerateNodeId();
+
 private:
     std::vector<SceneNode> m_RootNodes;
+    uint64_t m_NextNodeId = 1;
+
+    // Recursive removal helper
+    bool RemoveNodeRecursive(std::vector<SceneNode>& nodes, const std::string& name);
+    bool RemoveNodeByIdRecursive(std::vector<SceneNode>& nodes, uint64_t id);
 };
 
 } // namespace EngineEditor

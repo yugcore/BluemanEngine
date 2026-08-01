@@ -4,6 +4,8 @@ project(engine_editor C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_compile_definitions(WITH_DX12_BACKEND=1 ZEGFX_WITH_ASSIMP=0)
+
 include(FetchContent)
 
 # GLFW
@@ -45,7 +47,7 @@ target_include_directories(imgui_lib PUBLIC
 )
 target_link_libraries(imgui_lib PUBLIC glfw)
 
-# Main Executable
+# Main Executable & ZeGFX Sources
 file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/*.cpp"
     "src/app/*.cpp"
@@ -71,6 +73,63 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/panels/TextureViewer/*.cpp"
     "src/panels/ProjectWizard/*.cpp"
     "src/panels/ProjectSettings/*.cpp"
+
+    # ZeGFX Graphics Engine Core Sources
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/backend_factory.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/default_backend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/headless_backend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/diagnostics.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/render_parameters.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/render_graph.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/render_world.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/renderer_spine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/shader_source.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/shader_compiler.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/shader_artifact.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/shader_reflection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/shader_variant.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/shader_library.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/pipeline_cache.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/asset_importer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/asset_manager.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/asset_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/gltf_importer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ufbx_importer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/vox_importer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/assimp_importer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/hot_reload.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/terrain_system.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/binding_layout.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/platform_win32.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/dx12_pipeline.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/dx12_dxr.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx_graph.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx_vox_translator.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx_ufbx_translator.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx_pipeline.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx_factory.cpp"
+
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/dx12/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/pipeline/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/factories/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/translators/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/cooker/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/registry/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/physics/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/physics/bodies/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/physics/broadphase/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/physics/collision/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/physics/materials/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/physics/narrowphase/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/physics/queries/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/physics/solver/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/ufbx/ufbx.c"
+
+    # Zelyn Language Scripting Runtime Sources
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../Zelyn/src/core/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../Zelyn/src/api/*.cpp"
 )
 
 add_executable(engine_editor ${SOURCES})
@@ -79,11 +138,16 @@ target_include_directories(engine_editor PRIVATE
     src/third_party
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/ufbx
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Zelyn/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Zelyn/include/zelyn
 )
 
 if (WIN32)
-    target_link_libraries(engine_editor PRIVATE imgui_lib glfw d3d12 dxgi d3dcompiler)
+    target_link_libraries(engine_editor PRIVATE imgui_lib glfw d3d12 dxgi d3dcompiler dxguid ole32 winmm)
 else()
     target_link_libraries(engine_editor PRIVATE imgui_lib glfw GL dl)
 endif()
-

@@ -9,23 +9,92 @@ SceneGraph& SceneGraph::Get() {
     return instance;
 }
 
+uint64_t SceneGraph::GenerateNodeId() {
+    return m_NextNodeId++;
+}
+
 SceneGraph::SceneGraph() {
-    // Start with clean, un-seeded scene graph port
+    SceneNode sunNode;
+    sunNode.id = GenerateNodeId();
+    sunNode.name = "DirectionalSunLight";
+    sunNode.type = SceneNodeType::Light;
+    m_RootNodes.push_back(sunNode);
+
+    SceneNode skyNode;
+    skyNode.id = GenerateNodeId();
+    skyNode.name = "AtmosphericBlueSky";
+    skyNode.type = SceneNodeType::SkyAtmosphere;
+    m_RootNodes.push_back(skyNode);
+
+    SceneNode gridNode;
+    gridNode.id = GenerateNodeId();
+    gridNode.name = "FloorGrid_Ground";
+    gridNode.type = SceneNodeType::Actor;
+    m_RootNodes.push_back(gridNode);
+
+    // Forest Walk Environment Nodes (500m - 1km Playable Area)
+    SceneNode terrainNode;
+    terrainNode.id = GenerateNodeId();
+    terrainNode.name = "Forest_Terrain_1KM";
+    terrainNode.type = SceneNodeType::Terrain;
+    m_RootNodes.push_back(terrainNode);
+
+    SceneNode foliageNode;
+    foliageNode.id = GenerateNodeId();
+    foliageNode.name = "Forest_Canopy_Trees_Cluster";
+    foliageNode.type = SceneNodeType::FoliageCluster;
+    m_RootNodes.push_back(foliageNode);
+
+    SceneNode pathNode;
+    pathNode.id = GenerateNodeId();
+    pathNode.name = "Forest_Trail_Path_Waypoint_01";
+    pathNode.type = SceneNodeType::PathPoint;
+    m_RootNodes.push_back(pathNode);
 }
 
 void SceneGraph::AddNode(const SceneNode& node) {
-    m_RootNodes.push_back(node);
+    SceneNode n = node;
+    if (n.id == 0) {
+        n.id = GenerateNodeId();
+    }
+    m_RootNodes.push_back(n);
+}
+
+bool SceneGraph::RemoveNodeRecursive(std::vector<SceneNode>& nodes, const std::string& name) {
+    auto it = std::remove_if(nodes.begin(), nodes.end(), [&](const SceneNode& n) {
+        return n.name == name;
+    });
+    if (it != nodes.end()) {
+        nodes.erase(it, nodes.end());
+        return true;
+    }
+    // Search children recursively
+    for (auto& node : nodes) {
+        if (RemoveNodeRecursive(node.children, name)) return true;
+    }
+    return false;
 }
 
 bool SceneGraph::RemoveNode(const std::string& name) {
-    auto it = std::remove_if(m_RootNodes.begin(), m_RootNodes.end(), [&](const SceneNode& n) {
-        return n.name == name;
+    return RemoveNodeRecursive(m_RootNodes, name);
+}
+
+bool SceneGraph::RemoveNodeByIdRecursive(std::vector<SceneNode>& nodes, uint64_t id) {
+    auto it = std::remove_if(nodes.begin(), nodes.end(), [&](const SceneNode& n) {
+        return n.id == id;
     });
-    if (it != m_RootNodes.end()) {
-        m_RootNodes.erase(it, m_RootNodes.end());
+    if (it != nodes.end()) {
+        nodes.erase(it, nodes.end());
         return true;
     }
+    for (auto& node : nodes) {
+        if (RemoveNodeByIdRecursive(node.children, id)) return true;
+    }
     return false;
+}
+
+bool SceneGraph::RemoveNodeById(uint64_t id) {
+    return RemoveNodeByIdRecursive(m_RootNodes, id);
 }
 
 void SceneGraph::Clear() {
@@ -48,6 +117,42 @@ const SceneNode* SceneGraph::FindNode(const std::string& name, const std::vector
     return nullptr;
 }
 
+SceneNode* SceneGraph::FindNodeMutable(const std::string& name, std::vector<SceneNode>* nodes) {
+    if (nodes == nullptr) {
+        nodes = &m_RootNodes;
+    }
+    for (auto& node : *nodes) {
+        if (node.name == name) return &node;
+        SceneNode* found = FindNodeMutable(name, &node.children);
+        if (found) return found;
+    }
+    return nullptr;
+}
+
+const SceneNode* SceneGraph::FindNodeById(uint64_t id, const std::vector<SceneNode>* nodes) const {
+    if (nodes == nullptr) {
+        nodes = &m_RootNodes;
+    }
+    for (const auto& node : *nodes) {
+        if (node.id == id) return &node;
+        const SceneNode* found = FindNodeById(id, &node.children);
+        if (found) return found;
+    }
+    return nullptr;
+}
+
+SceneNode* SceneGraph::FindNodeByIdMutable(uint64_t id, std::vector<SceneNode>* nodes) {
+    if (nodes == nullptr) {
+        nodes = &m_RootNodes;
+    }
+    for (auto& node : *nodes) {
+        if (node.id == id) return &node;
+        SceneNode* found = FindNodeByIdMutable(id, &node.children);
+        if (found) return found;
+    }
+    return nullptr;
+}
+
 const char* SceneGraph::GetTypeName(SceneNodeType type) {
     switch (type) {
         case SceneNodeType::Folder:        return "Folder";
@@ -57,6 +162,9 @@ const char* SceneGraph::GetTypeName(SceneNodeType type) {
         case SceneNodeType::Audio:         return "Audio";
         case SceneNodeType::SkyAtmosphere: return "SkyAtmosphere";
         case SceneNodeType::Component:     return "Component";
+        case SceneNodeType::Terrain:       return "Terrain";
+        case SceneNodeType::FoliageCluster:return "FoliageCluster";
+        case SceneNodeType::PathPoint:     return "PathPoint";
         default:                           return "Object";
     }
 }
@@ -70,6 +178,9 @@ ImVec4 SceneGraph::GetTypeColor(SceneNodeType type) {
         case SceneNodeType::Audio:         return ImVec4(0.90f, 0.45f, 0.25f, 1.00f); // Orange
         case SceneNodeType::SkyAtmosphere: return ImVec4(0.70f, 0.45f, 0.95f, 1.00f); // Purple
         case SceneNodeType::Component:     return ImVec4(0.60f, 0.60f, 0.60f, 1.00f); // Muted
+        case SceneNodeType::Terrain:       return ImVec4(0.45f, 0.75f, 0.35f, 1.00f); // Forest Green
+        case SceneNodeType::FoliageCluster:return ImVec4(0.35f, 0.85f, 0.45f, 1.00f); // Emerald
+        case SceneNodeType::PathPoint:     return ImVec4(0.85f, 0.65f, 0.35f, 1.00f); // Soil Brown
         default:                           return ImVec4(0.80f, 0.80f, 0.80f, 1.00f);
     }
 }
@@ -83,6 +194,9 @@ const char* SceneGraph::GetTypeIconTag(SceneNodeType type) {
         case SceneNodeType::Audio:         return ICON_FA_VOLUME_HIGH;
         case SceneNodeType::SkyAtmosphere: return ICON_FA_SUN;
         case SceneNodeType::Component:     return ICON_FA_SLIDERS;
+        case SceneNodeType::Terrain:       return ICON_FA_MOUNTAIN;
+        case SceneNodeType::FoliageCluster:return ICON_FA_TREE;
+        case SceneNodeType::PathPoint:     return ICON_FA_LOCATION_DOT;
         default:                           return ICON_FA_CUBE;
     }
 }

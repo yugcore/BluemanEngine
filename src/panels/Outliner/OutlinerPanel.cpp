@@ -334,6 +334,66 @@ void RenderOutlinerPanel(bool* pOpen) {
                 RenderNodeRow(root, query, 0, typeColWidth, pal, rootIdx++);
             }
         }
+
+        // Right-Click Context Menu for Outliner
+        if (ImGui::BeginPopupContextWindow("OutlinerContextMenu")) {
+            if (ImGui::BeginMenu("+ Add Actor")) {
+                if (ImGui::MenuItem("Directional Sun Light")) {
+                    SceneNode sunNode;
+                    sunNode.name = "SunLight_" + std::to_string(rand() % 1000);
+                    sunNode.type = SceneNodeType::Light;
+                    SceneGraph::Get().AddNode(sunNode);
+                    Logger::Get().Info("[Outliner] Added Directional Sun Light actor");
+                }
+                if (ImGui::MenuItem("Point Light")) {
+                    SceneNode ptNode;
+                    ptNode.name = "PointLight_" + std::to_string(rand() % 1000);
+                    ptNode.type = SceneNodeType::Light;
+                    SceneGraph::Get().AddNode(ptNode);
+                    Logger::Get().Info("[Outliner] Added Point Light actor");
+                }
+                if (ImGui::MenuItem("Spot Light")) {
+                    SceneNode spotNode;
+                    spotNode.name = "SpotLight_" + std::to_string(rand() % 1000);
+                    spotNode.type = SceneNodeType::Light;
+                    SceneGraph::Get().AddNode(spotNode);
+                    Logger::Get().Info("[Outliner] Added Spot Light actor");
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem("ZePhysics RigidBody Actor")) {
+                    SceneNode physNode;
+                    physNode.name = "RigidBody_" + std::to_string(rand() % 1000);
+                    physNode.type = SceneNodeType::Actor;
+                    SceneGraph::Get().AddNode(physNode);
+                    Logger::Get().Info("[Outliner] Added ZePhysics RigidBody actor");
+                }
+                if (ImGui::MenuItem("Static Mesh Actor")) {
+                    SceneNode meshNode;
+                    meshNode.name = "StaticMesh_" + std::to_string(rand() % 1000);
+                    meshNode.type = SceneNodeType::Actor;
+                    SceneGraph::Get().AddNode(meshNode);
+                    Logger::Get().Info("[Outliner] Added Static Mesh actor");
+                }
+                if (ImGui::MenuItem("Folder")) {
+                    SceneNode folderNode;
+                    folderNode.name = "NewFolder_" + std::to_string(rand() % 1000);
+                    folderNode.type = SceneNodeType::Folder;
+                    SceneGraph::Get().AddNode(folderNode);
+                    Logger::Get().Info("[Outliner] Added Folder node");
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Delete Selected Actor", nullptr, false, !EditorState::Get().selectedNodeName.empty())) {
+                SceneGraph::Get().RemoveNode(EditorState::Get().selectedNodeName);
+                Logger::Get().Info("[Outliner] Deleted actor: " + EditorState::Get().selectedNodeName);
+                EditorState::Get().selectedNodeName = "";
+            }
+            if (ImGui::MenuItem("Duplicate Selected Actor", nullptr, false, !EditorState::Get().selectedNodeName.empty())) {
+                Logger::Get().Info("[Outliner] Duplicated actor: " + EditorState::Get().selectedNodeName);
+            }
+            ImGui::EndPopup();
+        }
     }
     ImGui::EndChild();
 

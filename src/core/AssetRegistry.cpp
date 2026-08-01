@@ -10,8 +10,8 @@ AssetRegistry& AssetRegistry::Get() {
 }
 
 AssetRegistry::AssetRegistry() {
-    m_RootFolder.name = "ZeGFX Workspace";
-    m_RootFolder.path = "ZeGFX Workspace";
+    m_RootFolder.name = "Blueman Cooked Assets";
+    m_RootFolder.path = "Z:\\Blueman Cooked Assets";
 }
 
 void AssetRegistry::RegisterAsset(const AssetItem& item, const std::string& folderPath) {

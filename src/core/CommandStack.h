@@ -4,9 +4,12 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <cstdint>
 #include "EditorState.h"
 
 namespace EngineEditor {
+
+static constexpr size_t kMaxUndoDepth = 200;
 
 class ICommand {
 public:
@@ -18,6 +21,7 @@ public:
 
 class TransformChangeCommand : public ICommand {
 public:
+    TransformChangeCommand(const std::string& nodeName, uint64_t nodeId, const TransformData& oldTransform, const TransformData& newTransform);
     TransformChangeCommand(const std::string& nodeName, const TransformData& oldTransform, const TransformData& newTransform);
 
     void Execute() override;
@@ -26,8 +30,11 @@ public:
 
 private:
     std::string m_NodeName;
+    uint64_t m_NodeId;
     TransformData m_OldTransform;
     TransformData m_NewTransform;
+
+    void ApplyTransformToNode(const TransformData& transform);
 };
 
 class CommandStack {

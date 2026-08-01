@@ -7,6 +7,8 @@
 
 namespace EngineEditor {
 
+static constexpr size_t kMaxLogMessages = 10000;
+
 enum class LogSeverity {
     Info,
     Warning,

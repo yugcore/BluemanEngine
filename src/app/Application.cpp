@@ -2,6 +2,12 @@
 #include "layout/Dockspace.h"
 #include "layout/WindowLayout.h"
 #include "core/EditorState.h"
+#include "core/Logger.h"
+#include "core/SceneGraph.h"
+#include "core/AssetRegistry.h"
+#include "core/BackgroundAssetCooker.h"
+#include "core/CommandStack.h"
+#include "render/SplashScreen.h"
 
 #include "panels/Chrome/CustomTitleBar.h"
 #include "panels/Chrome/MenuBar.h"
@@ -39,10 +45,25 @@
 namespace EngineEditor {
 
 void InitializeApplication() {
+    // Explicitly trigger singleton creation in the correct order.
+    // This ensures deterministic initialization and avoids the
+    // C++ static initialization order fiasco.
+    Logger::Get().Info("[Application] Subsystem initialization starting...");
+    SceneGraph::Get();           // Scene hierarchy
+    AssetRegistry::Get();        // Asset database
+    CommandStack::Get();         // Undo/redo
+    BackgroundAssetCooker::Get(); // Worker thread starts here
+    Logger::Get().Info("[Application] All editor subsystems initialized.");
 }
 
 void RenderApplicationLayout() {
     auto& state = EditorState::Get();
+
+    // Render Unreal-style Splash Screen if active
+    if (SplashScreen::Get().IsActive()) {
+        RenderSplashScreenUI();
+        return;
+    }
 
     // 1. Render unified title bar (includes menu bar inline)
     RenderCustomTitleBar();
@@ -117,6 +138,14 @@ void RenderApplicationLayout() {
 }
 
 void ShutdownApplication() {
+    // Explicitly shut down subsystems in reverse initialization order.
+    // Critical: BackgroundAssetCooker worker thread must be stopped
+    // before static destructors run, to prevent use-after-free.
+    Logger::Get().Info("[Application] Shutting down editor subsystems...");
+    BackgroundAssetCooker::Get().~BackgroundAssetCooker();
+    CommandStack::Get().Clear();
+    Logger::Get().Info("[Application] Shutdown complete.");
 }
 
 } // namespace EngineEditor
+

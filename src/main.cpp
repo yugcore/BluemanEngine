@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <chrono>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
@@ -17,6 +18,10 @@
 #include "core/CommandStack.h"
 #include "panels/Chrome/CustomTitleBar.h"
 #include "render/ViewportRenderer.h"
+#include "render/ZeGFXAdapter.h"
+#include "render/SplashScreen.h"
+#include "core/BackgroundAssetCooker.h"
+#include "core/WindowsFileDialog.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -54,9 +59,16 @@ static void CleanupRenderTarget();
 static void WaitForLastSubmittedFrame();
 static FrameContext* WaitForNextFrameResources();
 
+static constexpr UINT kMaxSrvDescriptors = 1024;
 static UINT g_srvHeapNextFreeIndex = 0;
 
 static void SrvDescriptorAlloc(ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) {
+    if (g_srvHeapNextFreeIndex >= kMaxSrvDescriptors) {
+        std::cerr << "[DX12] Error: SRV Descriptor Heap exhausted (" << kMaxSrvDescriptors << " descriptors allocated)!" << std::endl;
+        // Fallback to index 0 to avoid out-of-bounds access crash
+        g_srvHeapNextFreeIndex = 0;
+    }
+
     UINT handleIncrement = info->Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = info->SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -95,10 +107,19 @@ void WaitForGPU() {
 static GLFWwindow* g_Window = nullptr;
 static WNDPROC g_PrevWndProc = NULL;
 static bool s_InFrameRender = false;
+static double s_LastFrameTime = 0.0;
+static uint64_t s_FrameCounter = 0;
 
 static void RenderFrame() {
     if (s_InFrameRender || !g_Window || !g_pSwapChain) return;
     s_InFrameRender = true;
+
+    auto tFrameStart = std::chrono::high_resolution_clock::now();
+
+    double currentTime = glfwGetTime();
+    float deltaTime = (s_LastFrameTime > 0.0) ? static_cast<float>(currentTime - s_LastFrameTime) : 0.01667f;
+    if (deltaTime <= 0.0f || deltaTime > 0.1f) deltaTime = 0.01667f;
+    s_LastFrameTime = currentTime;
 
     int display_w = 0, display_h = 0;
     glfwGetFramebufferSize(g_Window, &display_w, &display_h);
@@ -129,8 +150,10 @@ static void RenderFrame() {
     }
 
     // 1. BeginFrame & Wait for Next Frame Resources
+    auto t1 = std::chrono::high_resolution_clock::now();
     FrameContext* frameCtx = WaitForNextFrameResources();
     g_FrameIndex = g_pSwapChain->GetCurrentBackBufferIndex();
+    auto tWait = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t1).count();
 
     // 2. Reset Command Allocator & List
     frameCtx->commandAllocator->Reset();
@@ -156,7 +179,8 @@ static void RenderFrame() {
     g_pd3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[g_FrameIndex], clear_color_with_alpha, 0, nullptr);
     g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[g_FrameIndex], FALSE, nullptr);
 
-    // 6. Start ImGui Frame
+    // 6. Start ImGui Frame & Render Application Layout
+    auto t2 = std::chrono::high_resolution_clock::now();
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -169,14 +193,40 @@ static void RenderFrame() {
         EngineEditor::CommandStack::Get().Redo();
     }
 
-    // Render Editor Application Shell
+    // Render Editor Application Shell (includes Viewport & ZeGFX Adapter rendering)
     EngineEditor::RenderApplicationLayout();
 
-    // 7. Render ImGui Draw Data
+    // Check if import file dialog was requested
+    if (EngineEditor::EditorState::Get().requestImportFileDialog) {
+        EngineEditor::EditorState::Get().requestImportFileDialog = false;
+        auto selectedFiles = EngineEditor::WindowsFileDialog::OpenFileDialog(
+            EngineEditor::FileDialogType::ImportAsset,
+            "Import Assets into Blueman Engine",
+            true
+        );
+        if (!selectedFiles.empty()) {
+            EngineEditor::BackgroundAssetCooker::Get().QueueFilesForCooking(selectedFiles);
+        }
+    }
+
+    // Render background asset cooking progress overlay & notifications
+    EngineEditor::BackgroundAssetCooker::Get().RenderCookingOverlay();
+
+    auto tLayout = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t2).count();
+
+    // 7. Render ImGui Draw Data & Platform Windows
+    auto t3 = std::chrono::high_resolution_clock::now();
     ImGui::Render();
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_pd3dCommandList.Get());
 
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault(nullptr, (void*)g_pd3dCommandList.Get());
+    }
+    auto tImGuiDraw = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t3).count();
+
     // 8. Transition Backbuffer to PRESENT & Close Command List
+    auto t4 = std::chrono::high_resolution_clock::now();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
     g_pd3dCommandList->ResourceBarrier(1, &barrier);
@@ -184,21 +234,17 @@ static void RenderFrame() {
 
     // 9. Execute Command Lists
     g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)g_pd3dCommandList.GetAddressOf());
-
-    // Multi-viewport Platform Windows
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault(nullptr, (void*)g_pd3dCommandList.Get());
-    }
+    auto tExecute = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t4).count();
 
     // 10. Present & EndFrame
-    g_pSwapChain->Present(1, 0);
+    auto t5 = std::chrono::high_resolution_clock::now();
+    UINT syncInterval = EngineEditor::EditorState::Get().settings.enableVSync ? 1 : 0;
+    g_pSwapChain->Present(syncInterval, 0);
 
     UINT64 fenceValue = g_fenceLastSignaledValue + 1;
     g_pd3dCommandQueue->Signal(g_pFence.Get(), fenceValue);
     g_fenceLastSignaledValue = fenceValue;
     frameCtx->fenceValue = fenceValue;
-
     s_InFrameRender = false;
 }
 
@@ -241,6 +287,7 @@ static LRESULT CALLBACK EditorWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 }
 
 int main(int argc, char** argv) {
+    DisableProcessWindowsGhosting();
     glfwSetErrorCallback(glfw_error_callback);
 
     if (!glfwInit()) {
@@ -248,15 +295,117 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    // ------------------------------------------------------------------------
+    // PHASE 1: Standalone Unreal-Style Splash Loading Window (640x360)
+    // ------------------------------------------------------------------------
+    const GLFWvidmode* videoMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    int splashW = 640;
+    int splashH = 360;
+    int splashX = (videoMode->width - splashW) / 2;
+    int splashY = (videoMode->height - splashH) / 2;
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
 
-    GLFWwindow* window = glfwCreateWindow(1920, 1080, "BLUEMAN ENGINE", nullptr, nullptr);
+    GLFWwindow* splashWindow = glfwCreateWindow(splashW, splashH, "Blueman Engine Loading...", nullptr, nullptr);
+    if (splashWindow) {
+        g_Window = splashWindow;
+        glfwSetWindowPos(splashWindow, splashX, splashY);
+        HWND splashHwnd = glfwGetWin32Window(splashWindow);
+        g_PrevWndProc = (WNDPROC)SetWindowLongPtr(splashHwnd, GWLP_WNDPROC, (LONG_PTR)EditorWndProc);
+
+        if (CreateDeviceD3D(splashHwnd)) {
+            IMGUI_CHECKVERSION();
+            ImGui::CreateContext();
+            ImGuiIO& splashIo = ImGui::GetIO(); (void)splashIo;
+            splashIo.IniFilename = nullptr;
+
+            ImGui_ImplGlfw_InitForOther(splashWindow, true);
+            g_srvHeapNextFreeIndex = 0;
+
+            ImGui_ImplDX12_InitInfo splashInitInfo = {};
+            splashInitInfo.Device = g_pd3dDevice.Get();
+            splashInitInfo.CommandQueue = g_pd3dCommandQueue.Get();
+            splashInitInfo.NumFramesInFlight = NUM_FRAMES_IN_FLIGHT;
+            splashInitInfo.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+            splashInitInfo.SrvDescriptorHeap = g_pd3dSrvDescHeap.Get();
+            splashInitInfo.SrvDescriptorAllocFn = SrvDescriptorAlloc;
+            splashInitInfo.SrvDescriptorFreeFn = SrvDescriptorFree;
+            ImGui_ImplDX12_Init(&splashInitInfo);
+
+            EngineEditor::ApplyTheme();
+
+            D3D12_CPU_DESCRIPTOR_HANDLE splashCpuDesc;
+            D3D12_GPU_DESCRIPTOR_HANDLE splashGpuDesc;
+            SrvDescriptorAlloc(&splashInitInfo, &splashCpuDesc, &splashGpuDesc);
+
+            EngineEditor::SplashScreen::Get().Init(
+                g_pd3dDevice.Get(),
+                g_pd3dCommandQueue.Get(),
+                g_pd3dSrvDescHeap.Get(),
+                splashCpuDesc,
+                splashGpuDesc
+            );
+
+            struct LoadStep {
+                float progress;
+                const char* status;
+            };
+            LoadStep loadSteps[] = {
+                { 0.15f, "Initializing Direct3D 12 Hardware Interface..." },
+                { 0.35f, "Loading ZeGFX Engine Backends (DX12)..." },
+                { 0.60f, "Prewarming HLSL Shader Variants & Pipeline Cache..." },
+                { 0.85f, "Synchronizing Scene Graph & Render World..." },
+                { 1.00f, "Launching BluemanEngine Editor..." }
+            };
+
+            for (int i = 0; i < 5; i++) {
+                EngineEditor::SplashScreen::Get().SetProgress(loadSteps[i].progress, loadSteps[i].status);
+                double startTime = glfwGetTime();
+                while (glfwGetTime() - startTime < 0.8 && !glfwWindowShouldClose(splashWindow)) {
+                    glfwPollEvents();
+                    RenderFrame();
+                }
+            }
+
+            WaitForLastSubmittedFrame();
+            EngineEditor::SplashScreen::Get().Shutdown();
+            ImGui_ImplDX12_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+            CleanupRenderTarget();
+            g_pSwapChain.Reset();
+            SetWindowLongPtr(splashHwnd, GWLP_WNDPROC, (LONG_PTR)g_PrevWndProc);
+            g_Window = nullptr;
+        }
+        glfwDestroyWindow(splashWindow);
+    }
+
+    // ------------------------------------------------------------------------
+    // PHASE 2: Main Blueman Engine Editor Window Initialization & Reveal
+    // ------------------------------------------------------------------------
+    EngineEditor::SplashScreen::Get().SetActive(false);
+
+    int editorW = 1920;
+    int editorH = 1080;
+    if (videoMode->width < 1920 || videoMode->height < 1080) {
+        editorW = videoMode->width - 100;
+        editorH = videoMode->height - 100;
+    }
+
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+
+    GLFWwindow* window = glfwCreateWindow(editorW, editorH, "BLUEMAN ENGINE", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window!" << std::endl;
         glfwTerminate();
         return -1;
     }
+
+    glfwSetWindowPos(window, (videoMode->width - editorW) / 2, (videoMode->height - editorH) / 2);
 
     g_Window = window;
     HWND hwnd = glfwGetWin32Window(window);
@@ -270,16 +419,15 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    // Initialize Dear ImGui
+    // Initialize Dear ImGui for Main Editor
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    io.IniFilename = nullptr;
+    io.IniFilename = "blueman_layout.ini";
 
-    // Setup Platform/Renderer Backends BEFORE loading fonts / applying theme
     ImGui_ImplGlfw_InitForOther(window, true);
     
     g_srvHeapNextFreeIndex = 0;
@@ -295,9 +443,7 @@ int main(int argc, char** argv) {
 
     ImGui_ImplDX12_Init(&init_info);
 
-    // Apply Dark Theme & Load Fonts (now that backend capabilities are registered)
     EngineEditor::ApplyTheme();
-
     EngineEditor::InitializeApplication();
     EngineEditor::SetCustomTitleBarWindow(window);
 
@@ -315,6 +461,14 @@ int main(int argc, char** argv) {
         viewportGpuDesc
     );
 
+    // Initialize ZeGFX Engine Adapter
+    EngineEditor::ZeGFXAdapter::Get().Initialize(
+        g_pd3dDevice.Get(),
+        hwnd,
+        1280,
+        720
+    );
+
     // Main Loop
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -324,6 +478,7 @@ int main(int argc, char** argv) {
     WaitForLastSubmittedFrame();
 
     // Cleanup
+    EngineEditor::ZeGFXAdapter::Get().Shutdown();
     EngineEditor::ShutdownApplication();
     EngineEditor::ViewportRenderer::Get().Shutdown();
 
@@ -340,33 +495,55 @@ int main(int argc, char** argv) {
 }
 
 static bool CreateDeviceD3D(HWND hWnd) {
-    // Create DXGI Factory
+    if (!g_pd3dDevice) {
+        // Create DXGI Factory
+        ComPtr<IDXGIFactory4> factory;
+        if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return false;
+
+        // Create D3D12 Device
+        if (FAILED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&g_pd3dDevice)))) return false;
+
+        // Create Command Queue
+        D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+        queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+        if (FAILED(g_pd3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&g_pd3dCommandQueue)))) return false;
+
+        // Create Command Allocators & List
+        for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++) {
+            if (FAILED(g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_FrameContext[i].commandAllocator))))
+                return false;
+        }
+        if (FAILED(g_pd3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_FrameContext[0].commandAllocator.Get(), nullptr, IID_PPV_ARGS(&g_pd3dCommandList))) || FAILED(g_pd3dCommandList->Close()))
+            return false;
+
+        // Create Fence
+        if (FAILED(g_pd3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&g_pFence)))) return false;
+        g_hFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        if (!g_hFenceEvent) return false;
+
+        // Create RTV Descriptor Heap
+        D3D12_DESCRIPTOR_HEAP_DESC rtvDesc = {};
+        rtvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        rtvDesc.NumDescriptors = NUM_BACK_BUFFERS;
+        rtvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        if (FAILED(g_pd3dDevice->CreateDescriptorHeap(&rtvDesc, IID_PPV_ARGS(&g_pd3dRtvDescHeap)))) return false;
+
+        // Create SRV Descriptor Heap
+        D3D12_DESCRIPTOR_HEAP_DESC srvDesc = {};
+        srvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        srvDesc.NumDescriptors = kMaxSrvDescriptors;
+        srvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        if (FAILED(g_pd3dDevice->CreateDescriptorHeap(&srvDesc, IID_PPV_ARGS(&g_pd3dSrvDescHeap)))) return false;
+    }
+
+    // Attach Swap Chain for target hWnd
+    CleanupRenderTarget();
+    g_pSwapChain.Reset();
+
     ComPtr<IDXGIFactory4> factory;
     if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return false;
 
-    // Create D3D12 Device
-    if (FAILED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&g_pd3dDevice)))) return false;
-
-    // Create Command Queue
-    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    if (FAILED(g_pd3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&g_pd3dCommandQueue)))) return false;
-
-    // Create Command Allocators & List
-    for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++) {
-        if (FAILED(g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_FrameContext[i].commandAllocator))))
-            return false;
-    }
-    if (FAILED(g_pd3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_FrameContext[0].commandAllocator.Get(), nullptr, IID_PPV_ARGS(&g_pd3dCommandList))) || FAILED(g_pd3dCommandList->Close()))
-        return false;
-
-    // Create Fence
-    if (FAILED(g_pd3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&g_pFence)))) return false;
-    g_hFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-    if (!g_hFenceEvent) return false;
-
-    // Create Swap Chain
     DXGI_SWAP_CHAIN_DESC1 sd = {};
     sd.BufferCount = NUM_BACK_BUFFERS;
     sd.Width = 0;
@@ -384,20 +561,6 @@ static bool CreateDeviceD3D(HWND hWnd) {
     if (FAILED(factory->CreateSwapChainForHwnd(g_pd3dCommandQueue.Get(), hWnd, &sd, nullptr, nullptr, &swapChain1))) return false;
     if (FAILED(swapChain1.As(&g_pSwapChain))) return false;
     g_pSwapChain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
-
-    // Create RTV Descriptor Heap
-    D3D12_DESCRIPTOR_HEAP_DESC rtvDesc = {};
-    rtvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvDesc.NumDescriptors = NUM_BACK_BUFFERS;
-    rtvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    if (FAILED(g_pd3dDevice->CreateDescriptorHeap(&rtvDesc, IID_PPV_ARGS(&g_pd3dRtvDescHeap)))) return false;
-
-    // Create SRV Descriptor Heap
-    D3D12_DESCRIPTOR_HEAP_DESC srvDesc = {};
-    srvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    srvDesc.NumDescriptors = 64;
-    srvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    if (FAILED(g_pd3dDevice->CreateDescriptorHeap(&srvDesc, IID_PPV_ARGS(&g_pd3dSrvDescHeap)))) return false;
 
     RECT rect = {};
     GetClientRect(hWnd, &rect);

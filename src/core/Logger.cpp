@@ -32,6 +32,11 @@ static std::string GetCurrentTimestamp() {
 }
 
 void Logger::AddMessage(LogSeverity severity, const std::string& msg) {
+    // Enforce bounded capacity — drop oldest 25% when full
+    if (m_Messages.size() >= kMaxLogMessages) {
+        size_t dropCount = kMaxLogMessages / 4;
+        m_Messages.erase(m_Messages.begin(), m_Messages.begin() + dropCount);
+    }
     m_Messages.push_back({ GetCurrentTimestamp(), severity, msg });
 }
 

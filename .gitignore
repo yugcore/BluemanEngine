@@ -36,6 +36,7 @@ compile_commands.json
 
 # Dear ImGui Runtime User Configurations
 imgui.ini
+blueman_layout.ini
 
 # Visual Studio & IDE Configuration Directories
 .vs/

@@ -348,6 +348,44 @@ void RenderDetailsPanel(bool* pOpen) {
         }
     }
 
+    // 4. ZePhysics 3D Component
+    bool physOpen = RenderCollapsibleHeader("ZePhysics 3D Component", true);
+    if (physOpen) {
+        ImGui::Indent(Theme::Metrics::panelLeftMargin);
+        ImGui::Spacing();
+
+        static bool simulatePhysics = false;
+        static bool enableGravity = true;
+        static float massKg = 10.0f;
+        static float friction = 0.50f;
+        static float bounciness = 0.20f;
+        static int collisionLayer = 2;
+
+        ImGui::Checkbox("Simulate 3D RigidBody Physics", &simulatePhysics);
+        ImGui::Checkbox("Enable Gravity Force", &enableGravity);
+
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Mass (kg) [0 = Static Body]:");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##PhysicsMass", &massKg, 0.5f, 0.0f, 10000.0f, "%.1f kg");
+
+        ImGui::TextUnformatted("Friction Coefficient:");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::SliderFloat("##PhysicsFriction", &friction, 0.0f, 1.0f, "%.2f");
+
+        ImGui::TextUnformatted("Restitution (Bounciness):");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::SliderFloat("##PhysicsBounciness", &bounciness, 0.0f, 1.0f, "%.2f");
+
+        const char* layerNames[] = { "Default (Layer 0)", "Static Geometry (Layer 1)", "Dynamic RigidBody (Layer 2)", "Trigger Sensor (Layer 3)" };
+        ImGui::TextUnformatted("Collision Layer:");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::Combo("##PhysicsCollisionLayer", &collisionLayer, layerNames, 4);
+
+        ImGui::Spacing();
+        ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+    }
+
     ImGui::End();
 }
 

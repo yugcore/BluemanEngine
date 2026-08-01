@@ -43,20 +43,39 @@ void RenderContentBrowserPanel(bool* pOpen) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Theme::Metrics::intraGroupGap, 4.0f));
     
     // + Add (Vibrant primary action button)
-    ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.accentHover);
-    ImGui::PushStyleColor(ImGuiCol_Text, pal.textPrimary);
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(38, 55, 75, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(52, 75, 102, 255));
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(240, 245, 255, 255));
     if (ImGui::Button("+ Add", ImVec2(0.0f, Theme::Metrics::rowHeight))) {
-        Logger::Get().Info("[ContentBrowser] + Add asset dialog opened.");
+        ImGui::OpenPopup("+AddAssetPopup");
+    }
+    if (ImGui::BeginPopup("+AddAssetPopup")) {
+        if (ImGui::MenuItem("Import External Asset (FBX/GLTF/Textures...)")) {
+            EditorState::Get().TriggerImportFileDialog();
+            Logger::Get().Info("[ContentBrowser] Native Windows File Import triggered from +Add menu.");
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("New PBR Material")) {
+            Logger::Get().Info("[ContentBrowser] Created new Material asset");
+        }
+        if (ImGui::MenuItem("New Zelyn Script")) {
+            Logger::Get().Info("[ContentBrowser] Created new Zelyn Script");
+        }
+        if (ImGui::MenuItem("New Physics Asset")) {
+            Logger::Get().Info("[ContentBrowser] Created new ZePhysics Asset");
+        }
+        ImGui::EndPopup();
     }
     ImGui::PopStyleColor(3);
 
     ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
-    ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(28, 34, 44, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(40, 48, 60, 255));
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(230, 235, 245, 255));
 
     if (ImGui::Button("Import", ImVec2(0.0f, Theme::Metrics::rowHeight))) {
-        Logger::Get().Info("[ContentBrowser] Import external asset selected.");
+        Logger::Get().Info("[ContentBrowser] Import external asset selected -> Launching Windows File Dialog.");
+        EditorState::Get().TriggerImportFileDialog();
     }
     ImGui::SameLine(0.0f, Theme::Metrics::intraGroupGap);
     if (ImGui::Button("Save All", ImVec2(0.0f, Theme::Metrics::rowHeight))) {
@@ -68,6 +87,8 @@ void RenderContentBrowserPanel(bool* pOpen) {
     ImGui::Button("<", ImVec2(28.0f, Theme::Metrics::rowHeight));
     ImGui::SameLine(0.0f, 4.0f);
     ImGui::Button(">", ImVec2(28.0f, Theme::Metrics::rowHeight));
+
+    ImGui::PopStyleColor(3);
 
     // Path Breadcrumbs (All > Content > StarterContent > Materials)
     ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
@@ -113,7 +134,6 @@ void RenderContentBrowserPanel(bool* pOpen) {
         ImGui::EndPopup();
     }
 
-    ImGui::PopStyleColor(2);
     ImGui::PopStyleVar(2);
 
     ImGui::Spacing();
