@@ -79,62 +79,94 @@ struct RenderSettings {
     bool showOutputLog = true;
 };
 
+struct MeshStudioData {
+    std::string meshName = "";
+    std::string meshPath = "";
+    uint32_t vertexCount = 0;
+    uint32_t triangleCount = 0;
+    uint32_t submeshCount = 0;
+    float boundsMin[3] = { 0.0f, 0.0f, 0.0f };
+    float boundsMax[3] = { 0.0f, 0.0f, 0.0f };
+    bool isLoaded = false;
+};
+
+struct ShaderStudioData {
+    std::string shaderName = "";
+    std::string shaderSource = "";
+    bool isCompiled = false;
+    std::string compileErrorStr = "";
+};
+
+struct TextureViewerData {
+    std::string textureName = "";
+    uint32_t width = 0;
+    uint32_t height = 0;
+    std::string formatStr = "";
+    float sizeMB = 0.0f;
+    bool isLoaded = false;
+};
+
 struct RenderStats {
-    std::string gpuName = "NVIDIA GeForce RTX 4080 (Lovelace)";
-    float vramUsedGB = 10.2f;
-    float vramTotalGB = 16.0f;
-    uint32_t triangleCount = 3214567;
-    uint32_t drawCalls = 1845;
-    uint32_t entityCount = 346;
-    float fps = 185.2f;
-    float frameTimeMs = 5.41f;
-    float ramUsedGB = 6.4f;
-    float ramTotalGB = 32.0f;
-    float cpuUsagePct = 14.2f;
-    std::string upscalerMode = "DLSS 3.5 Quality (Frame Gen)";
-    std::string rtxGIStatus = "RTX GI Ultra (4 Bounces)";
-    std::string volumetricLighting = "Volumetric: Enabled";
-    std::string naniteStatus = "Nanite: Active";
-    std::string apiTag = "DR12";
-    std::string csrPolicy = "CSR Policy: Traversals (MS) 1.1 Active (Ray Tracing + Solve)";
+    std::string gpuName = "GPU Standby / Unbound";
+    float vramUsedGB = 0.0f;
+    float vramTotalGB = 0.0f;
+    uint32_t triangleCount = 0;
+    uint32_t drawCalls = 0;
+    uint32_t entityCount = 0;
+    float fps = 0.0f;
+    float frameTimeMs = 0.0f;
+    float ramUsedGB = 0.0f;
+    float ramTotalGB = 0.0f;
+    float cpuUsagePct = 0.0f;
+    std::string upscalerMode = "Off";
+    std::string rtxGIStatus = "Standby";
+    std::string volumetricLighting = "Disabled";
+    std::string naniteStatus = "Inactive";
+    std::string apiTag = "DX12";
+    std::string csrPolicy = "CSR Policy: Idle";
 };
 
 struct EditorState {
     // Workspace Architecture
     WorkspaceMode activeWorkspace = WorkspaceMode::Editor;
 
-    // Status Bar & System Metadata (Phase 8)
+    // Status Bar & System Metadata
     EngineStatus status = EngineStatus::Ready;
-    std::string gitBranch = "feature/volumetrics";
-    std::string currentLevelName = "Default Level";
+    std::string gitBranch = "main";
+    std::string currentLevelName = "Untitled Scene";
     std::string editorMode = "LevelDesign";
     std::string editorModeName = "Editor Mode: LevelDesign";
-    float cpuUsagePct = 14.2f;
+    float cpuUsagePct = 0.0f;
 
-    // Render Settings & Stats (Phases 3 & 4)
+    // Render Settings & Stats
     RenderSettings settings;
     RenderStats stats;
 
-    // Active Selection Transform & Details (Phase 6 & 9)
+    // Studio Data Ports (exposing runtime hooks)
+    MeshStudioData meshStudioData;
+    ShaderStudioData shaderStudioData;
+    TextureViewerData textureViewerData;
+
+    // Active Selection Transform & Details
     TransformData activeTransform;
     SkyAtmosphereProperties skyAtmosphereProps;
     GizmoOperation gizmoOp = GizmoOperation::Translate;
 
-    // Asset Selection State (Phase 2)
-    std::string selectedFolderPath = "ZeGFX Workspace/Blueman Cooked Assets/Meshes";
+    // Asset Selection State
+    std::string selectedFolderPath = "";
     std::string selectedAssetName = "";
     std::string selectedAssetPath = "";
     std::string selectedAssetType = "";
 
-    // Scene Graph Node Selection State (Phase 5 & 9)
+    // Scene Graph Node Selection State
     std::string selectedNodeName = "";
     std::string selectedNodeType = "";
 
     // Active Code Document State
-    std::string activeCodeFileName = "Main.cpp";
-    int activeCodeLine = 14;
-    int activeCodeColumn = 5;
-    int activeCodeErrorsCount = 2;
+    std::string activeCodeFileName = "";
+    int activeCodeLine = 1;
+    int activeCodeColumn = 1;
+    int activeCodeErrorsCount = 0;
     bool showNewFileDialog = false;
 
     // Modal & Panel Visibility Toggles

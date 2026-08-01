@@ -1,5 +1,6 @@
 #include "SceneGraph.h"
 #include "third_party/IconsFontAwesome6.h"
+#include <algorithm>
 
 namespace EngineEditor {
 
@@ -9,102 +10,30 @@ SceneGraph& SceneGraph::Get() {
 }
 
 SceneGraph::SceneGraph() {
-    SeedDummyData();
+    // Start with clean, un-seeded scene graph port
 }
 
-void SceneGraph::SeedDummyData() {
-    // 1. Environments
-    SceneNode envFolder;
-    envFolder.name = "Environments";
-    envFolder.type = SceneNodeType::Folder;
-    envFolder.world = "DefaultWorld";
-    envFolder.panel = "LevelPanel";
+void SceneGraph::AddNode(const SceneNode& node) {
+    m_RootNodes.push_back(node);
+}
 
-    SceneNode villageFolder;
-    villageFolder.name = "Modular_Village";
-    villageFolder.type = SceneNodeType::Folder;
-    villageFolder.world = "DefaultWorld";
-    villageFolder.panel = "LevelPanel";
+bool SceneGraph::RemoveNode(const std::string& name) {
+    auto it = std::remove_if(m_RootNodes.begin(), m_RootNodes.end(), [&](const SceneNode& n) {
+        return n.name == name;
+    });
+    if (it != m_RootNodes.end()) {
+        m_RootNodes.erase(it, m_RootNodes.end());
+        return true;
+    }
+    return false;
+}
 
-    SceneNode bridgesFolder;
-    bridgesFolder.name = "Bridges";
-    bridgesFolder.type = SceneNodeType::Folder;
-    bridgesFolder.world = "DefaultWorld";
-    bridgesFolder.panel = "LevelPanel";
+void SceneGraph::Clear() {
+    m_RootNodes.clear();
+}
 
-    SceneNode buildingsFolder;
-    buildingsFolder.name = "Buildings_01";
-    buildingsFolder.type = SceneNodeType::Folder;
-    buildingsFolder.world = "DefaultWorld";
-    buildingsFolder.panel = "LevelPanel";
-
-    villageFolder.children = { bridgesFolder, buildingsFolder };
-
-    SceneNode skyFolder;
-    skyFolder.name = "Sky";
-    skyFolder.type = SceneNodeType::Folder;
-    skyFolder.world = "DefaultWorld";
-    skyFolder.panel = "SkyPanel";
-
-    SceneNode skyAtmosphere;
-    skyAtmosphere.name = "SkyAtmosphere";
-    skyAtmosphere.type = SceneNodeType::SkyAtmosphere;
-    skyAtmosphere.world = "DefaultWorld";
-    skyAtmosphere.panel = "SkyPanel";
-
-    SceneNode sunLight;
-    sunLight.name = "SunLight";
-    sunLight.type = SceneNodeType::Light;
-    sunLight.world = "DefaultWorld";
-    sunLight.panel = "LightPanel";
-
-    SceneNode skyLight;
-    skyLight.name = "SkyLight";
-    skyLight.type = SceneNodeType::Light;
-    skyLight.world = "DefaultWorld";
-    skyLight.panel = "LightPanel";
-
-    skyFolder.children = { skyAtmosphere, sunLight, skyLight };
-
-    envFolder.children = { villageFolder, skyFolder };
-
-    // 2. Player
-    SceneNode playerFolder;
-    playerFolder.name = "Player";
-    playerFolder.type = SceneNodeType::Folder;
-    playerFolder.world = "GameWorld";
-    playerFolder.panel = "ActorPanel";
-
-    SceneNode charActor;
-    charActor.name = "CharacterActor";
-    charActor.type = SceneNodeType::Actor;
-    charActor.world = "GameWorld";
-    charActor.panel = "ActorPanel";
-
-    SceneNode cameraActor;
-    cameraActor.name = "CameraActor";
-    cameraActor.type = SceneNodeType::Camera;
-    cameraActor.world = "GameWorld";
-    cameraActor.panel = "CameraPanel";
-
-    playerFolder.children = { charActor, cameraActor };
-
-    // 3. Audio
-    SceneNode audioFolder;
-    audioFolder.name = "Audio";
-    audioFolder.type = SceneNodeType::Folder;
-    audioFolder.world = "AudioWorld";
-    audioFolder.panel = "SoundPanel";
-
-    SceneNode ambientSound;
-    ambientSound.name = "AmbientSoundVolume";
-    ambientSound.type = SceneNodeType::Audio;
-    ambientSound.world = "AudioWorld";
-    ambientSound.panel = "SoundPanel";
-
-    audioFolder.children = { ambientSound };
-
-    m_RootNodes = { envFolder, playerFolder, audioFolder };
+void SceneGraph::SetRootNodes(const std::vector<SceneNode>& nodes) {
+    m_RootNodes = nodes;
 }
 
 const SceneNode* SceneGraph::FindNode(const std::string& name, const std::vector<SceneNode>* nodes) const {

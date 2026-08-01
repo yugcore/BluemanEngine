@@ -24,9 +24,21 @@ void RenderMeshStudioPanel(bool* pOpen) {
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 5.0f));
 
+    const auto& meshData = EditorState::Get().meshStudioData;
+
+    if (!meshData.isLoaded && meshData.meshName.empty()) {
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 30.0f);
+        ImGui::TextColored(pal.textDisabled, "No Mesh Selected for Inspection.");
+        ImGui::Spacing();
+        ImGui::TextColored(pal.textSecondary, "Select a mesh asset in the Content Browser to inspect geometry statistics and material slots.");
+        ImGui::PopStyleVar();
+        ImGui::End();
+        return;
+    }
+
     // Active Mesh Name Header Card
     ImGui::TextColored(pal.textSecondary, "ACTIVE MESH ASSET");
-    ImGui::TextColored(pal.textPrimary, "SM_SciFi_Corridor_Chunk01.fbx");
+    ImGui::TextColored(pal.textPrimary, "%s", meshData.meshName.c_str());
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -56,27 +68,22 @@ void RenderMeshStudioPanel(bool* pOpen) {
         ImGui::Indent(8.0f);
         ImGui::TextColored(pal.textSecondary, "Vertices:");
         ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "14,280");
+        ImGui::TextColored(pal.textPrimary, "%u", meshData.vertexCount);
 
         ImGui::TextColored(pal.textSecondary, "Triangles:");
         ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "28,400");
+        ImGui::TextColored(pal.textPrimary, "%u", meshData.triangleCount);
 
         ImGui::TextColored(pal.textSecondary, "Submeshes:");
         ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "2");
-
-        ImGui::TextColored(pal.textSecondary, "UV Channels:");
-        ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "2 (Base Color, Lightmap)");
+        ImGui::TextColored(pal.textPrimary, "%u", meshData.submeshCount);
 
         ImGui::TextColored(pal.textSecondary, "Bounding Box (m):");
         ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "X: 4.2  Y: 2.8  Z: 3.5");
-
-        ImGui::TextColored(pal.textSecondary, "Collision Type:");
-        ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "Convex Hull (16 Vertices)");
+        ImGui::TextColored(pal.textPrimary, "X: %.1f  Y: %.1f  Z: %.1f", 
+            meshData.boundsMax[0] - meshData.boundsMin[0],
+            meshData.boundsMax[1] - meshData.boundsMin[1],
+            meshData.boundsMax[2] - meshData.boundsMin[2]);
         ImGui::Unindent(8.0f);
     }
 

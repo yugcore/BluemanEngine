@@ -40,9 +40,13 @@ public:
     static ImVec4 GetTypeColor(SceneNodeType type);
     static const char* GetTypeIconTag(SceneNodeType type);
 
-private:
-    void SeedDummyData();
+    // Runtime Ports for Engine Integration
+    void AddNode(const SceneNode& node);
+    bool RemoveNode(const std::string& name);
+    void Clear();
+    void SetRootNodes(const std::vector<SceneNode>& nodes);
 
+private:
     std::vector<SceneNode> m_RootNodes;
 };
 

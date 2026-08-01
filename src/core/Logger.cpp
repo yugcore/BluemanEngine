@@ -12,7 +12,7 @@ Logger& Logger::Get() {
 }
 
 Logger::Logger() {
-    SeedStartupLogs();
+    Info("Blueman Engine Editor Log Stream Initialized.");
 }
 
 static std::string GetCurrentTimestamp() {
@@ -59,15 +59,6 @@ ImVec4 Logger::GetSeverityColor(LogSeverity severity) {
         case LogSeverity::Error:   return pal.statusError;
         default:                   return pal.textSecondary;
     }
-}
-
-void Logger::SeedStartupLogs() {
-    Info("Blueman Engine v2.0 Enterprise Initialized.");
-    Info("ZeGFX v3.5 Graphics Backend Loaded (DirectX 12 Ultimate).");
-    Info("Successfully loaded asset pool: Industrial_Bespoke_1.2");
-    Info("Level: 'Default_Environment' loaded (1.2s)");
-    Info("Found 346 active actors.");
-    Info("Render settings optimized for RTX 4080");
 }
 
 } // namespace EngineEditor

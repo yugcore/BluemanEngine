@@ -6,7 +6,8 @@
 namespace EngineEditor {
 
 void RenderCodeEditorPanel(bool* pOpen = nullptr);
-void OpenCodeDocument(const std::string& filename);
+void OpenCodeDocument(const std::string& filename, const std::string& content = "");
+void CloseCodeDocument(const std::string& filename);
 
 } // namespace EngineEditor
 

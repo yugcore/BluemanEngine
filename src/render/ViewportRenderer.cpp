@@ -119,7 +119,14 @@ void ViewportRenderer::Resize(uint32_t width, uint32_t height) {
 
 void ViewportRenderer::RenderScene(float deltaTime, ID3D12GraphicsCommandList* cmdList) {
     ID3D12GraphicsCommandList* cl = cmdList ? cmdList : m_ActiveCmdList;
-    if (!m_ColorTexture || m_Width == 0 || m_Height == 0 || !cl) return;
+    if (m_Width == 0 || m_Height == 0 || !cl) return;
+
+    if (m_RenderCallback) {
+        m_RenderCallback(cl, m_Width, m_Height, deltaTime);
+        return;
+    }
+
+    if (!m_ColorTexture) return;
 
     m_RotationAngle += deltaTime * 45.0f;
     if (m_RotationAngle > 360.0f) m_RotationAngle -= 360.0f;

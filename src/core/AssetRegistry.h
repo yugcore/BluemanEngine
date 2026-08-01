@@ -50,9 +50,13 @@ public:
     static const char* GetTypeName(AssetItemType type);
     static ImVec4 GetTypeColor(AssetItemType type);
 
-private:
-    void SeedDummyData();
+    // Runtime Ports for Engine Integration
+    void RegisterAsset(const AssetItem& item, const std::string& folderPath = "");
+    void RegisterFolder(const AssetFolder& folder);
+    void Clear();
+    void SetRootFolder(const AssetFolder& folder);
 
+private:
     AssetFolder m_RootFolder;
 };
 

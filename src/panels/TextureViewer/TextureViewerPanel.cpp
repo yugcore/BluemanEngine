@@ -22,9 +22,21 @@ void RenderTextureViewerPanel(bool* pOpen) {
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 5.0f));
 
+    const auto& texData = EditorState::Get().textureViewerData;
+
+    if (!texData.isLoaded && texData.textureName.empty()) {
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 30.0f);
+        ImGui::TextColored(pal.textDisabled, "No Texture Selected for Inspection.");
+        ImGui::Spacing();
+        ImGui::TextColored(pal.textSecondary, "Select a texture asset in the Content Browser to inspect resolution, channel data, and GPU compression.");
+        ImGui::PopStyleVar();
+        ImGui::End();
+        return;
+    }
+
     // Texture Asset Header
     ImGui::TextColored(pal.textSecondary, "ACTIVE TEXTURE ASSET");
-    ImGui::TextColored(pal.textPrimary, "T_Concrete_Normal_2K.png");
+    ImGui::TextColored(pal.textPrimary, "%s", texData.textureName.c_str());
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -41,7 +53,7 @@ void RenderTextureViewerPanel(bool* pOpen) {
     }
 
     ImGui::Spacing();
-    ImGui::SliderInt("Mipmap Tier", &s_ActiveMipLevel, 0, 10, "Mip %d (2048x2048)");
+    ImGui::SliderInt("Mipmap Tier", &s_ActiveMipLevel, 0, 10, "Mip %d");
 
     ImGui::Spacing();
     ImGui::Separator();
@@ -53,23 +65,15 @@ void RenderTextureViewerPanel(bool* pOpen) {
 
         ImGui::TextColored(pal.textSecondary, "Resolution:");
         ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "2048 x 2048 px");
+        ImGui::TextColored(pal.textPrimary, "%u x %u px", texData.width, texData.height);
 
-        ImGui::TextColored(pal.textSecondary, "Color Format:");
+        ImGui::TextColored(pal.textSecondary, "GPU Format:");
         ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "32-bit RGBA (8bpc)");
-
-        ImGui::TextColored(pal.textSecondary, "GPU Compression:");
-        ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "BC7_UNORM (DXGI_FORMAT_BC7_UNORM)");
+        ImGui::TextColored(pal.textPrimary, "%s", texData.formatStr.empty() ? "Uncompressed RGBA" : texData.formatStr.c_str());
 
         ImGui::TextColored(pal.textSecondary, "Total Memory:");
         ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "5.33 MB (with 11 Mipmaps)");
-
-        ImGui::TextColored(pal.textSecondary, "Texture Type:");
-        ImGui::SameLine(160.0f);
-        ImGui::TextColored(pal.textPrimary, "Normal Map (Tangent Space)");
+        ImGui::TextColored(pal.textPrimary, "%.2f MB", texData.sizeMB);
 
         ImGui::Unindent(8.0f);
     }

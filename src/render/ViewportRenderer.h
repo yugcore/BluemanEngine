@@ -22,7 +22,13 @@ public:
     void SetCommandList(ID3D12GraphicsCommandList* cmdList) { m_ActiveCmdList = cmdList; }
     void RenderScene(float deltaTime, ID3D12GraphicsCommandList* cmdList = nullptr);
 
-    uint64_t GetTextureID() const { return m_SRVGpuHandle.ptr; }
+    // Runtime Engine Integration Ports
+    typedef void (*RenderCallbackFn)(ID3D12GraphicsCommandList* cmdList, uint32_t width, uint32_t height, float deltaTime);
+    void SetRenderCallback(RenderCallbackFn callback) { m_RenderCallback = callback; }
+    void SetExternalTextureID(uint64_t textureID) { m_ExternalTextureID = textureID; m_UseExternalTexture = true; }
+    void ClearExternalTextureOverride() { m_UseExternalTexture = false; }
+
+    uint64_t GetTextureID() const { return m_UseExternalTexture ? m_ExternalTextureID : m_SRVGpuHandle.ptr; }
     uint32_t GetWidth() const { return m_Width; }
     uint32_t GetHeight() const { return m_Height; }
 
@@ -45,6 +51,10 @@ private:
     uint32_t m_Height = 0;
     float m_RotationAngle = 0.0f;
     D3D12_RESOURCE_STATES m_CurrentState = D3D12_RESOURCE_STATE_COMMON;
+
+    RenderCallbackFn m_RenderCallback = nullptr;
+    uint64_t m_ExternalTextureID = 0;
+    bool m_UseExternalTexture = false;
 };
 
 } // namespace EngineEditor

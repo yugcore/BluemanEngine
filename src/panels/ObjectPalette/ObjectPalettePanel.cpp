@@ -103,10 +103,10 @@ void RenderObjectPalettePanel(bool* pOpen) {
         // Card Container
         ImVec2 cardPos = ImGui::GetCursorScreenPos();
         float cardWidth = ImGui::GetContentRegionAvail().x;
-        float cardHeight = 44.0f;
+        float cardHeight = 58.0f;
 
         // Reserve layout space in window
-        ImGui::Dummy(ImVec2(cardWidth, cardHeight + 4.0f));
+        ImGui::Dummy(ImVec2(cardWidth, cardHeight + 6.0f));
 
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         bool isHovered = ImGui::IsMouseHoveringRect(cardPos, ImVec2(cardPos.x + cardWidth, cardPos.y + cardHeight));
@@ -117,18 +117,17 @@ void RenderObjectPalettePanel(bool* pOpen) {
         drawList->AddRectFilled(cardPos, ImVec2(cardPos.x + cardWidth, cardPos.y + cardHeight), bgCol, 4.0f);
         drawList->AddRect(cardPos, ImVec2(cardPos.x + cardWidth, cardPos.y + cardHeight), borderCol, 4.0f);
 
-        // Content positioned inside card bounds
-        ImGui::SetCursorScreenPos(ImVec2(cardPos.x + 10.0f, cardPos.y + 4.0f));
-
-        // Badge Text
+        // 1. Badge Text on Left (vertically centered)
+        ImGui::SetCursorScreenPos(ImVec2(cardPos.x + 14.0f, cardPos.y + 18.0f));
         ImGui::TextColored(pal.textSecondary, "%s", item.badgeStr);
-        ImGui::SameLine(0.0f, 10.0f);
 
-        // Item Name & Category
-        ImGui::BeginGroup();
+        // 2. Title Text on Right Top
+        ImGui::SetCursorScreenPos(ImVec2(cardPos.x + 80.0f, cardPos.y + 10.0f));
         ImGui::TextColored(pal.textPrimary, "%s", item.name.c_str());
+
+        // 3. Description Text on Right Bottom
+        ImGui::SetCursorScreenPos(ImVec2(cardPos.x + 80.0f, cardPos.y + 30.0f));
         ImGui::TextColored(pal.textDisabled, "%s", item.description.c_str());
-        ImGui::EndGroup();
 
         // Click to spawn/select item
         if (isHovered && ImGui::IsMouseClicked(0)) {

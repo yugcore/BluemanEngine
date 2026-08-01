@@ -44,9 +44,11 @@ void RenderShaderStudioPanel(bool* pOpen) {
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 5.0f));
 
+    auto& shaderData = EditorState::Get().shaderStudioData;
+
     // Active Material File Header
-    ImGui::TextColored(pal.textSecondary, "ACTIVE MATERIAL ASSET");
-    ImGui::TextColored(pal.textPrimary, "M_PBR_MetallicStructure.mat");
+    ImGui::TextColored(pal.textSecondary, "ACTIVE SHADER MATERIAL");
+    ImGui::TextColored(pal.textPrimary, "%s", shaderData.shaderName.empty() ? "CustomSurfaceShader.hlsl" : shaderData.shaderName.c_str());
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -73,7 +75,8 @@ void RenderShaderStudioPanel(bool* pOpen) {
         if (Theme::GetFontAtlas().monoFont) ImGui::PushFont(Theme::GetFontAtlas().monoFont);
 
         ImGui::BeginChild("HlslCodePane", ImVec2(0, 180.0f), true, ImGuiWindowFlags_HorizontalScrollbar);
-        ImGui::TextColored(pal.textSecondary, "%s", s_ShaderHlslCode.c_str());
+        const char* displayCode = shaderData.shaderSource.empty() ? s_ShaderHlslCode.c_str() : shaderData.shaderSource.c_str();
+        ImGui::TextColored(pal.textSecondary, "%s", displayCode);
         ImGui::EndChild();
 
         if (Theme::GetFontAtlas().monoFont) ImGui::PopFont();

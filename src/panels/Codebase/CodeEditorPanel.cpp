@@ -23,101 +23,38 @@ struct Document {
     bool isOpen = true;
 };
 
-static std::vector<Document> s_Documents = {
-    {
-        "Main.cpp",
-        "#include <iostream>\n"
-        "#include \"Engine.h\"\n\n"
-        "// ZeGFX Primary Application Entry Point\n"
-        "int main(int argc, char** argv) {\n"
-        "    std::cout << \"Initializing ZeGFX Engine v3.5...\" << std::endl;\n"
-        "    Engine::Initialize();\n"
-        "    Engine::Run();\n"
-        "    Engine::Shutdown();\n"
-        "    return 0;\n"
-        "}\n",
-        { 7 }, // Breakpoint on line 7
-        6, 5, true
-    },
-    {
-        "Renderer.cpp",
-        "#include \"Renderer.h\"\n"
-        "#include \"Engine.h\"\n\n"
-        "// Hardware DXR Acceleration & Volumetrics\n"
-        "void Renderer::RenderFrame() {\n"
-        "    // Execute DXR Ray Tracing solve & Volumetric Lighting pipeline\n"
-        "    Raytrace(Vec3(0, 5, 0), Vec3(0, -1, 0), 1000.0f);\n"
-        "}\n",
-        {},
-        5, 1, true
-    },
-    {
-        "Engine.h",
-        "#pragma once\n\n"
-        "namespace Engine {\n"
-        "    void Initialize();\n"
-        "    void Run();\n"
-        "    void Shutdown();\n"
-        "}\n",
-        {},
-        4, 1, true
-    },
-    {
-        "game_logic.zl",
-        "// ========================================================\n"
-        "// Zelyn First-Class Script: Spatial Entity Controller\n"
-        "// ========================================================\n"
-        "@attribute(name: \"Player Speed\", category: \"Gameplay\")\n"
-        "var move_speed: float = 12.5f\n\n"
-        "func update(dt: float) -> void {\n"
-        "    var pos: Vec3 = Vec3(0.0, 1.5, -4.0)\n"
-        "    var hit: HitResult = Raytrace(pos, Vec3(0, -1, 0), 50.0f)\n"
-        "    if (hit.hasHit) {\n"
-        "        print(\"Raytraced surface hit at distance: \" + hit.distance)\n"
-        "    }\n"
-        "}\n\n"
-        "func spawn_effects() -> Entity {\n"
-        "    let e: Entity = spawn_entity(\"ParticleSystem\", Vec3(0, 0, 0))\n"
-        "    return e\n"
-        "}\n",
-        { 8 }, // Breakpoint on line 8
-        6, 1, true
-    },
-    {
-        "player_controller.zyn",
-        "// Zelyn Module: Player Controller Logic\n"
-        "import Scene\n\n"
-        "class PlayerController {\n"
-        "    var health: int = 100\n"
-        "    var is_active: bool = true\n\n"
-        "    func on_start() -> void {\n"
-        "        print(\"Player Controller Initialized.\")\n"
-        "    }\n"
-        "}\n",
-        {},
-        5, 1, true
-    }
-};
-
+static std::vector<Document> s_Documents;
 static int s_ActiveDocIndex = 0;
 
-void OpenCodeDocument(const std::string& filename) {
+void OpenCodeDocument(const std::string& filename, const std::string& content) {
     for (size_t i = 0; i < s_Documents.size(); ++i) {
         if (s_Documents[i].filename == filename) {
             s_Documents[i].isOpen = true;
+            if (!content.empty()) s_Documents[i].content = content;
             s_ActiveDocIndex = (int)i;
             EditorState::Get().activeCodeFileName = filename;
             return;
         }
     }
-    // Create new document if not found
-    LanguageType lang = CodeHighlighter::GetLanguageFromExtension(filename);
-    std::string defaultContent = (lang == LanguageType::Zelyn) ?
-        "// Zelyn Script\nfunc main() -> void {\n    print(\"Hello Zelyn!\")\n}\n" :
-        "// C++ Source\n#include <iostream>\n\nvoid run() {\n}\n";
+    std::string defaultContent = content;
+    if (defaultContent.empty()) {
+        LanguageType lang = CodeHighlighter::GetLanguageFromExtension(filename);
+        defaultContent = (lang == LanguageType::Zelyn) ?
+            "// Zelyn Script: " + filename + "\nfunc main() -> void {\n    print(\"Hello Zelyn!\")\n}\n" :
+            "// C++ Source: " + filename + "\n#include <iostream>\n\nvoid run() {\n}\n";
+    }
     s_Documents.push_back({ filename, defaultContent, {}, 1, 1, true });
     s_ActiveDocIndex = (int)s_Documents.size() - 1;
     EditorState::Get().activeCodeFileName = filename;
+}
+
+void CloseCodeDocument(const std::string& filename) {
+    auto it = std::remove_if(s_Documents.begin(), s_Documents.end(), [&](const Document& d) {
+        return d.filename == filename;
+    });
+    if (it != s_Documents.end()) {
+        s_Documents.erase(it, s_Documents.end());
+    }
 }
 
 static std::vector<std::string> SplitLines(const std::string& text) {
@@ -138,6 +75,16 @@ void RenderCodeEditorPanel(bool* pOpen) {
     }
 
     const auto& pal = Theme::GetPalette();
+
+    if (s_Documents.empty()) {
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 40.0f);
+        ImGui::SetCursorPosX(20.0f);
+        ImGui::TextColored(pal.textDisabled, "No Code Documents Open.");
+        ImGui::SetCursorPosX(20.0f);
+        ImGui::TextColored(pal.textSecondary, "Select a script file (.zyn, .zl, .cpp) in the Project Explorer to open in the editor.");
+        ImGui::End();
+        return;
+    }
 
     // Top-Right Ghosted Toggle Widget (Point 5)
     float availWidthHeader = ImGui::GetContentRegionAvail().x;

@@ -10,155 +10,34 @@ AssetRegistry& AssetRegistry::Get() {
 }
 
 AssetRegistry::AssetRegistry() {
-    SeedDummyData();
-}
-
-void AssetRegistry::SeedDummyData() {
     m_RootFolder.name = "ZeGFX Workspace";
     m_RootFolder.path = "ZeGFX Workspace";
+}
 
-    // --- Content Folder ---
-    AssetFolder contentFolder;
-    contentFolder.name = "Content";
-    contentFolder.path = "ZeGFX Workspace/Content";
+void AssetRegistry::RegisterAsset(const AssetItem& item, const std::string& folderPath) {
+    if (folderPath.empty() || folderPath == m_RootFolder.path) {
+        m_RootFolder.items.push_back(item);
+        return;
+    }
+    AssetFolder* folder = const_cast<AssetFolder*>(FindFolder(folderPath));
+    if (folder) {
+        folder->items.push_back(item);
+    } else {
+        m_RootFolder.items.push_back(item);
+    }
+}
 
-    // --- StarterContent Folder ---
-    AssetFolder starterFolder;
-    starterFolder.name = "StarterContent";
-    starterFolder.path = "ZeGFX Workspace/Content/StarterContent";
+void AssetRegistry::RegisterFolder(const AssetFolder& folder) {
+    m_RootFolder.subfolders.push_back(folder);
+}
 
-    // 1. Materials Folder (matching UE5 screenshot)
-    AssetFolder materialsFolder;
-    materialsFolder.name = "Materials";
-    materialsFolder.path = "ZeGFX Workspace/Content/StarterContent/Materials";
-    materialsFolder.items = {
-        { "M_Asset_Platform", AssetItemType::Material, materialsFolder.path + "/M_Asset_Platform" },
-        { "M_Basic_Floor", AssetItemType::Material, materialsFolder.path + "/M_Basic_Floor" },
-        { "M_Basic_Wall", AssetItemType::Material, materialsFolder.path + "/M_Basic_Wall" },
-        { "M_Brick_Clay_Beveled", AssetItemType::Material, materialsFolder.path + "/M_Brick_Clay_Beveled" },
-        { "M_Brick_Clay_Old", AssetItemType::Material, materialsFolder.path + "/M_Brick_Clay_Old" },
-        { "M_Brick_Cut_Stone", AssetItemType::Material, materialsFolder.path + "/M_Brick_Cut_Stone" },
-        { "M_Brick_Hewn_Stone", AssetItemType::Material, materialsFolder.path + "/M_Brick_Hewn_Stone" },
-        { "M_Ceramic_Tile_Checker", AssetItemType::Material, materialsFolder.path + "/M_Ceramic_Tile_Checker" },
-        { "M_CobbleStone_Pebble", AssetItemType::Material, materialsFolder.path + "/M_CobbleStone_Pebble" },
-        { "M_CobbleStone_Rough", AssetItemType::Material, materialsFolder.path + "/M_CobbleStone_Rough" },
-        { "M_CobbleStone_Smooth", AssetItemType::Material, materialsFolder.path + "/M_CobbleStone_Smooth" },
-        { "M_ColorGrid_LowSpec", AssetItemType::Material, materialsFolder.path + "/M_ColorGrid_LowSpec" },
-        { "M_Concrete_Grime", AssetItemType::Material, materialsFolder.path + "/M_Concrete_Grime" },
-        { "M_Concrete_Panels", AssetItemType::Material, materialsFolder.path + "/M_Concrete_Panels" },
-        { "M_Concrete_Poured", AssetItemType::Material, materialsFolder.path + "/M_Concrete_Poured" },
-        { "M_Concrete_Tiles", AssetItemType::Material, materialsFolder.path + "/M_Concrete_Tiles" },
-        { "M_Glass", AssetItemType::Material, materialsFolder.path + "/M_Glass" },
-        { "M_Ground_Grass", AssetItemType::Material, materialsFolder.path + "/M_Ground_Grass" },
-        { "M_Ground_Gravel", AssetItemType::Material, materialsFolder.path + "/M_Ground_Gravel" },
-        { "M_Ground_Moss", AssetItemType::Material, materialsFolder.path + "/M_Ground_Moss" },
-        { "M_Metal_Brushed_Nickel", AssetItemType::Material, materialsFolder.path + "/M_Metal_Brushed_Nickel" },
-        { "M_Metal_Burnished_Steel", AssetItemType::Material, materialsFolder.path + "/M_Metal_Burnished_Steel" },
-        { "M_Metal_Chrome", AssetItemType::Material, materialsFolder.path + "/M_Metal_Chrome" },
-        { "M_Metal_Copper", AssetItemType::Material, materialsFolder.path + "/M_Metal_Copper" },
-        { "M_Metal_Gold", AssetItemType::Material, materialsFolder.path + "/M_Metal_Gold" },
-        { "M_Metal_Rust", AssetItemType::Material, materialsFolder.path + "/M_Metal_Rust" },
-        { "M_Metal_Steel", AssetItemType::Material, materialsFolder.path + "/M_Metal_Steel" },
-        { "M_Rock_Basalt", AssetItemType::Material, materialsFolder.path + "/M_Rock_Basalt" },
-        { "M_Rock_Marble_Polished", AssetItemType::Material, materialsFolder.path + "/M_Rock_Marble_Polished" },
-        { "M_Rock_Sandstone", AssetItemType::Material, materialsFolder.path + "/M_Rock_Sandstone" },
-        { "M_Rock_Slate", AssetItemType::Material, materialsFolder.path + "/M_Rock_Slate" }
-    };
+void AssetRegistry::Clear() {
+    m_RootFolder.items.clear();
+    m_RootFolder.subfolders.clear();
+}
 
-    // 2. Architecture
-    AssetFolder archFolder;
-    archFolder.name = "Architecture";
-    archFolder.path = "ZeGFX Workspace/Content/StarterContent/Architecture";
-    archFolder.items = {
-        { "SM_DoorFrame", AssetItemType::Mesh, archFolder.path + "/SM_DoorFrame" },
-        { "SM_PillarFrame", AssetItemType::Mesh, archFolder.path + "/SM_PillarFrame" },
-        { "SM_Wall_400x400", AssetItemType::Mesh, archFolder.path + "/SM_Wall_400x400" }
-    };
-
-    // 3. Audio
-    AssetFolder audioFolder;
-    audioFolder.name = "Audio";
-    audioFolder.path = "ZeGFX Workspace/Content/StarterContent/Audio";
-    audioFolder.items = {
-        { "A_Ambient_Wind_Loop", AssetItemType::Audio, audioFolder.path + "/A_Ambient_Wind_Loop" },
-        { "A_Explosion_Heavy", AssetItemType::Audio, audioFolder.path + "/A_Explosion_Heavy" },
-        { "A_Footstep_Concrete", AssetItemType::Audio, audioFolder.path + "/A_Footstep_Concrete" }
-    };
-
-    // 4. Scripts (Zelyn & C++)
-    AssetFolder scriptsFolder;
-    scriptsFolder.name = "Scripts";
-    scriptsFolder.path = "ZeGFX Workspace/Content/StarterContent/Scripts";
-    scriptsFolder.items = {
-        { "PlayerController.zyn", AssetItemType::Script, scriptsFolder.path + "/PlayerController.zyn" },
-        { "CameraRig.zl", AssetItemType::Script, scriptsFolder.path + "/CameraRig.zl" },
-        { "InventorySystem.cpp", AssetItemType::Script, scriptsFolder.path + "/InventorySystem.cpp" }
-    };
-
-    // 5. HDRI & Textures
-    AssetFolder hdriFolder;
-    hdriFolder.name = "HDRI";
-    hdriFolder.path = "ZeGFX Workspace/Content/StarterContent/HDRI";
-
-    // 6. Maps / Levels
-    AssetFolder mapsFolder;
-    mapsFolder.name = "Maps";
-    mapsFolder.path = "ZeGFX Workspace/Content/StarterContent/Maps";
-    mapsFolder.items = {
-        { "L_Main_Showcase", AssetItemType::Level, mapsFolder.path + "/L_Main_Showcase" },
-        { "L_Lighting_Studio", AssetItemType::Level, mapsFolder.path + "/L_Lighting_Studio" }
-    };
-
-    // 7. Particles & VFX
-    AssetFolder particlesFolder;
-    particlesFolder.name = "Particles";
-    particlesFolder.path = "ZeGFX Workspace/Content/StarterContent/Particles";
-    particlesFolder.items = {
-        { "P_Fire_Sparks", AssetItemType::VFX, particlesFolder.path + "/P_Fire_Sparks" },
-        { "P_Smoke_Dense", AssetItemType::VFX, particlesFolder.path + "/P_Smoke_Dense" }
-    };
-
-    // 8. Props
-    AssetFolder propsFolder;
-    propsFolder.name = "Props";
-    propsFolder.path = "ZeGFX Workspace/Content/StarterContent/Props";
-
-    // 9. Shapes
-    AssetFolder shapesFolder;
-    shapesFolder.name = "Shapes";
-    shapesFolder.path = "ZeGFX Workspace/Content/StarterContent/Shapes";
-
-    // 10. Textures
-    AssetFolder texturesFolder;
-    texturesFolder.name = "Textures";
-    texturesFolder.path = "ZeGFX Workspace/Content/StarterContent/Textures";
-    texturesFolder.items = {
-        { "T_Concrete_Normal_2K", AssetItemType::Texture, texturesFolder.path + "/T_Concrete_Normal_2K" },
-        { "T_Brick_Albedo_4K", AssetItemType::Texture, texturesFolder.path + "/T_Brick_Albedo_4K" },
-        { "T_Skybox_HDRI_Cubemap", AssetItemType::Texture, texturesFolder.path + "/T_Skybox_HDRI_Cubemap" }
-    };
-
-    starterFolder.subfolders = {
-        archFolder,
-        audioFolder,
-        scriptsFolder,
-        hdriFolder,
-        mapsFolder,
-        materialsFolder,
-        particlesFolder,
-        propsFolder,
-        shapesFolder,
-        texturesFolder
-    };
-
-    contentFolder.subfolders = { starterFolder };
-
-    // Engine folder
-    AssetFolder engineFolder;
-    engineFolder.name = "Engine";
-    engineFolder.path = "ZeGFX Workspace/Engine";
-
-    m_RootFolder.subfolders = { contentFolder, engineFolder };
+void AssetRegistry::SetRootFolder(const AssetFolder& folder) {
+    m_RootFolder = folder;
 }
 
 const AssetFolder* AssetRegistry::FindFolder(const std::string& path, const AssetFolder* current) const {

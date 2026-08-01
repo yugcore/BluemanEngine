@@ -322,9 +322,17 @@ void RenderOutlinerPanel(bool* pOpen) {
         std::string query = s_OutlinerSearch;
         const auto& rootNodes = SceneGraph::Get().GetRootNodes();
 
-        int rootIdx = 0;
-        for (const auto& root : rootNodes) {
-            RenderNodeRow(root, query, 0, typeColWidth, pal, rootIdx++);
+        if (rootNodes.empty()) {
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 20.0f);
+            ImGui::SetCursorPosX(16.0f);
+            ImGui::TextColored(pal.textDisabled, "No actors in scene.");
+            ImGui::SetCursorPosX(16.0f);
+            ImGui::TextColored(pal.textSecondary, "Use Object Palette or Create menu to add nodes.");
+        } else {
+            int rootIdx = 0;
+            for (const auto& root : rootNodes) {
+                RenderNodeRow(root, query, 0, typeColWidth, pal, rootIdx++);
+            }
         }
     }
     ImGui::EndChild();
