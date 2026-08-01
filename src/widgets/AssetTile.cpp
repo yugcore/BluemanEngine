@@ -28,8 +28,9 @@ static ImU32 GetMaterialBaseColor(const std::string& name) {
     return IM_COL32(r, g, b, 255);
 }
 
-bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, const char* typeName, const ImVec4& typeColor, bool isSelected, float width, float height) {
+bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, const char* typeName, const ImVec4& typeColor, bool isSelected, float width, float height, bool* outDoubleClicked) {
     bool clicked = false;
+    if (outDoubleClicked) *outDoubleClicked = false;
     const auto& pal = Theme::GetPalette();
 
     ImVec4 cardBg = isSelected ? ImVec4(pal.accent.x, pal.accent.y, pal.accent.z, 0.22f) : pal.bgElevated;
@@ -154,9 +155,12 @@ bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, c
     ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(2);
 
-    // Click Detection
+    // Click & Double-Click Detection
     if (ImGui::IsItemClicked()) {
         clicked = true;
+    }
+    if (outDoubleClicked && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        *outDoubleClicked = true;
     }
 
     // 4. Hover Tooltip for Full Asset Name & Path

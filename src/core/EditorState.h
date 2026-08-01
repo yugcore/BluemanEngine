@@ -73,10 +73,10 @@ struct RenderSettings {
     bool isoMeshShader = false;
     bool isoPostProcess = false;
 
-    // Panel Visibility
-    bool showRenderControlStrip = true;
+    // Panel Visibility Defaults
+    bool showRenderControlStrip = false;
     bool showContentBrowser = true;
-    bool showOutputLog = true;
+    bool showOutputLog = false;
 };
 
 struct MeshStudioData {
@@ -172,10 +172,33 @@ struct EditorState {
     // Modal & Panel Visibility Toggles
     bool showProjectWizardModal = false;
     bool showProjectSettingsModal = false;
-    bool showObjectPalettePanel = true;
-    bool showMeshStudioPanel = true;
-    bool showShaderStudioPanel = true;
-    bool showTextureViewerPanel = true;
+
+    // Always Visible (Default)
+    bool showViewportPanel = true;
+    bool showOutlinerPanel = true;
+    bool showDetailsPanel = true;
+
+    // Hidden by Default
+    bool showObjectPalettePanel = false;
+    bool showMeshStudioPanel = false;
+    bool showShaderStudioPanel = false;
+    bool showTextureViewerPanel = false;
+    bool showMaterialEditorPanel = false;
+    bool showAnimationWorkspacePanel = false;
+    bool showBlueprintEditorPanel = false;
+    bool showAudioEditorPanel = false;
+    bool showProfilerPanel = false;
+    bool showRenderDocPanel = false;
+    bool showGpuDebuggerPanel = false;
+    bool showSequencerPanel = false;
+    bool showAssetRegistryPanel = false;
+    bool showMemoryProfilerPanel = false;
+    bool showPackageManagerPanel = false;
+    bool showPluginManagerPanel = false;
+    bool showLocalizationPanel = false;
+    bool showConsoleVariablesPanel = false;
+    bool showNavigationBuilderPanel = false;
+    bool showLightBakingPanel = false;
 
     void SetSelection(const std::string& name, const std::string& type, const std::string& path = "") {
         selectedNodeName = name;
@@ -184,6 +207,7 @@ struct EditorState {
             selectedAssetName = name;
             selectedAssetType = type;
             selectedAssetPath = path.empty() ? ("Scene/" + name) : path;
+            showDetailsPanel = true; // Automatically opens or expands when an object is selected
         }
     }
 

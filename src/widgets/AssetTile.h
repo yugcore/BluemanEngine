@@ -7,7 +7,7 @@
 
 namespace EngineEditor::Widgets {
 
-bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, const char* typeName, const ImVec4& typeColor, bool isSelected, float width = 120.0f, float height = 128.0f);
+bool RenderAssetTile(const char* id, const char* name, AssetItemType itemType, const char* typeName, const ImVec4& typeColor, bool isSelected, float width = 120.0f, float height = 128.0f, bool* outDoubleClicked = nullptr);
 
 } // namespace EngineEditor::Widgets
 

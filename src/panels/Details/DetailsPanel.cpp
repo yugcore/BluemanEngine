@@ -247,6 +247,72 @@ void RenderDetailsPanel(bool* pOpen) {
             ImGui::Spacing();
             ImGui::Unindent(Theme::Metrics::panelLeftMargin);
         }
+    } else if (selectedNodeType == "Material" || selectedNodeName.find("Material") != std::string::npos || selectedNodeName.find("Mat") != std::string::npos) {
+        bool matOpen = RenderCollapsibleHeader("Material Inspector", true);
+        if (matOpen) {
+            ImGui::Indent(Theme::Metrics::panelLeftMargin);
+            ImGui::Spacing();
+            static float albedo[3] = { 0.85f, 0.20f, 0.20f };
+            static float roughness = 0.40f;
+            static float metallic = 0.80f;
+            ImGui::TextUnformatted("Albedo Color:");
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::ColorEdit3("##MatAlbedo", albedo);
+            ImGui::TextUnformatted("Roughness:");
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::SliderFloat("##MatRoughness", &roughness, 0.0f, 1.0f);
+            ImGui::TextUnformatted("Metallic:");
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::SliderFloat("##MatMetallic", &metallic, 0.0f, 1.0f);
+            ImGui::Spacing();
+            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+        }
+    } else if (selectedNodeType == "Animation" || selectedNodeName.find("Anim") != std::string::npos || selectedNodeName.find("Character") != std::string::npos) {
+        bool animOpen = RenderCollapsibleHeader("Animation Properties", true);
+        if (animOpen) {
+            ImGui::Indent(Theme::Metrics::panelLeftMargin);
+            ImGui::Spacing();
+            static float playRate = 1.0f;
+            static bool loopAnim = true;
+            ImGui::TextUnformatted("Playback Speed:");
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::SliderFloat("##AnimRate", &playRate, 0.1f, 3.0f, "%.2fx");
+            ImGui::Checkbox("Looping Animation", &loopAnim);
+            ImGui::Spacing();
+            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+        }
+    } else if (selectedNodeType == "Terrain" || selectedNodeName.find("Terrain") != std::string::npos || selectedNodeName.find("Landscape") != std::string::npos) {
+        bool terrainOpen = RenderCollapsibleHeader("Terrain Properties", true);
+        if (terrainOpen) {
+            ImGui::Indent(Theme::Metrics::panelLeftMargin);
+            ImGui::Spacing();
+            static float heightScale = 100.0f;
+            static int gridResolution = 2048;
+            ImGui::TextUnformatted("Heightmap Elevation Scale:");
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::DragFloat("##TerrainHeight", &heightScale, 1.0f, 1.0f, 1000.0f, "%.0f m");
+            ImGui::TextUnformatted("Terrain Mesh Grid Resolution:");
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::InputInt("##TerrainRes", &gridResolution);
+            ImGui::Spacing();
+            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+        }
+    } else if (selectedNodeType == "VFX" || selectedNodeType == "Particle" || selectedNodeName.find("Particle") != std::string::npos || selectedNodeName.find("VFX") != std::string::npos) {
+        bool vfxOpen = RenderCollapsibleHeader("Particle System Properties", true);
+        if (vfxOpen) {
+            ImGui::Indent(Theme::Metrics::panelLeftMargin);
+            ImGui::Spacing();
+            static int maxParticles = 50000;
+            static float spawnRate = 1200.0f;
+            ImGui::TextUnformatted("Max Particle Capacity:");
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::InputInt("##VFXMaxPart", &maxParticles);
+            ImGui::TextUnformatted("Spawn Rate (Particles / Sec):");
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::DragFloat("##VFXSpawnRate", &spawnRate, 10.0f, 10.0f, 50000.0f, "%.0f / s");
+            ImGui::Spacing();
+            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+        }
     } else if (selectedNodeType == "Light" || selectedNodeName == "SunLight" || selectedNodeName == "SkyLight") {
         bool lightOpen = RenderCollapsibleHeader("Directional Light Component", true);
 

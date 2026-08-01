@@ -34,6 +34,7 @@
 #include "panels/TextureViewer/TextureViewerPanel.h"
 #include "panels/ProjectWizard/ProjectWizardModal.h"
 #include "panels/ProjectSettings/ProjectSettingsModal.h"
+#include "panels/ContextPanels.h"
 
 namespace EngineEditor {
 
@@ -64,16 +65,37 @@ void RenderApplicationLayout() {
     WorkspaceMode mode = state.activeWorkspace;
 
     if (mode == WorkspaceMode::Editor) {
+        // Always Visible Panels (Default)
+        if (state.showViewportPanel) RenderViewportPanel(&state.showViewportPanel);
+        if (state.showOutlinerPanel) RenderOutlinerPanel(&state.showOutlinerPanel);
+        if (state.settings.showContentBrowser) RenderContentBrowserPanel(&state.settings.showContentBrowser);
+        if (state.showDetailsPanel) RenderDetailsPanel(&state.showDetailsPanel);
+
+        // Hidden by Default Panels
         if (state.showObjectPalettePanel) RenderObjectPalettePanel(&state.showObjectPalettePanel);
-        RenderContentBrowserPanel();
-        RenderViewportPanel();
-        RenderOutlinerPanel();
-        RenderDetailsPanel();
-        RenderOutputLogPanel();
-        RenderRenderControlStripPanel();
+        if (state.settings.showOutputLog) RenderOutputLogPanel(&state.settings.showOutputLog);
+        if (state.settings.showRenderControlStrip) RenderRenderControlStripPanel(&state.settings.showRenderControlStrip);
         if (state.showMeshStudioPanel) RenderMeshStudioPanel(&state.showMeshStudioPanel);
         if (state.showShaderStudioPanel) RenderShaderStudioPanel(&state.showShaderStudioPanel);
         if (state.showTextureViewerPanel) RenderTextureViewerPanel(&state.showTextureViewerPanel);
+        if (state.showProfilerPanel) RenderProfilerPanel(&state.showProfilerPanel);
+        if (state.showRenderDocPanel) RenderRenderDocPanel(&state.showRenderDocPanel);
+        if (state.showGpuDebuggerPanel) RenderGpuDebuggerPanel(&state.showGpuDebuggerPanel);
+        if (state.showMemoryProfilerPanel) RenderMemoryProfilerPanel(&state.showMemoryProfilerPanel);
+        if (state.showPackageManagerPanel) RenderPackageManagerPanel(&state.showPackageManagerPanel);
+        if (state.showPluginManagerPanel) RenderPluginManagerPanel(&state.showPluginManagerPanel);
+        if (state.showLocalizationPanel) RenderLocalizationPanel(&state.showLocalizationPanel);
+        if (state.showConsoleVariablesPanel) RenderConsoleVariablesPanel(&state.showConsoleVariablesPanel);
+        if (state.showAssetRegistryPanel) RenderAssetRegistryPanel(&state.showAssetRegistryPanel);
+        if (state.showNavigationBuilderPanel) RenderNavigationBuilderPanel(&state.showNavigationBuilderPanel);
+        if (state.showLightBakingPanel) RenderLightBakingPanel(&state.showLightBakingPanel);
+
+        // Context-Sensitive & Workflow Editors
+        if (state.showMaterialEditorPanel) RenderMaterialEditorPanel(&state.showMaterialEditorPanel);
+        if (state.showBlueprintEditorPanel) RenderBlueprintEditorPanel(&state.showBlueprintEditorPanel);
+        if (state.showAnimationWorkspacePanel) RenderAnimationWorkspacePanel(&state.showAnimationWorkspacePanel);
+        if (state.showAudioEditorPanel) RenderAudioEditorPanel(&state.showAudioEditorPanel);
+        if (state.showSequencerPanel) RenderSequencerPanel(&state.showSequencerPanel);
     }
     else if (mode == WorkspaceMode::Codebase) {
         RenderProjectExplorerPanel();

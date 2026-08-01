@@ -55,6 +55,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/core/*.cpp"
     "src/render/*.cpp"
     "src/third_party/ImGuizmo/*.cpp"
+    "src/panels/*.cpp"
     "src/panels/Chrome/*.cpp"
     "src/panels/Codebase/*.cpp"
     "src/panels/Run/*.cpp"

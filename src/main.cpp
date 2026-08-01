@@ -222,7 +222,16 @@ static LRESULT CALLBACK EditorWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
         float titleHeight = EngineEditor::GetTitleBarTotalHeight();
         RECT rect;
         GetClientRect(hwnd, &rect);
-        if (pt.y >= 0 && pt.y <= titleHeight && pt.x >= 0 && pt.x < (rect.right - 132)) {
+        if (pt.y >= 0 && pt.y <= titleHeight) {
+            if (ImGui::GetCurrentContext() != nullptr) {
+                ImGuiIO& io = ImGui::GetIO();
+                if (ImGui::IsAnyItemHovered() || ImGui::IsAnyItemActive() || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) || io.WantCaptureMouse) {
+                    return HTCLIENT;
+                }
+            }
+            if (pt.x >= (rect.right - 132)) {
+                return HTCLIENT;
+            }
             return HTCAPTION;
         }
         break;

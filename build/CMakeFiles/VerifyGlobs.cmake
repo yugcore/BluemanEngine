@@ -111,6 +111,42 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
 endif()
 
 # SOURCES at CMakeLists.txt:49 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "Z:/BluemanEditor/src/panels/*.cpp")
+set(OLD_GLOB
+  "Z:/BluemanEditor/src/panels/ContentBrowserPanel.cpp"
+  "Z:/BluemanEditor/src/panels/ContextPanels.cpp"
+  "Z:/BluemanEditor/src/panels/DetailsPanel.cpp"
+  "Z:/BluemanEditor/src/panels/MenuBar.cpp"
+  "Z:/BluemanEditor/src/panels/OutlinerPanel.cpp"
+  "Z:/BluemanEditor/src/panels/OutputLogPanel.cpp"
+  "Z:/BluemanEditor/src/panels/PlaceholderPanels.cpp"
+  "Z:/BluemanEditor/src/panels/RenderControlStripPanel.cpp"
+  "Z:/BluemanEditor/src/panels/StatusBar.cpp"
+  "Z:/BluemanEditor/src/panels/Toolbar.cpp"
+  "Z:/BluemanEditor/src/panels/ViewportPanel.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  set(NEW_ONLY ${NEW_GLOB})
+  set(OLD_ONLY ${OLD_GLOB})
+  list(REMOVE_ITEM NEW_ONLY ${OLD_GLOB})
+  list(REMOVE_ITEM OLD_ONLY ${NEW_GLOB})
+  if(NEW_ONLY)
+    message("The following files were added:")
+    foreach(VAR_FILE IN LISTS NEW_ONLY)
+      message("  +${VAR_FILE}")
+    endforeach()
+  endif()
+  if(OLD_ONLY)
+    message("The following files were removed:")
+    foreach(VAR_FILE IN LISTS OLD_ONLY)
+      message("  -${VAR_FILE}")
+    endforeach()
+  endif()
+  file(TOUCH_NOCREATE "Z:/BluemanEditor/build/CMakeFiles/cmake.verify_globs")
+endif()
+
+# SOURCES at CMakeLists.txt:49 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "Z:/BluemanEditor/src/panels/Chrome/*.cpp")
 set(OLD_GLOB
   "Z:/BluemanEditor/src/panels/Chrome/CustomTitleBar.cpp"

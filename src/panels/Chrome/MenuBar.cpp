@@ -83,14 +83,37 @@ void RenderMenuBarContents() {
     if (ImGui::BeginMenu("Window")) {
         auto& state = EditorState::Get();
 
+        ImGui::TextDisabled("Always Visible (Default)");
+        ImGui::MenuItem("Viewport", nullptr, &state.showViewportPanel);
+        ImGui::MenuItem("Outliner", nullptr, &state.showOutlinerPanel);
+        ImGui::MenuItem("Content Browser", nullptr, &state.settings.showContentBrowser);
+        ImGui::MenuItem("Details / Inspector", nullptr, &state.showDetailsPanel);
+
+        ImGui::Separator();
+        ImGui::TextDisabled("Hidden by Default Panels");
         ImGui::MenuItem("Object Palette", nullptr, &state.showObjectPalettePanel);
-        ImGui::MenuItem("Mesh Studio", nullptr, &state.showMeshStudioPanel);
+        ImGui::MenuItem("Output Log", nullptr, &state.settings.showOutputLog);
+        ImGui::MenuItem("Profiler", nullptr, &state.showProfilerPanel);
+        ImGui::MenuItem("RenderDoc Integrator", nullptr, &state.showRenderDocPanel);
+        ImGui::MenuItem("GPU Debugger", nullptr, &state.showGpuDebuggerPanel);
+        ImGui::MenuItem("Memory Profiler", nullptr, &state.showMemoryProfilerPanel);
+        ImGui::MenuItem("Package Manager", nullptr, &state.showPackageManagerPanel);
+        ImGui::MenuItem("Plugin Manager", nullptr, &state.showPluginManagerPanel);
+        ImGui::MenuItem("Localization", nullptr, &state.showLocalizationPanel);
+        ImGui::MenuItem("Console Variables", nullptr, &state.showConsoleVariablesPanel);
+        ImGui::MenuItem("Render Control Strip", nullptr, &state.settings.showRenderControlStrip);
+
+        ImGui::Separator();
+        ImGui::TextDisabled("Context-Sensitive & Editors");
+        ImGui::MenuItem("Material Editor", nullptr, &state.showMaterialEditorPanel);
+        ImGui::MenuItem("Blueprint / Visual Script", nullptr, &state.showBlueprintEditorPanel);
         ImGui::MenuItem("Shader Studio", nullptr, &state.showShaderStudioPanel);
         ImGui::MenuItem("Texture Viewer", nullptr, &state.showTextureViewerPanel);
-        ImGui::Separator();
-        ImGui::MenuItem("Content Browser", nullptr, &state.settings.showContentBrowser);
-        ImGui::MenuItem("Output Log", nullptr, &state.settings.showOutputLog);
-        ImGui::MenuItem("Render Control Strip", nullptr, &state.settings.showRenderControlStrip);
+        ImGui::MenuItem("Mesh Studio", nullptr, &state.showMeshStudioPanel);
+        ImGui::MenuItem("Animation Workspace", nullptr, &state.showAnimationWorkspacePanel);
+        ImGui::MenuItem("Audio Mixer", nullptr, &state.showAudioEditorPanel);
+        ImGui::MenuItem("Sequencer / Timeline", nullptr, &state.showSequencerPanel);
+
         ImGui::Separator();
         if (ImGui::MenuItem("Reset Layout")) {
             Layout::RequestLayoutReset();
@@ -100,12 +123,17 @@ void RenderMenuBarContents() {
     }
 
     if (ImGui::BeginMenu("Tools")) {
-        if (ImGui::MenuItem("Material Editor")) Logger::Get().Info("[Menu] Tools > Material Editor");
-        if (ImGui::MenuItem("Level Sequence Editor")) Logger::Get().Info("[Menu] Tools > Level Sequence Editor");
-        if (ImGui::MenuItem("Animation Editor")) Logger::Get().Info("[Menu] Tools > Animation Editor");
+        auto& state = EditorState::Get();
+        if (ImGui::MenuItem("Material Editor")) state.showMaterialEditorPanel = true;
+        if (ImGui::MenuItem("Blueprint Editor")) state.showBlueprintEditorPanel = true;
+        if (ImGui::MenuItem("Animation Workspace")) state.showAnimationWorkspacePanel = true;
+        if (ImGui::MenuItem("Audio Mixer")) state.showAudioEditorPanel = true;
+        if (ImGui::MenuItem("Shader Studio")) state.showShaderStudioPanel = true;
+        if (ImGui::MenuItem("Texture Inspector")) state.showTextureViewerPanel = true;
         ImGui::Separator();
-        if (ImGui::MenuItem("Shader Compiler")) Logger::Get().Info("[Menu] Tools > Shader Compiler");
-        if (ImGui::MenuItem("Asset Validator")) Logger::Get().Info("[Menu] Tools > Asset Validator");
+        if (ImGui::MenuItem("Asset Registry", nullptr, &state.showAssetRegistryPanel)) Logger::Get().Info("[Menu] Tools > Asset Registry");
+        if (ImGui::MenuItem("Navigation Builder", nullptr, &state.showNavigationBuilderPanel)) Logger::Get().Info("[Menu] Tools > Navigation Builder");
+        if (ImGui::MenuItem("Light Baking", nullptr, &state.showLightBakingPanel)) Logger::Get().Info("[Menu] Tools > Light Baking");
         ImGui::EndMenu();
     }
 

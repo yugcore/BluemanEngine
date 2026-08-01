@@ -236,9 +236,34 @@ void RenderContentBrowserPanel(bool* pOpen) {
             const char* typeName = AssetRegistry::GetTypeName(item.type);
 
             std::string tileId = "Tile_" + std::to_string(i);
-            if (Widgets::RenderAssetTile(tileId.c_str(), item.name.c_str(), item.type, typeName, typeColor, isSelected, itemWidth, itemHeight)) {
+            bool doubleClicked = false;
+            if (Widgets::RenderAssetTile(tileId.c_str(), item.name.c_str(), item.type, typeName, typeColor, isSelected, itemWidth, itemHeight, &doubleClicked)) {
                 EditorState::Get().SetSelection(item.name, typeName, item.path);
                 Logger::Get().Info("[ContentBrowser] Selected asset: " + item.name);
+            }
+
+            if (doubleClicked) {
+                EditorState::Get().SetSelection(item.name, typeName, item.path);
+                auto& state = EditorState::Get();
+                if (item.type == AssetItemType::Material) {
+                    state.showMaterialEditorPanel = true;
+                    Logger::Get().Info("[ContentBrowser] Double-clicked Material -> Opening Material Editor");
+                } else if (item.type == AssetItemType::Script) {
+                    state.showBlueprintEditorPanel = true;
+                    Logger::Get().Info("[ContentBrowser] Double-clicked Script/Blueprint -> Opening Blueprint Editor");
+                } else if (item.type == AssetItemType::Texture) {
+                    state.showTextureViewerPanel = true;
+                    Logger::Get().Info("[ContentBrowser] Double-clicked Texture -> Opening Texture Inspector");
+                } else if (item.type == AssetItemType::Audio) {
+                    state.showAudioEditorPanel = true;
+                    Logger::Get().Info("[ContentBrowser] Double-clicked Audio -> Opening Audio Editor");
+                } else if (item.type == AssetItemType::VFX) {
+                    state.showShaderStudioPanel = true;
+                    Logger::Get().Info("[ContentBrowser] Double-clicked Shader/VFX -> Opening Shader Editor");
+                } else if (item.type == AssetItemType::Mesh) {
+                    state.showMeshStudioPanel = true;
+                    Logger::Get().Info("[ContentBrowser] Double-clicked Mesh -> Opening Mesh Studio");
+                }
             }
 
             currentCol++;

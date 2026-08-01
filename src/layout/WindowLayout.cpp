@@ -59,15 +59,35 @@ void SetupDefaultLayout(ImGuiID dockspaceId, const DockspaceBounds& bounds, bool
         ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.55f, &dockRightBottom, &dockRightTop);
 
         // Assign Windows to Dock Nodes
-        ImGui::DockBuilderDockWindow("Content Browser", dockBottomLeft);
-        ImGui::DockBuilderDockWindow("Output Log", dockBottomRight);
+        // Always Visible
         ImGui::DockBuilderDockWindow("Viewport", dockViewport);
+        ImGui::DockBuilderDockWindow("Content Browser", dockBottomLeft);
         ImGui::DockBuilderDockWindow("Outliner", dockRightTop);
-        ImGui::DockBuilderDockWindow("Object Palette", dockRightTop);
         ImGui::DockBuilderDockWindow("Details", dockRightBottom);
-        ImGui::DockBuilderDockWindow("Mesh Studio", dockRightBottom);
-        ImGui::DockBuilderDockWindow("Shader Studio", dockRightBottom);
-        ImGui::DockBuilderDockWindow("Texture Viewer", dockRightBottom);
+
+        // Hidden & Context-Sensitive Workspaces (Docked centrally or in side/bottom tabs)
+        ImGui::DockBuilderDockWindow("Material Editor", dockViewport);
+        ImGui::DockBuilderDockWindow("Blueprint / Visual Script", dockViewport);
+        ImGui::DockBuilderDockWindow("Animation Workspace", dockViewport);
+        ImGui::DockBuilderDockWindow("Shader Studio", dockViewport);
+        ImGui::DockBuilderDockWindow("Mesh Studio", dockViewport);
+        ImGui::DockBuilderDockWindow("Texture Viewer", dockViewport);
+
+        ImGui::DockBuilderDockWindow("Output Log", dockBottomRight);
+        ImGui::DockBuilderDockWindow("Profiler", dockBottomRight);
+        ImGui::DockBuilderDockWindow("RenderDoc Integrator", dockBottomRight);
+        ImGui::DockBuilderDockWindow("GPU Debugger", dockBottomRight);
+        ImGui::DockBuilderDockWindow("Audio Mixer", dockBottomRight);
+        ImGui::DockBuilderDockWindow("Sequencer / Timeline", dockBottomLeft);
+        ImGui::DockBuilderDockWindow("Console Variables", dockBottomRight);
+
+        ImGui::DockBuilderDockWindow("Object Palette", dockRightTop);
+        ImGui::DockBuilderDockWindow("Asset Registry", dockRightTop);
+        ImGui::DockBuilderDockWindow("Package Manager", dockRightTop);
+        ImGui::DockBuilderDockWindow("Plugin Manager", dockRightTop);
+        ImGui::DockBuilderDockWindow("Localization", dockRightTop);
+        ImGui::DockBuilderDockWindow("Navigation Builder", dockRightTop);
+        ImGui::DockBuilderDockWindow("Light Baking", dockRightTop);
         ImGui::DockBuilderDockWindow("Render Control Strip", dockRightBottom);
     }
     else if (mode == WorkspaceMode::Codebase) {
