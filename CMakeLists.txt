@@ -73,6 +73,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/panels/TextureViewer/*.cpp"
     "src/panels/ProjectWizard/*.cpp"
     "src/panels/ProjectSettings/*.cpp"
+    "src/panels/ImportProgress/*.cpp"
 
     # ZeGFX Graphics Engine Core Sources
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx.cpp"

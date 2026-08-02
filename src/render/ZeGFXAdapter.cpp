@@ -55,9 +55,108 @@ bool ZeGFXAdapter::Initialize(ID3D12Device* device, HWND hwnd, uint32_t width, u
     sunLight.illuminanceLux = 100000.0f;
     m_Renderer->setDirectionalLight(sunLight);
 
+    CreateDefaultPrimitives();
+
     m_Initialized = true;
     std::cout << "[ZeGFXAdapter] ZeGFX engine & ZePhysics 3D backend initialized successfully (" << m_Width << "x" << m_Height << ")" << std::endl;
     return true;
+}
+
+void ZeGFXAdapter::CreateDefaultPrimitives() {
+    if (!m_Renderer) return;
+
+    // Create default PBR material
+    m_DefaultMaterialHandle = m_Renderer->createMaterial("DefaultPBRMaterial");
+    m_LoadedMaterials["DefaultPBRMaterial"] = m_DefaultMaterialHandle;
+
+    // Create default Cube mesh (unit cube)
+    std::vector<zegfx::ProceduralVertex> cubeVerts;
+    std::vector<uint32_t> cubeIndices;
+
+    struct Face {
+        float normal[3];
+        float positions[4][3];
+        float uvs[4][2];
+    };
+    Face faces[6] = {
+        // Front (+Z)
+        { {0, 0, 1}, {{-0.5f,-0.5f, 0.5f}, { 0.5f,-0.5f, 0.5f}, { 0.5f, 0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f}}, {{0,1},{1,1},{1,0},{0,0}} },
+        // Back (-Z)
+        { {0, 0,-1}, {{ 0.5f,-0.5f,-0.5f}, {-0.5f,-0.5f,-0.5f}, {-0.5f, 0.5f,-0.5f}, { 0.5f, 0.5f,-0.5f}}, {{0,1},{1,1},{1,0},{0,0}} },
+        // Top (+Y)
+        { {0, 1, 0}, {{-0.5f, 0.5f, 0.5f}, { 0.5f, 0.5f, 0.5f}, { 0.5f, 0.5f,-0.5f}, {-0.5f, 0.5f,-0.5f}}, {{0,1},{1,1},{1,0},{0,0}} },
+        // Bottom (-Y)
+        { {0,-1, 0}, {{-0.5f,-0.5f,-0.5f}, { 0.5f,-0.5f,-0.5f}, { 0.5f,-0.5f, 0.5f}, {-0.5f,-0.5f, 0.5f}}, {{0,1},{1,1},{1,0},{0,0}} },
+        // Right (+X)
+        { {1, 0, 0}, {{ 0.5f,-0.5f, 0.5f}, { 0.5f,-0.5f,-0.5f}, { 0.5f, 0.5f,-0.5f}, { 0.5f, 0.5f, 0.5f}}, {{0,1},{1,1},{1,0},{0,0}} },
+        // Left (-X)
+        { {-1, 0, 0}, {{-0.5f,-0.5f,-0.5f}, {-0.5f,-0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f}, {-0.5f, 0.5f,-0.5f}}, {{0,1},{1,1},{1,0},{0,0}} }
+    };
+
+    zegfx::Color whiteColor{255, 255, 255, 255};
+    for (int f = 0; f < 6; ++f) {
+        uint32_t baseIdx = (uint32_t)cubeVerts.size();
+        for (int v = 0; v < 4; ++v) {
+            zegfx::ProceduralVertex vert;
+            vert.x = faces[f].positions[v][0];
+            vert.y = faces[f].positions[v][1];
+            vert.z = faces[f].positions[v][2];
+            vert.nx = faces[f].normal[0];
+            vert.ny = faces[f].normal[1];
+            vert.nz = faces[f].normal[2];
+            vert.u = faces[f].uvs[v][0];
+            vert.v = faces[f].uvs[v][1];
+            vert.color = whiteColor;
+            cubeVerts.push_back(vert);
+        }
+        cubeIndices.push_back(baseIdx + 0);
+        cubeIndices.push_back(baseIdx + 1);
+        cubeIndices.push_back(baseIdx + 2);
+        cubeIndices.push_back(baseIdx + 0);
+        cubeIndices.push_back(baseIdx + 2);
+        cubeIndices.push_back(baseIdx + 3);
+    }
+
+    m_DefaultMeshHandle = m_Renderer->createProceduralMesh(cubeVerts, cubeIndices);
+    m_LoadedMeshes["DefaultCube"] = m_DefaultMeshHandle;
+    m_LoadedMeshes["cube"] = m_DefaultMeshHandle;
+    m_LoadedMeshes["Engine/DefaultCube"] = m_DefaultMeshHandle;
+}
+
+zegfx::RenderMeshHandle ZeGFXAdapter::LoadMeshAsset(const std::string& meshPath) {
+    if (meshPath.empty()) return m_DefaultMeshHandle;
+
+    auto it = m_LoadedMeshes.find(meshPath);
+    if (it != m_LoadedMeshes.end()) return it->second;
+
+    if (!m_Renderer) return m_DefaultMeshHandle;
+
+    std::string err;
+    zegfx::RenderMeshHandle handle = m_Renderer->loadMesh(meshPath, err);
+    if (handle.valid()) {
+        m_LoadedMeshes[meshPath] = handle;
+        return handle;
+    } else {
+        std::cerr << "[ZeGFXAdapter] Failed to load mesh asset (" << meshPath << "): " << err << std::endl;
+        return m_DefaultMeshHandle;
+    }
+}
+
+zegfx::RenderMaterialHandle ZeGFXAdapter::LoadMaterialAsset(const std::string& matPath) {
+    if (matPath.empty()) return m_DefaultMaterialHandle;
+
+    auto it = m_LoadedMaterials.find(matPath);
+    if (it != m_LoadedMaterials.end()) return it->second;
+
+    if (!m_Renderer) return m_DefaultMaterialHandle;
+
+    zegfx::RenderMaterialHandle handle = m_Renderer->createMaterial(matPath);
+    if (handle.valid()) {
+        m_LoadedMaterials[matPath] = handle;
+        return handle;
+    } else {
+        return m_DefaultMaterialHandle;
+    }
 }
 
 void ZeGFXAdapter::Shutdown() {
@@ -202,8 +301,8 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
         for (const auto& node : nodes) {
             if (node.type == SceneNodeType::Actor || node.type == SceneNodeType::Terrain) {
                 zegfx::RenderInstance inst = {};
-                inst.mesh = zegfx::RenderMeshHandle{ (uint32_t)m_DefaultMeshHandle };
-                inst.material = zegfx::RenderMaterialHandle{ (uint32_t)m_DefaultMaterialHandle };
+                inst.mesh = LoadMeshAsset(node.meshPath);
+                inst.material = LoadMaterialAsset(node.materialPath);
 
                 float pitch = node.rotation[0] * 3.14159265f / 180.0f;
                 float yaw   = node.rotation[1] * 3.14159265f / 180.0f;
@@ -245,8 +344,8 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
                     float py = node.location[1] + (std::sin(px * 0.05f) + std::cos(pz * 0.05f)) * 3.5f;
 
                     zegfx::RenderInstance inst = {};
-                    inst.mesh = zegfx::RenderMeshHandle{ (uint32_t)m_DefaultMeshHandle };
-                    inst.material = zegfx::RenderMaterialHandle{ (uint32_t)m_DefaultMaterialHandle };
+                    inst.mesh = LoadMeshAsset(node.meshPath);
+                    inst.material = LoadMaterialAsset(node.materialPath);
                     inst.world = zegfx::Mat4::identity();
                     inst.world.m[0][0] = 1.0f + (float)(i % 3) * 0.4f; // Scale variation
                     inst.world.m[1][1] = 1.5f + (float)(i % 4) * 0.5f; // Tree height variation
@@ -261,8 +360,8 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
             } else if (node.type == SceneNodeType::PathPoint) {
                 // Forest trail path marker
                 zegfx::RenderInstance inst = {};
-                inst.mesh = zegfx::RenderMeshHandle{ (uint32_t)m_DefaultMeshHandle };
-                inst.material = zegfx::RenderMaterialHandle{ (uint32_t)m_DefaultMaterialHandle };
+                inst.mesh = LoadMeshAsset(node.meshPath);
+                inst.material = LoadMaterialAsset(node.materialPath);
                 inst.world = zegfx::Mat4::identity();
                 inst.world.m[0][0] = 0.5f; inst.world.m[1][1] = 0.1f; inst.world.m[2][2] = 0.5f; // Flat path stone
                 inst.world.m[3][0] = node.location[0];
@@ -360,8 +459,21 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
     stats.apiTag = "ZeGFX v1.0.0 (DX12)";
 }
 
+void ZeGFXAdapter::SetOutputRenderTarget(ID3D12Resource* rtResource, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle) {
+    m_ActiveRenderTargetResource = rtResource;
+    m_ActiveRtvHandle = rtvHandle;
+}
+
 void ZeGFXAdapter::Render(ID3D12GraphicsCommandList* cmdList, uint32_t width, uint32_t height, float deltaTime) {
     if (!m_Initialized || !m_Renderer) return;
+
+    if (cmdList && m_ActiveRtvHandle.ptr != 0) {
+        cmdList->OMSetRenderTargets(1, &m_ActiveRtvHandle, FALSE, nullptr);
+        D3D12_VIEWPORT vp = { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f };
+        D3D12_RECT sr = { 0, 0, (LONG)width, (LONG)height };
+        cmdList->RSSetViewports(1, &vp);
+        cmdList->RSSetScissorRects(1, &sr);
+    }
 
     m_TimeAccumulator += deltaTime;
     Resize(width, height);

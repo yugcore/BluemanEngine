@@ -60,14 +60,20 @@ static void CleanupRenderTarget();
 static void WaitForLastSubmittedFrame();
 static FrameContext* WaitForNextFrameResources();
 
-static constexpr UINT kMaxSrvDescriptors = 1024;
+static constexpr UINT kMaxSrvDescriptors = 4096;
 static UINT g_srvHeapNextFreeIndex = 0;
+static std::vector<UINT> g_srvFreeList;
 
 static void SrvDescriptorAlloc(ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) {
-    if (g_srvHeapNextFreeIndex >= kMaxSrvDescriptors) {
-        std::cerr << "[DX12] Error: SRV Descriptor Heap exhausted (" << kMaxSrvDescriptors << " descriptors allocated)!" << std::endl;
-        // Fallback to index 0 to avoid out-of-bounds access crash
-        g_srvHeapNextFreeIndex = 0;
+    UINT index = 0;
+    if (!g_srvFreeList.empty()) {
+        index = g_srvFreeList.back();
+        g_srvFreeList.pop_back();
+    } else if (g_srvHeapNextFreeIndex < kMaxSrvDescriptors) {
+        index = g_srvHeapNextFreeIndex++;
+    } else {
+        std::cerr << "[DX12] FATAL ERROR: SRV Descriptor Heap exhausted (" << kMaxSrvDescriptors << " descriptors allocated)!" << std::endl;
+        index = 0;
     }
 
     UINT handleIncrement = info->Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -75,17 +81,26 @@ static void SrvDescriptorAlloc(ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPT
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = info->SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
     D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = info->SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
     
-    cpuHandle.ptr += (SIZE_T)g_srvHeapNextFreeIndex * handleIncrement;
-    gpuHandle.ptr += (SIZE_T)g_srvHeapNextFreeIndex * handleIncrement;
-    
-    g_srvHeapNextFreeIndex++;
+    cpuHandle.ptr += (SIZE_T)index * handleIncrement;
+    gpuHandle.ptr += (SIZE_T)index * handleIncrement;
     
     *out_cpu_handle = cpuHandle;
     *out_gpu_handle = gpuHandle;
 }
 
 static void SrvDescriptorFree(ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) {
-    (void)info; (void)cpu_handle; (void)gpu_handle;
+    (void)gpu_handle;
+    if (!info || !info->Device || !info->SrvDescriptorHeap || cpu_handle.ptr == 0) return;
+
+    UINT handleIncrement = info->Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    SIZE_T heapStart = info->SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+
+    if (cpu_handle.ptr >= heapStart && handleIncrement > 0) {
+        UINT index = static_cast<UINT>((cpu_handle.ptr - heapStart) / handleIncrement);
+        if (index < kMaxSrvDescriptors) {
+            g_srvFreeList.push_back(index);
+        }
+    }
 }
 
 static UINT g_SwapChainWidth = 0;
@@ -217,7 +232,13 @@ static void RenderFrame() {
 
     auto tLayout = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t2).count();
 
-    // 7. Render ImGui Draw Data & Platform Windows
+    // 7. Re-bind Main Window Backbuffer RTV & Viewport before ImGui draw data rendering
+    D3D12_VIEWPORT mainViewport = { 0.0f, 0.0f, (float)display_w, (float)display_h, 0.0f, 1.0f };
+    D3D12_RECT mainScissor = { 0, 0, display_w, display_h };
+    g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[g_FrameIndex], FALSE, nullptr);
+    g_pd3dCommandList->RSSetViewports(1, &mainViewport);
+    g_pd3dCommandList->RSSetScissorRects(1, &mainScissor);
+
     auto t3 = std::chrono::high_resolution_clock::now();
     ImGui::Render();
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_pd3dCommandList.Get());
@@ -370,6 +391,7 @@ int main(int argc, char** argv) {
 
             ImGui_ImplGlfw_InitForOther(splashWindow, true);
             g_srvHeapNextFreeIndex = 0;
+            g_srvFreeList.clear();
 
             ImGui_ImplDX12_InitInfo splashInitInfo = {};
             splashInitInfo.Device = g_pd3dDevice.Get();
@@ -472,12 +494,12 @@ int main(int argc, char** argv) {
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     io.IniFilename = "blueman_layout.ini";
 
     ImGui_ImplGlfw_InitForOther(window, true);
     
     g_srvHeapNextFreeIndex = 0;
+    g_srvFreeList.clear();
 
     ImGui_ImplDX12_InitInfo init_info = {};
     init_info.Device = g_pd3dDevice.Get();

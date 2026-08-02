@@ -302,6 +302,18 @@ struct EditorState {
     int activeCodeErrorsCount = 0;
     bool showNewFileDialog = false;
 
+    std::string currentScenePath = "";
+    std::vector<std::string> recentScenes;
+    bool showAutosaveSettingsModal = false;
+
+    void AddRecentScene(const std::string& path) {
+        if (path.empty()) return;
+        auto it = std::find(recentScenes.begin(), recentScenes.end(), path);
+        if (it != recentScenes.end()) recentScenes.erase(it);
+        recentScenes.insert(recentScenes.begin(), path);
+        if (recentScenes.size() > 10) recentScenes.pop_back();
+    }
+
     // Modal & Panel Visibility Toggles
     bool showProjectWizardModal = false;
     bool showProjectSettingsModal = false;
@@ -339,7 +351,6 @@ struct EditorState {
     // Simulation & File State
     bool isSimulating = false;
     bool isPaused = false;
-    std::string currentScenePath = "";
     bool showAboutModal = false;
 
     bool IsSelected(const std::string& name) const {

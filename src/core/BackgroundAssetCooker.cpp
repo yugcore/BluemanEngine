@@ -4,6 +4,7 @@
 #include "EditorState.h"
 #include "render/ZeGFXAdapter.h"
 #include "asset_importer.h"
+#include "cooker/asset_cooker.h"
 
 #include <imgui.h>
 #include <iostream>
@@ -71,6 +72,19 @@ static std::string GetFileExtensionLower(const std::string& path) {
     return ext;
 }
 
+bool BackgroundAssetCooker::PopCompletedResult(CookedAssetResult& outResult) {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    if (m_CompletedResults.empty()) return false;
+    outResult = m_CompletedResults.front();
+    m_CompletedResults.pop();
+    return true;
+}
+
+bool BackgroundAssetCooker::HasCompletedResults() const {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    return !m_CompletedResults.empty();
+}
+
 void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
     namespace fs = std::filesystem;
     std::string fileName = fs::path(filePath).filename().string();
@@ -83,43 +97,53 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
     }
     m_CurrentProgress.store(0.10f);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Non-blocking simulation step for UI responsiveness
-
     AssetItemType itemType = AssetItemType::Unknown;
     bool success = true;
     std::string statusMsg = "";
     std::string projectDir = "Z:\\Blueman Cooked Assets";
     std::error_code ec;
     fs::create_directories(projectDir, ec);
+    if (ec) {
+        projectDir = "./CookedAssets";
+        fs::create_directories(projectDir, ec);
+    }
+
+    std::string cookedOutPath = "";
 
     if (ext == ".fbx" || ext == ".gltf" || ext == ".glb" || ext == ".obj" || ext == ".vox") {
         itemType = AssetItemType::Mesh;
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
-            m_CurrentStatusText = "Parsing 3D scene hierarchy via ufbx...";
+            m_CurrentStatusText = "Cooking binary .zmesh payload via zegfx::cooker::AssetCooker...";
         }
         m_CurrentProgress.store(0.35f);
 
-        // Invoke ZeGFX Asset Importer backend & cook to binary packages
-        zegfx::asset::ImportOptions options = {};
-        options.allowAssimpFallback = true;
-        options.generateMissingTangents = true;
-        options.generateMissingNormals = true;
-        
-        auto importRes = zegfx::asset::importAsset(filePath, options);
+        std::string stemName = fs::path(filePath).stem().string();
+        std::string outMeshPath = (fs::path(projectDir) / (stemName + ".zmesh")).string();
+
+        zegfx::cooker::AssetCooker cooker;
+        bool cookedOk = cooker.CookMesh(filePath, outMeshPath);
         m_CurrentProgress.store(0.70f);
 
-        {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            m_CurrentStatusText = "Cooking binary .zasset & .zmat packages to project folder...";
-        }
-        bool cookedOk = zegfx::asset::cookAssetToZAsset(filePath, projectDir, options);
-        std::this_thread::sleep_for(std::chrono::milliseconds(150));
-
-        if (importRes.success || cookedOk) {
-            statusMsg = "Mesh asset cooked successfully (" + std::to_string(importRes.asset.diagnostics.vertexCount) + " verts)";
+        if (cookedOk) {
+            // Verify cooked file was actually written
+            std::error_code sizeEc;
+            auto fileSize = fs::file_size(outMeshPath, sizeEc);
+            if (sizeEc || fileSize == 0) {
+                fprintf(stderr, "[AssetCooker] WARNING: CookMesh returned true but .zmesh file missing or empty: '%s' (ec=%s)\n",
+                        outMeshPath.c_str(), sizeEc.message().c_str());
+                statusMsg = "Mesh cooking produced empty output for " + fileName;
+                success = false;
+            } else {
+                fprintf(stderr, "[AssetCooker] CookMesh succeeded: '%s' (%llu bytes)\n",
+                        outMeshPath.c_str(), (unsigned long long)fileSize);
+                statusMsg = "Mesh asset cooked successfully into binary .zmesh: " + outMeshPath;
+                cookedOutPath = outMeshPath;
+            }
         } else {
-            statusMsg = "Import processed with fallbacks: " + importRes.error;
+            fprintf(stderr, "[AssetCooker] CookMesh FAILED for '%s'\n", filePath.c_str());
+            statusMsg = "Mesh cooking failed for " + fileName;
+            success = false;
         }
 
     } else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga" || ext == ".dds" || ext == ".bmp" || ext == ".hdr" || ext == ".exr") {
@@ -128,16 +152,31 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
             std::lock_guard<std::mutex> lock(m_Mutex);
             m_CurrentStatusText = "Compressing texture to BC7 block-format (.ztex)...";
         }
-        m_CurrentProgress.store(0.60f);
-        std::this_thread::sleep_for(std::chrono::milliseconds(150));
-        statusMsg = "Texture compressed into .ztex payload successfully";
+        m_CurrentProgress.store(0.35f);
+
+        std::string stemName = fs::path(filePath).stem().string();
+        std::string outTexPath = (fs::path(projectDir) / (stemName + ".ztex")).string();
+
+        zegfx::cooker::AssetCooker cooker;
+        bool cookedOk = cooker.CookTexture(filePath, outTexPath);
+        m_CurrentProgress.store(0.70f);
+
+        if (cookedOk) {
+            statusMsg = "Texture compressed into .ztex payload successfully: " + outTexPath;
+            cookedOutPath = outTexPath;
+        } else {
+            statusMsg = "Texture cooking failed for " + fileName;
+            success = false;
+        }
 
     } else if (ext == ".zmesh" || ext == ".zasset") {
         itemType = AssetItemType::Mesh;
+        cookedOutPath = filePath;
         m_CurrentProgress.store(0.80f);
         statusMsg = "Pre-compiled ZeGFX mesh registered";
     } else if (ext == ".ztex") {
         itemType = AssetItemType::Texture;
+        cookedOutPath = filePath;
         m_CurrentProgress.store(0.80f);
         statusMsg = "Pre-compiled ZeGFX texture registered";
     } else if (ext == ".zelyn" || ext == ".lua" || ext == ".cpp" || ext == ".cs") {
@@ -156,9 +195,18 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
         m_CurrentStatusText = "Finalizing asset registration...";
     }
 
-    // Copy original or cooked file into project folder "Z:\Blueman Cooked Assets"
+    // Copy original or cooked file into project folder
     std::string targetPath = (fs::path(projectDir) / fileName).string();
     fs::copy_file(filePath, targetPath, fs::copy_options::overwrite_existing, ec);
+
+    // Also copy sibling .bin buffers (essential for glTF assets)
+    std::string stemName = fs::path(filePath).stem().string();
+    fs::path parentDir = fs::path(filePath).parent_path();
+    fs::path binSibling = parentDir / (stemName + ".bin");
+    if (fs::exists(binSibling)) {
+        std::error_code binEc;
+        fs::copy_file(binSibling, fs::path(projectDir) / (stemName + ".bin"), fs::copy_options::overwrite_existing, binEc);
+    }
 
     // Thread-safe dispatch to AssetRegistry & full rescan
     AssetItem item;
@@ -169,15 +217,24 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
     AssetRegistry::Get().RegisterAsset(item, projectDir);
     AssetRegistry::Get().ScanProjectFolder(projectDir);
 
-    // Add completion notification
+    // Add completion notification and result queue entry
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         NotificationMsg notif;
-        notif.text = "Imported " + fileName + " successfully!";
+        notif.text = "Imported " + fileName + (success ? " successfully!" : " with errors!");
         notif.isSuccess = success;
         notif.startTime = std::chrono::steady_clock::now();
         notif.durationSeconds = 4.5f;
         m_Notifications.push_back(notif);
+
+        CookedAssetResult resultRecord;
+        resultRecord.sourcePath = filePath;
+        resultRecord.outputCachePath = cookedOutPath.empty() ? targetPath : cookedOutPath;
+        resultRecord.assetType = itemType;
+        resultRecord.success = success;
+        resultRecord.errorMsg = success ? "" : statusMsg;
+        m_CompletedResults.push(resultRecord);
+
         m_CurrentTaskName = "";
         m_CurrentStatusText = "";
     }
@@ -186,16 +243,52 @@ void BackgroundAssetCooker::ProcessSingleFile(const std::string& filePath) {
 }
 
 void BackgroundAssetCooker::Update() {
-    // Clean up expired notifications
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    auto now = std::chrono::steady_clock::now();
-    m_Notifications.erase(
-        std::remove_if(m_Notifications.begin(), m_Notifications.end(), [&](const NotificationMsg& n) {
-            float elapsed = std::chrono::duration<float>(now - n.startTime).count();
-            return elapsed >= n.durationSeconds;
-        }),
-        m_Notifications.end()
-    );
+    // 1. Clean up expired notifications
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        auto now = std::chrono::steady_clock::now();
+        m_Notifications.erase(
+            std::remove_if(m_Notifications.begin(), m_Notifications.end(), [&](const NotificationMsg& n) {
+                float elapsed = std::chrono::duration<float>(now - n.startTime).count();
+                return elapsed >= n.durationSeconds;
+            }),
+            m_Notifications.end()
+        );
+    }
+
+    // 2. Main-thread processing of completed asset cooking results
+    CookedAssetResult result;
+    while (PopCompletedResult(result)) {
+        if (result.success && result.assetType == AssetItemType::Mesh) {
+            // Load GPU mesh handle into ZeGFXAdapter
+            fprintf(stderr, "[AssetCooker::Update] Loading mesh into GPU: '%s'\n", result.outputCachePath.c_str());
+            auto meshHandle = ZeGFXAdapter::Get().LoadMeshAsset(result.outputCachePath);
+            fprintf(stderr, "[AssetCooker::Update] LoadMeshAsset result: handle.valid()=%d\n", (int)meshHandle.valid());
+
+            // Construct new SceneNode for the imported mesh
+            namespace fs = std::filesystem;
+            std::string baseName = fs::path(result.sourcePath).stem().string();
+
+            SceneNode newNode;
+            newNode.id = SceneGraph::Get().GenerateNodeId();
+            newNode.name = baseName;
+            newNode.type = SceneNodeType::Actor;
+            newNode.meshPath = result.outputCachePath;
+            newNode.location[0] = 0.0f;
+            newNode.location[1] = 0.0f;
+            newNode.location[2] = 0.0f;
+
+            // Add node to SceneGraph
+            SceneGraph::Get().AddNode(newNode);
+
+            // Auto-select the newly added SceneNode in EditorState
+            EditorState::Get().selectedNodeName = newNode.name;
+            EditorState::Get().selectedNodeType = SceneGraph::GetTypeName(newNode.type);
+            EditorState::Get().selectedNodeNames = { newNode.name };
+
+            Logger::Get().Info("[AssetCooker] Automatically instantiated SceneNode '" + newNode.name + "' with mesh " + result.outputCachePath);
+        }
+    }
 }
 
 void BackgroundAssetCooker::RenderCookingOverlay() {

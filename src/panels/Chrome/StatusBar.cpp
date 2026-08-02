@@ -1,5 +1,6 @@
 #include "StatusBar.h"
 #include "core/EditorState.h"
+#include "core/BackgroundAssetCooker.h"
 #include "panels/Codebase/CodeHighlighter.h"
 #include "theme/Fonts.h"
 #include "theme/Colors.h"
@@ -221,6 +222,9 @@ void RenderStatusBar() {
             ImGui::SameLine(0.0f, 5.0f);
             ImGui::TextColored(pal.textPrimary, "%s", statusText);
         } else {
+            bool isCooking = BackgroundAssetCooker::Get().IsCooking();
+            const char* queueVal = isCooking ? "Cooking..." : "Idle";
+
             // Calculate total width of the right group
             float rightGroupWidth = 0.0f;
             rightGroupWidth += ImGui::CalcTextSize(arText).x + dividerGap;
@@ -231,6 +235,7 @@ void RenderStatusBar() {
             rightGroupWidth += ImGui::CalcTextSize("RAM: ").x + ImGui::CalcTextSize(ramVal).x + dividerGap;
             rightGroupWidth += ImGui::CalcTextSize("Draws: ").x + ImGui::CalcTextSize(drawVal.c_str()).x + dividerGap;
             rightGroupWidth += ImGui::CalcTextSize("Entities: ").x + ImGui::CalcTextSize(entVal).x + dividerGap;
+            rightGroupWidth += ImGui::CalcTextSize("Import Queue: ").x + ImGui::CalcTextSize(queueVal).x + dividerGap;
             rightGroupWidth += ImGui::CalcTextSize("Preset: ").x + ImGui::CalcTextSize(presets[pIdx]).x + dividerGap;
             rightGroupWidth += ImGui::CalcTextSize("Git: ").x + ImGui::CalcTextSize(gitVal).x;
 
@@ -294,13 +299,19 @@ void RenderStatusBar() {
             // Separator
             RenderVerticalSeparator(pal, windowTopY);
 
-            // 9. Quality Preset
+            // 9. Import Queue
+            RenderStatItem("Import Queue:", queueVal, pal, textY);
+
+            // Separator
+            RenderVerticalSeparator(pal, windowTopY);
+
+            // 10. Quality Preset
             RenderStatItem("Preset:", presets[pIdx], pal, textY);
 
             // Separator
             RenderVerticalSeparator(pal, windowTopY);
 
-            // 10. Git Branch
+            // 11. Git Branch
             RenderStatItem("Git:", gitVal, pal, textY);
         }
     }

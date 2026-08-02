@@ -147,6 +147,15 @@ void ViewportRenderer::RenderScene(float deltaTime, ID3D12GraphicsCommandList* c
     float skyClearColor[4] = { 0.38f, 0.62f, 0.92f, 1.00f };
     cl->ClearRenderTargetView(m_RtvHandle, skyClearColor, 0, nullptr);
 
+    // Bind viewport offscreen render target to command list & register target
+    cl->OMSetRenderTargets(1, &m_RtvHandle, FALSE, nullptr);
+    D3D12_VIEWPORT vp = { 0.0f, 0.0f, (float)m_Width, (float)m_Height, 0.0f, 1.0f };
+    D3D12_RECT sr = { 0, 0, (LONG)m_Width, (LONG)m_Height };
+    cl->RSSetViewports(1, &vp);
+    cl->RSSetScissorRects(1, &sr);
+
+    ZeGFXAdapter::Get().SetOutputRenderTarget(m_ColorTexture.Get(), m_RtvHandle);
+
     // Execute ZeGFX Engine Rendering Pipeline
     ZeGFXAdapter::Get().Render(cl, m_Width, m_Height, deltaTime);
 

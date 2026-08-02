@@ -9,6 +9,7 @@
 #include "ViewportPreferences.h"
 #include "ViewportDragDrop.h"
 #include "render/ViewportRenderer.h"
+#include "render/ZeGFXAdapter.h"
 #include "core/EditorState.h"
 #include "core/SceneGraph.h"
 #include "core/CommandStack.h"
@@ -169,6 +170,57 @@ void RenderViewportPanel(bool* pOpen) {
         ImGui::Image((ImTextureID)textureID, viewportAvail, ImVec2(0, 1), ImVec2(1, 0));
     } else {
         ImGui::Dummy(viewportAvail);
+    }
+
+    // Viewport "No Content" Helper Overlay
+    if (SceneGraph::Get().GetRootNodes().empty()) {
+        const auto& pal = Theme::GetPalette();
+        ImVec2 centerPos = ImVec2(cursorPos.x + viewportAvail.x * 0.5f, cursorPos.y + viewportAvail.y * 0.5f);
+        
+        ImGui::SetCursorScreenPos(ImVec2(centerPos.x - 220.0f, centerPos.y - 45.0f));
+        ImGui::BeginGroup();
+        
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(pal.bgElevated.x, pal.bgElevated.y, pal.bgElevated.z, 0.85f));
+        
+        if (ImGui::BeginChild("##EmptyViewportHelper", ImVec2(440.0f, 90.0f), true, ImGuiWindowFlags_NoScrollbar)) {
+            ImGui::SetCursorPosY(12.0f);
+            ImGui::TextColored(pal.textSecondary, "    Drag 3D assets here or use Create > 3D Object");
+            ImGui::Spacing();
+            ImGui::SetCursorPosX(35.0f);
+            
+            if (ImGui::Button("+ Cube", ImVec2(100.0f, 26.0f))) {
+                SceneNode node;
+                node.id = SceneGraph::Get().GenerateNodeId();
+                node.name = "Cube";
+                node.type = SceneNodeType::Actor;
+                node.meshPath = "Engine/DefaultCube";
+                SceneGraph::Get().AddNode(node);
+                ZeGFXAdapter::Get().CreateDefaultPrimitives();
+            }
+            ImGui::SameLine(0.0f, 12.0f);
+            if (ImGui::Button("+ Sphere", ImVec2(100.0f, 26.0f))) {
+                SceneNode node;
+                node.id = SceneGraph::Get().GenerateNodeId();
+                node.name = "Sphere";
+                node.type = SceneNodeType::Actor;
+                node.meshPath = "Engine/DefaultCube";
+                SceneGraph::Get().AddNode(node);
+            }
+            ImGui::SameLine(0.0f, 12.0f);
+            if (ImGui::Button("+ Plane", ImVec2(100.0f, 26.0f))) {
+                SceneNode node;
+                node.id = SceneGraph::Get().GenerateNodeId();
+                node.name = "Plane";
+                node.type = SceneNodeType::Actor;
+                node.meshPath = "Engine/DefaultCube";
+                SceneGraph::Get().AddNode(node);
+            }
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+        ImGui::EndGroup();
     }
 
     // Drag-and-drop target handling

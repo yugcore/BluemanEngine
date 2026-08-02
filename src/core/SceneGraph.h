@@ -28,6 +28,7 @@ struct SceneNode {
     std::string world = "DefaultWorld";
     std::string panel = "MainPanel";
     std::string meshPath = "";
+    std::string materialPath = "";
     float location[3] = { 0.0f, 0.0f, 0.0f };
     float rotation[3] = { 0.0f, 0.0f, 0.0f };
     float scale[3]    = { 1.0f, 1.0f, 1.0f };

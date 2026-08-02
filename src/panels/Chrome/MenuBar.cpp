@@ -50,10 +50,30 @@ void RenderMenuBarContents() {
                     EditorState::Get().currentScenePath = files[0];
                     std::filesystem::path p(files[0]);
                     EditorState::Get().currentLevelName = p.filename().string();
+                    EditorState::Get().AddRecentScene(files[0]);
                     EditorState::Get().SetSelection("", "");
                     Logger::Get().Info("[Menu] Loaded scene from " + files[0]);
                 }
             }
+        }
+        if (ImGui::BeginMenu("Recent Scenes")) {
+            const auto& recents = EditorState::Get().recentScenes;
+            if (recents.empty()) {
+                ImGui::TextDisabled("No recent scenes");
+            } else {
+                for (const auto& scenePath : recents) {
+                    std::string label = std::filesystem::path(scenePath).filename().string();
+                    if (ImGui::MenuItem(label.c_str())) {
+                        if (SceneGraph::Get().LoadFromFile(scenePath)) {
+                            EditorState::Get().currentScenePath = scenePath;
+                            EditorState::Get().currentLevelName = label;
+                            EditorState::Get().AddRecentScene(scenePath);
+                            Logger::Get().Info("[Menu] Loaded recent scene: " + scenePath);
+                        }
+                    }
+                }
+            }
+            ImGui::EndMenu();
         }
         if (ImGui::MenuItem("Save", "Ctrl+S")) {
             if (EditorState::Get().currentScenePath.empty()) {
@@ -62,10 +82,12 @@ void RenderMenuBarContents() {
                     EditorState::Get().currentScenePath = files[0];
                     std::filesystem::path p(files[0]);
                     EditorState::Get().currentLevelName = p.filename().string();
+                    EditorState::Get().AddRecentScene(files[0]);
                 }
             }
             if (!EditorState::Get().currentScenePath.empty()) {
                 if (SceneGraph::Get().SaveToFile(EditorState::Get().currentScenePath)) {
+                    EditorState::Get().AddRecentScene(EditorState::Get().currentScenePath);
                     Logger::Get().Info("[Menu] Saved scene to " + EditorState::Get().currentScenePath);
                 }
             }
@@ -76,6 +98,7 @@ void RenderMenuBarContents() {
                 EditorState::Get().currentScenePath = files[0];
                 std::filesystem::path p(files[0]);
                 EditorState::Get().currentLevelName = p.filename().string();
+                EditorState::Get().AddRecentScene(files[0]);
                 SceneGraph::Get().SaveToFile(files[0]);
                 Logger::Get().Info("[Menu] Saved scene as " + files[0]);
             }
@@ -84,6 +107,24 @@ void RenderMenuBarContents() {
         if (ImGui::MenuItem("Import Assets...", "Ctrl+I")) {
             EditorState::Get().TriggerImportFileDialog();
             Logger::Get().Info("[Menu] File > Import Assets dialog opened.");
+        }
+        if (ImGui::MenuItem("Import Asset with Options...")) {
+            EditorState::Get().TriggerImportFileDialog();
+            Logger::Get().Info("[Menu] File > Import Asset with Options requested.");
+        }
+        if (ImGui::BeginMenu("Export Selection")) {
+            bool hasSelection = !EditorState::Get().selectedNodeName.empty();
+            if (ImGui::MenuItem("Export Selection as FBX...", nullptr, false, hasSelection)) {
+                Logger::Get().Info("[Menu] Exporting selection as FBX...");
+            }
+            if (ImGui::MenuItem("Export Selection as glTF...", nullptr, false, hasSelection)) {
+                Logger::Get().Info("[Menu] Exporting selection as glTF...");
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Autosave Settings...")) {
+            EditorState::Get().showAutosaveSettingsModal = true;
         }
         ImGui::Separator();
         if (ImGui::MenuItem("Exit", "Alt+F4")) {

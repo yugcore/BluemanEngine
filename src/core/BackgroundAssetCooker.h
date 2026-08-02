@@ -1,6 +1,7 @@
 #ifndef BACKGROUND_ASSET_COOKER_H
 #define BACKGROUND_ASSET_COOKER_H
 
+#include "AssetRegistry.h"
 #include <string>
 #include <vector>
 #include <queue>
@@ -10,6 +11,16 @@
 #include <chrono>
 
 namespace EngineEditor {
+
+struct CookedAssetResult {
+    std::string sourcePath;
+    std::string outputCachePath;
+    std::vector<std::string> textureRefs;
+    AssetItemType assetType = AssetItemType::Unknown;
+    uint32_t renderMeshHandle = 0;
+    bool success = false;
+    std::string errorMsg = "";
+};
 
 struct CookTask {
     std::string sourcePath;
@@ -43,6 +54,10 @@ public:
     // Updates state & dispatches main-thread completion callbacks
     void Update();
 
+    // Main-thread thread-safe retrieval of completed cooking results
+    bool PopCompletedResult(CookedAssetResult& outResult);
+    bool HasCompletedResults() const;
+
     // Renders small progress bar & notification overlay in bottom-right corner
     void RenderCookingOverlay();
 
@@ -57,6 +72,7 @@ private:
 
     mutable std::mutex m_Mutex;
     std::queue<std::string> m_PendingQueue;
+    std::queue<CookedAssetResult> m_CompletedResults;
     std::thread m_WorkerThread;
     std::atomic<bool> m_StopWorker{ false };
     std::atomic<bool> m_IsCooking{ false };
