@@ -10,14 +10,37 @@ ViewportPicker& ViewportPicker::Get() {
 }
 
 AABB ViewportPicker::ComputeNodeWorldAABB(const SceneNode& node) {
-    AABB box;
-    // Standard unit cube bounds expanded by node scale & position
-    float halfX = std::max(0.5f, std::abs(node.scale[0]) * 0.5f);
-    float halfY = std::max(0.5f, std::abs(node.scale[1]) * 0.5f);
-    float halfZ = std::max(0.5f, std::abs(node.scale[2]) * 0.5f);
+    float hx = std::max(0.5f, std::abs(node.scale[0]) * 0.5f);
+    float hy = std::max(0.5f, std::abs(node.scale[1]) * 0.5f);
+    float hz = std::max(0.5f, std::abs(node.scale[2]) * 0.5f);
 
-    box.minBounds = Vec3f(node.location[0] - halfX, node.location[1] - halfY, node.location[2] - halfZ);
-    box.maxBounds = Vec3f(node.location[0] + halfX, node.location[1] + halfY, node.location[2] + halfZ);
+    float pitch = node.rotation[0] * 3.14159265f / 180.0f;
+    float yaw   = node.rotation[1] * 3.14159265f / 180.0f;
+    float roll  = node.rotation[2] * 3.14159265f / 180.0f;
+
+    float cx = std::cos(pitch), sx = std::sin(pitch);
+    float cy = std::cos(yaw),   sy = std::sin(yaw);
+    float cz = std::cos(roll),  sz = std::sin(roll);
+
+    float r00 = cy * cz + sy * sx * sz;
+    float r01 = cx * sz;
+    float r02 = -sy * cz + cy * sx * sz;
+
+    float r10 = -cy * sz + sy * sx * cz;
+    float r11 = cx * cz;
+    float r12 = sy * sz + cy * sx * cz;
+
+    float r20 = sy * cx;
+    float r21 = -sx;
+    float r22 = cy * cx;
+
+    float ex = std::abs(r00) * hx + std::abs(r01) * hy + std::abs(r02) * hz;
+    float ey = std::abs(r10) * hx + std::abs(r11) * hy + std::abs(r12) * hz;
+    float ez = std::abs(r20) * hx + std::abs(r21) * hy + std::abs(r22) * hz;
+
+    AABB box;
+    box.minBounds = Vec3f(node.location[0] - ex, node.location[1] - ey, node.location[2] - ez);
+    box.maxBounds = Vec3f(node.location[0] + ex, node.location[1] + ey, node.location[2] + ez);
     return box;
 }
 

@@ -1,7 +1,7 @@
 #include "OutlinerPanel.h"
-#include "core/SceneGraph.h"
+#include "engine/scene/SceneGraph.h"
 #include "core/EditorState.h"
-#include "core/Logger.h"
+#include "engine/core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 #include "theme/Fonts.h"
@@ -14,6 +14,22 @@
 #include <cstdio>
 
 namespace EngineEditor {
+
+static ImVec4 GetSceneNodeTypeColor(SceneNodeType type) {
+    switch (type) {
+        case SceneNodeType::Folder:        return ImVec4(0.85f, 0.85f, 0.85f, 1.00f); // Light Gray
+        case SceneNodeType::Actor:         return ImVec4(0.30f, 0.75f, 0.95f, 1.00f); // Cyan
+        case SceneNodeType::Light:         return ImVec4(0.95f, 0.80f, 0.25f, 1.00f); // Amber Yellow
+        case SceneNodeType::Camera:        return ImVec4(0.40f, 0.85f, 0.50f, 1.00f); // Green
+        case SceneNodeType::Audio:         return ImVec4(0.90f, 0.45f, 0.25f, 1.00f); // Orange
+        case SceneNodeType::SkyAtmosphere: return ImVec4(0.70f, 0.45f, 0.95f, 1.00f); // Purple
+        case SceneNodeType::Component:     return ImVec4(0.60f, 0.60f, 0.60f, 1.00f); // Muted
+        case SceneNodeType::Terrain:       return ImVec4(0.45f, 0.75f, 0.35f, 1.00f); // Forest Green
+        case SceneNodeType::FoliageCluster:return ImVec4(0.35f, 0.85f, 0.45f, 1.00f); // Emerald
+        case SceneNodeType::PathPoint:     return ImVec4(0.85f, 0.65f, 0.35f, 1.00f); // Soil Brown
+        default:                           return ImVec4(0.80f, 0.80f, 0.80f, 1.00f);
+    }
+}
 
 static char s_OutlinerSearch[128] = "";
 static bool s_FilterVisibleOnly = false;
@@ -140,7 +156,7 @@ static void RenderNodeRow(const SceneNode& node, const std::string& searchQuery,
     ImVec2 iconBoxMin = ImVec2(currentX, rMin.y + (rowHeight - iconBoxSize) * 0.5f);
     ImVec2 iconBoxMax = ImVec2(iconBoxMin.x + iconBoxSize, iconBoxMin.y + iconBoxSize);
 
-    ImVec4 iconColor = SceneGraph::GetTypeColor(node.type);
+    ImVec4 iconColor = GetSceneNodeTypeColor(node.type);
 
     if (node.type == SceneNodeType::Folder) {
         // Folder Icon Shape (Gold/Amber)

@@ -5,7 +5,7 @@
 #include <vector>
 #include <imgui.h>
 #include "ViewportMath.h"
-#include "core/SceneGraph.h"
+#include "engine/scene/SceneGraph.h"
 
 namespace EngineEditor::Panels {
 
@@ -31,9 +31,11 @@ public:
     // Finds closest vertex on scene geometry near ray
     bool FindClosestVertex(const ViewportMath::Ray3D& ray, const float view[16], const float proj[16], ImVec2 cursorPos, ImVec2 viewportAvail, Vec3f& outVertexPos);
 
+    // Computes world-space oriented AABB for a scene node including rotation and scale
+    static AABB ComputeNodeWorldAABB(const SceneNode& node);
+
 private:
     void RaycastNodeRecursive(const SceneNode& node, const ViewportMath::Ray3D& ray, RaycastHit& bestHit);
-    AABB ComputeNodeWorldAABB(const SceneNode& node);
 };
 
 } // namespace EngineEditor::Panels

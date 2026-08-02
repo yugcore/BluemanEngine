@@ -1,5 +1,5 @@
 #include "ImportProgressModal.h"
-#include "core/BackgroundAssetCooker.h"
+#include "engine/assets/BackgroundAssetCooker.h"
 #include "core/EditorState.h"
 #include "theme/Colors.h"
 

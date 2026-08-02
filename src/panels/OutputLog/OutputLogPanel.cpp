@@ -1,5 +1,5 @@
 #include "OutputLogPanel.h"
-#include "core/Logger.h"
+#include "engine/core/Logger.h"
 #include "core/EditorState.h"
 #include "widgets/SearchBar.h"
 #include "theme/Fonts.h"
@@ -12,6 +12,16 @@
 #include <cctype>
 
 namespace EngineEditor {
+
+static ImVec4 GetLogSeverityColor(LogSeverity severity) {
+    const auto& pal = Theme::GetPalette();
+    switch (severity) {
+        case LogSeverity::Info:    return pal.textPrimary;
+        case LogSeverity::Warning: return pal.statusWarning;
+        case LogSeverity::Error:   return pal.statusError;
+        default:                   return pal.textSecondary;
+    }
+}
 
 static char s_ConsoleFilter[128] = "";
 static bool s_AutoScroll = true;
@@ -73,7 +83,7 @@ void RenderOutputLogPanel(bool* pOpen) {
                     continue;
                 }
 
-                ImVec4 color = Logger::GetSeverityColor(log.severity);
+                ImVec4 color = GetLogSeverityColor(log.severity);
 
                 ImGui::TextDisabled("[%s]", log.timestamp.c_str());
                 ImGui::SameLine();

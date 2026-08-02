@@ -1,6 +1,6 @@
 #include "MeshStudioPanel.h"
 #include "core/EditorState.h"
-#include "core/Logger.h"
+#include "engine/core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 #include "widgets/PropertyRow.h"

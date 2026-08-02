@@ -20,9 +20,10 @@
 #include "render/ViewportRenderer.h"
 #include "render/ZeGFXAdapter.h"
 #include "render/SplashScreen.h"
-#include "core/BackgroundAssetCooker.h"
-#include "core/AssetRegistry.h"
+#include "engine/assets/BackgroundAssetCooker.h"
+#include "engine/assets/AssetRegistry.h"
 #include "core/WindowsFileDialog.h"
+#include "panels/AssetCooking/AssetCookingOverlayPanel.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -228,7 +229,7 @@ static void RenderFrame() {
     }
 
     // Render background asset cooking progress overlay & notifications
-    EngineEditor::BackgroundAssetCooker::Get().RenderCookingOverlay();
+    EngineEditor::RenderAssetCookingOverlay(EngineEditor::BackgroundAssetCooker::Get());
 
     auto tLayout = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t2).count();
 

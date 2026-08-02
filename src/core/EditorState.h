@@ -4,7 +4,7 @@
 #include <string>
 #include <cstdint>
 #include "EditorCamera.h"
-#include "SceneGraph.h"
+#include "engine/scene/SceneGraph.h"
 
 namespace EngineEditor {
 
@@ -128,8 +128,9 @@ struct ZeGFXFoliageSettings {
 };
 
 struct RenderSettings {
-    // Quality Presets (0: Low, 1: Medium, 2: High)
-    int qualityPreset = 1;
+    // Quality Presets (0: Low, 1: Medium, 2: High, 3: Ultra)
+    int qualityPreset = 3;
+    int lightingDebugMode = 0; // 0: Default Lit, 1: Unlit, 2: LightingOnly, etc.
 
     // Presentation & VSync Controls
     bool enableVSync = false;

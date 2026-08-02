@@ -1,6 +1,8 @@
 #include "Gizmos.h"
+#include "ViewportPicker.h"
+#include "ViewportMath.h"
 #include "core/EditorState.h"
-#include "core/SceneGraph.h"
+#include "engine/scene/SceneGraph.h"
 #include "core/CommandStack.h"
 #include "third_party/ImGuizmo/ImGuizmo.h"
 
@@ -94,7 +96,7 @@ void RenderViewportGizmos(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 viewpor
     }
 
     ImGuizmo::BeginFrame();
-    ImGuizmo::SetDrawlist(drawList);
+    ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
     ImGuizmo::SetRect(cursorPos.x, cursorPos.y, viewportAvail.x, viewportAvail.y);
 
     auto& transform = EditorState::Get().activeTransform;
@@ -132,16 +134,9 @@ void RenderViewportGizmos(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 viewpor
     float aspectRatio = (viewportAvail.y > 0.0f) ? (viewportAvail.x / viewportAvail.y) : 1.777f;
     camera.GetProjectionMatrix(aspectRatio, projMatrix);
 
-    float modelMatrix[16];
-    ImGuizmo::RecomposeMatrixFromComponents(transform.location, transform.rotation, transform.scale, modelMatrix);
-
-    ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
-    if (EditorState::Get().gizmoOp == GizmoOperation::Rotate) op = ImGuizmo::ROTATE;
-    else if (EditorState::Get().gizmoOp == GizmoOperation::Scale) op = ImGuizmo::SCALE;
-
     // Handle Multi-Selection Group Center
     const auto& selectedNames = EditorState::Get().selectedNodeNames;
-    if (selectedNames.size() > 1) {
+    if (selectedNames.size() > 1 && !wasUsingBeforeManipulate) {
         float avgLoc[3] = { 0.0f, 0.0f, 0.0f };
         int validCount = 0;
         for (const auto& name : selectedNames) {
@@ -166,6 +161,17 @@ void RenderViewportGizmos(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 viewpor
         transform.location[1] += EditorState::Get().customPivotOffset[1];
         transform.location[2] += EditorState::Get().customPivotOffset[2];
     }
+
+    float oldLoc[3]   = { transform.location[0], transform.location[1], transform.location[2] };
+    float oldRot[3]   = { transform.rotation[0], transform.rotation[1], transform.rotation[2] };
+    float oldScale[3] = { transform.scale[0], transform.scale[1], transform.scale[2] };
+
+    float modelMatrix[16];
+    ImGuizmo::RecomposeMatrixFromComponents(transform.location, transform.rotation, transform.scale, modelMatrix);
+
+    ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
+    if (EditorState::Get().gizmoOp == GizmoOperation::Rotate) op = ImGuizmo::ROTATE;
+    else if (EditorState::Get().gizmoOp == GizmoOperation::Scale) op = ImGuizmo::SCALE;
 
     // Force LOCAL mode for scale operations
     ImGuizmo::MODE mode = (op == ImGuizmo::SCALE)
@@ -192,8 +198,8 @@ void RenderViewportGizmos(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 viewpor
     }
 
     // Gate gizmo interaction behind camera state (disable while Fly/Orbit/Pan).
-    const bool isCameraIdle = (camera.GetMode() == CameraMode::Idle);
-    ImGuizmo::Enable(isCameraIdle);
+    const bool cameraIsIdle = (EditorState::Get().camera.GetMode() == CameraMode::Idle);
+    ImGuizmo::Enable(cameraIsIdle);
 
     ImGuizmo::Manipulate(viewMatrix, projMatrix, op, mode, modelMatrix, nullptr, pSnap);
 
@@ -202,17 +208,68 @@ void RenderViewportGizmos(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 viewpor
     if (isUsingNow) {
         ImGuizmo::DecomposeMatrixToComponents(modelMatrix, transform.location, transform.rotation, transform.scale);
 
-        node->location[0] = transform.location[0];
-        node->location[1] = transform.location[1];
-        node->location[2] = transform.location[2];
+        // V-key vertex snapping while manipulating gizmo
+        if (ImGui::IsKeyDown(ImGuiKey_V)) {
+            ImVec2 mousePos = ImGui::GetMousePos();
+            ViewportMath::Ray3D vRay = ViewportMath::ScreenToWorldRay(mousePos, cursorPos, viewportAvail, viewMatrix, projMatrix);
+            Vec3f snapVertex;
+            if (ViewportPicker::Get().FindClosestVertex(vRay, viewMatrix, projMatrix, cursorPos, viewportAvail, snapVertex)) {
+                transform.location[0] = snapVertex.x;
+                transform.location[1] = snapVertex.y;
+                transform.location[2] = snapVertex.z;
+            }
+        }
 
-        node->rotation[0] = transform.rotation[0];
-        node->rotation[1] = transform.rotation[1];
-        node->rotation[2] = transform.rotation[2];
+        float deltaLoc[3] = {
+            transform.location[0] - oldLoc[0],
+            transform.location[1] - oldLoc[1],
+            transform.location[2] - oldLoc[2]
+        };
+        float deltaRot[3] = {
+            transform.rotation[0] - oldRot[0],
+            transform.rotation[1] - oldRot[1],
+            transform.rotation[2] - oldRot[2]
+        };
+        float deltaScale[3] = {
+            transform.scale[0] - oldScale[0],
+            transform.scale[1] - oldScale[1],
+            transform.scale[2] - oldScale[2]
+        };
 
-        node->scale[0] = transform.scale[0];
-        node->scale[1] = transform.scale[1];
-        node->scale[2] = transform.scale[2];
+        if (selectedNames.size() > 1) {
+            for (const auto& name : selectedNames) {
+                SceneNode* sNode = SceneGraph::Get().FindNodeMutable(name);
+                if (sNode) {
+                    sNode->location[0] += deltaLoc[0];
+                    sNode->location[1] += deltaLoc[1];
+                    sNode->location[2] += deltaLoc[2];
+
+                    sNode->rotation[0] += deltaRot[0];
+                    sNode->rotation[1] += deltaRot[1];
+                    sNode->rotation[2] += deltaRot[2];
+
+                    sNode->scale[0] += deltaScale[0];
+                    sNode->scale[1] += deltaScale[1];
+                    sNode->scale[2] += deltaScale[2];
+
+                    SceneGraph::Get().SyncNodeComponents(*sNode);
+                }
+            }
+        } else {
+            node->location[0] = transform.location[0];
+            node->location[1] = transform.location[1];
+            node->location[2] = transform.location[2];
+
+            node->rotation[0] = transform.rotation[0];
+            node->rotation[1] = transform.rotation[1];
+            node->rotation[2] = transform.rotation[2];
+
+            node->scale[0] = transform.scale[0];
+            node->scale[1] = transform.scale[1];
+            node->scale[2] = transform.scale[2];
+
+            SceneGraph::Get().SyncNodeComponents(*node);
+        }
     }
 
     // Drag start: base the "before" snapshot on the last idle transform we

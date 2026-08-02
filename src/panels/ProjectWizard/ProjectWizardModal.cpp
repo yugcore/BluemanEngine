@@ -1,5 +1,5 @@
 #include "ProjectWizardModal.h"
-#include "core/Logger.h"
+#include "engine/core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 

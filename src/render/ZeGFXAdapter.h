@@ -37,6 +37,7 @@ public:
     zegfx::RenderMeshHandle LoadMeshAsset(const std::string& meshPath);
     zegfx::RenderMaterialHandle LoadMaterialAsset(const std::string& matPath);
     void CreateDefaultPrimitives();
+    void SetLightingDebugMode(int mode);
 
     // Render target redirection
     void SetOutputRenderTarget(ID3D12Resource* rtResource, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle);
@@ -49,6 +50,7 @@ private:
     uint32_t m_Width = 1280;
     uint32_t m_Height = 720;
     float m_TimeAccumulator = 0.0f;
+    float m_PhysicsAccumulator = 0.0f;
     std::unique_ptr<zegfx::Renderer> m_Renderer;
     std::unique_ptr<zephysics::PhysicsWorld> m_PhysicsWorld;
 
@@ -57,6 +59,11 @@ private:
 
     zegfx::RenderMaterialHandle m_DefaultMaterialHandle = {};
     zegfx::RenderMeshHandle m_DefaultMeshHandle = {};
+    zegfx::RenderMaterialHandle m_DefaultPlaneMaterialHandle = {};
+    zegfx::RenderMeshHandle m_DefaultPlaneMeshHandle = {};
+    zegfx::RenderMeshHandle m_DefaultSphereMeshHandle = {};
+    zegfx::RenderMeshHandle m_DefaultCylinderMeshHandle = {};
+    zegfx::RenderMeshHandle m_DefaultConeMeshHandle = {};
 
     std::unordered_map<std::string, zegfx::RenderMeshHandle> m_LoadedMeshes;
     std::unordered_map<std::string, zegfx::RenderMaterialHandle> m_LoadedMaterials;

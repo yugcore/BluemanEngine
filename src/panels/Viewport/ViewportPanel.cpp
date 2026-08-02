@@ -11,9 +11,9 @@
 #include "render/ViewportRenderer.h"
 #include "render/ZeGFXAdapter.h"
 #include "core/EditorState.h"
-#include "core/SceneGraph.h"
+#include "engine/scene/SceneGraph.h"
+#include "engine/core/Logger.h"
 #include "core/CommandStack.h"
-#include "core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 
@@ -30,7 +30,6 @@ static int s_QualityIdx = 0;
 static int s_ShowFlags = 7;
 
 static void RenderStatusPill(const char* label, const ImVec4& color) {
-    const auto& pal = Theme::GetPalette();
     ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(28, 34, 44, 255));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(40, 48, 60, 255));
     ImGui::PushStyleColor(ImGuiCol_Text, color);
@@ -204,8 +203,9 @@ void RenderViewportPanel(bool* pOpen) {
                 node.id = SceneGraph::Get().GenerateNodeId();
                 node.name = "Sphere";
                 node.type = SceneNodeType::Actor;
-                node.meshPath = "Engine/DefaultCube";
+                node.meshPath = "Engine/DefaultSphere";
                 SceneGraph::Get().AddNode(node);
+                ZeGFXAdapter::Get().CreateDefaultPrimitives();
             }
             ImGui::SameLine(0.0f, 12.0f);
             if (ImGui::Button("+ Plane", ImVec2(100.0f, 26.0f))) {
@@ -213,8 +213,9 @@ void RenderViewportPanel(bool* pOpen) {
                 node.id = SceneGraph::Get().GenerateNodeId();
                 node.name = "Plane";
                 node.type = SceneNodeType::Actor;
-                node.meshPath = "Engine/DefaultCube";
+                node.meshPath = "Engine/DefaultPlane";
                 SceneGraph::Get().AddNode(node);
+                ZeGFXAdapter::Get().CreateDefaultPrimitives();
             }
         }
         ImGui::EndChild();
@@ -226,11 +227,14 @@ void RenderViewportPanel(bool* pOpen) {
     // Drag-and-drop target handling
     float viewMat[16], projMat[16];
     camera.GetViewMatrix(viewMat);
-    camera.GetProjectionMatrix(viewportAvail.x / viewportAvail.y, projMat);
+    float aspect = (viewportAvail.y > 0.0f) ? (viewportAvail.x / viewportAvail.y) : 1.777f;
+    camera.GetProjectionMatrix(aspect, projMat);
     Panels::ViewportDragDrop::Get().HandleDragDropTarget(cursorPos, viewportAvail, viewMat, projMat);
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const auto& pal = Theme::GetPalette();
+
+    Panels::ViewportDragDrop::Get().RenderGhostPreview(drawList, cursorPos, viewportAvail, viewMat, projMat);
 
     // Render Speed Readout HUD Overlay when Fly Mode or Speed Tuning is Active
     if (camera.IsSpeedTuningActive() || camera.GetMode() == CameraMode::Fly) {
@@ -317,6 +321,8 @@ void RenderViewportPanel(bool* pOpen) {
         for (int r = 0; r < 7; ++r) {
             if (ImGui::MenuItem(renderPassNames[r], nullptr, s_RenderPassMode == r)) {
                 s_RenderPassMode = r;
+                int debugMap[] = { 0, 1, 7, 3, 4, 10, 8 };
+                EngineEditor::ZeGFXAdapter::Get().SetLightingDebugMode(debugMap[r]);
             }
         }
         ImGui::EndPopup();
@@ -324,16 +330,12 @@ void RenderViewportPanel(bool* pOpen) {
 
     // --- Right-Aligned Live Engine Status Readouts (Unlocked Dynamic FPS) ---
     const auto& stats = EditorState::Get().stats;
-    uint32_t entCount = (uint32_t)SceneGraph::Get().GetRootNodes().size();
-    
-    float realFps = (io.DeltaTime > 0.00001f) ? (1.0f / io.DeltaTime) : 60.0f;
-    float realMs = io.DeltaTime * 1000.0f;
 
-    char fpsBuf[32]; snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.1f", realFps);
-    char msBuf[32]; snprintf(msBuf, sizeof(msBuf), "Frame: %.2f ms", realMs);
+    char fpsBuf[32]; snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.1f", stats.fps);
+    char msBuf[32]; snprintf(msBuf, sizeof(msBuf), "Frame: %.2f ms", stats.frameTimeMs);
     char drrBuf[32]; snprintf(drrBuf, sizeof(drrBuf), "DRR: %s", qualNames[s_QualityIdx]);
     char wpBuf[48]; snprintf(wpBuf, sizeof(wpBuf), "WP: 2 Cells");
-    char entBuf[32]; snprintf(entBuf, sizeof(entBuf), "Entities: %u", entCount);
+    char entBuf[32]; snprintf(entBuf, sizeof(entBuf), "Entities: %u", stats.entityCount);
 
     const float pillPaddingX = 16.0f;
     const float gap = Theme::Metrics::intraGroupGap;
@@ -372,7 +374,7 @@ void RenderViewportPanel(bool* pOpen) {
 
     if (ImGui::Button(entBuf)) ImGui::OpenPopup("EntitiesPopup");
     if (ImGui::BeginPopup("EntitiesPopup")) {
-        ImGui::Text("Active Scene Entities: %u", entCount);
+        ImGui::Text("Active Scene Entities: %u", stats.entityCount);
         ImGui::Separator();
         ImGui::MenuItem("Select All Entities");
         ImGui::MenuItem("Hide Unselected Entities");

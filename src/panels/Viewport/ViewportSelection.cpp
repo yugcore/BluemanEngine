@@ -1,7 +1,7 @@
 #include "ViewportSelection.h"
 #include "ViewportPicker.h"
 #include "core/EditorState.h"
-#include "core/SceneGraph.h"
+#include "engine/scene/SceneGraph.h"
 #include "core/CommandStack.h"
 #include <algorithm>
 
@@ -160,12 +160,7 @@ void ViewportSelection::EndMarquee(ImVec2 cursorPos, ImVec2 viewportAvail, const
     std::vector<std::string> newSel = (shiftHeld || ctrlHeld) ? oldSel : std::vector<std::string>();
 
     auto checkNodeIntersection = [&](auto& self, const SceneNode& node) -> void {
-        AABB box;
-        float halfX = std::max(0.5f, std::abs(node.scale[0]) * 0.5f);
-        float halfY = std::max(0.5f, std::abs(node.scale[1]) * 0.5f);
-        float halfZ = std::max(0.5f, std::abs(node.scale[2]) * 0.5f);
-        box.minBounds = Vec3f(node.location[0] - halfX, node.location[1] - halfY, node.location[2] - halfZ);
-        box.maxBounds = Vec3f(node.location[0] + halfX, node.location[1] + halfY, node.location[2] + halfZ);
+        AABB box = ViewportPicker::ComputeNodeWorldAABB(node);
 
         if (ViewportMath::ScreenRectIntersectsAABB(minRect, maxRect, box, view, proj, cursorPos, viewportAvail)) {
             if (ctrlHeld) {

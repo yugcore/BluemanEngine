@@ -1,7 +1,8 @@
 #include "ZeGFXAdapter.h"
 #include "zegfx.h"
 #include "core/EditorState.h"
-#include "core/SceneGraph.h"
+#include "core/ComponentRegistry.h"
+#include "engine/scene/SceneGraph.h"
 
 #include <iostream>
 #include <vector>
@@ -30,7 +31,7 @@ bool ZeGFXAdapter::Initialize(ID3D12Device* device, HWND hwnd, uint32_t width, u
     m_Width = width > 0 ? width : 1280;
     m_Height = height > 0 ? height : 720;
 
-    zegfx::RendererSettings settings = zegfx::RendererSettings::fromPreset(zegfx::QualityPreset::Medium);
+    zegfx::RendererSettings settings = zegfx::RendererSettings::fromPreset(zegfx::QualityPreset::Ultra);
     settings.outputWidth = m_Width;
     settings.outputHeight = m_Height;
     settings.requestedTier = zegfx::CapabilityTier::Tier2_DXR_Effects;
@@ -121,11 +122,139 @@ void ZeGFXAdapter::CreateDefaultPrimitives() {
     m_LoadedMeshes["DefaultCube"] = m_DefaultMeshHandle;
     m_LoadedMeshes["cube"] = m_DefaultMeshHandle;
     m_LoadedMeshes["Engine/DefaultCube"] = m_DefaultMeshHandle;
+    m_LoadedMeshes["primitives/cube.zmesh"] = m_DefaultMeshHandle;
+
+    // Create default Ground Plane mesh (100m x 100m at Y=0)
+    std::vector<zegfx::ProceduralVertex> planeVerts;
+    std::vector<uint32_t> planeIndices;
+    float halfSize = 50.0f;
+    float uvTile = 10.0f;
+    zegfx::ProceduralVertex p0 = { -halfSize, 0.0f,  halfSize, 0.0f, 1.0f, 0.0f, 0.0f,   0.0f,   whiteColor };
+    zegfx::ProceduralVertex p1 = {  halfSize, 0.0f,  halfSize, 0.0f, 1.0f, 0.0f, uvTile, 0.0f,   whiteColor };
+    zegfx::ProceduralVertex p2 = {  halfSize, 0.0f, -halfSize, 0.0f, 1.0f, 0.0f, uvTile, uvTile, whiteColor };
+    zegfx::ProceduralVertex p3 = { -halfSize, 0.0f, -halfSize, 0.0f, 1.0f, 0.0f, 0.0f,   uvTile, whiteColor };
+    planeVerts.push_back(p0); planeVerts.push_back(p1); planeVerts.push_back(p2); planeVerts.push_back(p3);
+    planeIndices = { 0, 1, 2, 0, 2, 3 };
+
+    m_DefaultPlaneMeshHandle = m_Renderer->createProceduralMesh(planeVerts, planeIndices);
+    m_LoadedMeshes["DefaultPlane"] = m_DefaultPlaneMeshHandle;
+    m_LoadedMeshes["plane"] = m_DefaultPlaneMeshHandle;
+    m_LoadedMeshes["Engine/DefaultPlane"] = m_DefaultPlaneMeshHandle;
+    m_LoadedMeshes["primitives/plane.zmesh"] = m_DefaultPlaneMeshHandle;
+
+    // Create default Sphere mesh (UV Sphere, r=0.5)
+    std::vector<zegfx::ProceduralVertex> sphereVerts;
+    std::vector<uint32_t> sphereIndices;
+    const int sphereStacks = 16;
+    const int sphereSlices = 16;
+    const float radius = 0.5f;
+    const float PI = 3.1415926535f;
+
+    for (int i = 0; i <= sphereStacks; ++i) {
+        float V = (float)i / (float)sphereStacks;
+        float phi = V * PI;
+        for (int j = 0; j <= sphereSlices; ++j) {
+            float U = (float)j / (float)sphereSlices;
+            float theta = U * (2.0f * PI);
+
+            float x = std::cos(theta) * std::sin(phi);
+            float y = std::cos(phi);
+            float z = std::sin(theta) * std::sin(phi);
+
+            zegfx::ProceduralVertex v;
+            v.x = x * radius; v.y = y * radius; v.z = z * radius;
+            v.nx = x; v.ny = y; v.nz = z;
+            v.u = U; v.v = V;
+            v.color = whiteColor;
+            sphereVerts.push_back(v);
+        }
+    }
+    for (int i = 0; i < sphereStacks; ++i) {
+        for (int j = 0; j < sphereSlices; ++j) {
+            uint32_t first = (i * (sphereSlices + 1)) + j;
+            uint32_t second = first + sphereSlices + 1;
+            sphereIndices.push_back(first);
+            sphereIndices.push_back(second);
+            sphereIndices.push_back(first + 1);
+
+            sphereIndices.push_back(second);
+            sphereIndices.push_back(second + 1);
+            sphereIndices.push_back(first + 1);
+        }
+    }
+    m_DefaultSphereMeshHandle = m_Renderer->createProceduralMesh(sphereVerts, sphereIndices);
+    m_LoadedMeshes["DefaultSphere"] = m_DefaultSphereMeshHandle;
+    m_LoadedMeshes["sphere"] = m_DefaultSphereMeshHandle;
+    m_LoadedMeshes["Engine/DefaultSphere"] = m_DefaultSphereMeshHandle;
+    m_LoadedMeshes["primitives/sphere.zmesh"] = m_DefaultSphereMeshHandle;
+
+    // Create default Cylinder mesh (r=0.5, h=1.0)
+    std::vector<zegfx::ProceduralVertex> cylVerts;
+    std::vector<uint32_t> cylIndices;
+    const int cylSlices = 16;
+    for (int i = 0; i <= cylSlices; ++i) {
+        float u = (float)i / (float)cylSlices;
+        float theta = u * 2.0f * PI;
+        float cosT = std::cos(theta);
+        float sinT = std::sin(theta);
+
+        zegfx::ProceduralVertex vTop = { cosT * 0.5f,  0.5f, sinT * 0.5f, cosT, 0.0f, sinT, u, 0.0f, whiteColor };
+        zegfx::ProceduralVertex vBot = { cosT * 0.5f, -0.5f, sinT * 0.5f, cosT, 0.0f, sinT, u, 1.0f, whiteColor };
+        cylVerts.push_back(vTop);
+        cylVerts.push_back(vBot);
+    }
+    for (int i = 0; i < cylSlices; ++i) {
+        uint32_t idx = i * 2;
+        cylIndices.push_back(idx);
+        cylIndices.push_back(idx + 1);
+        cylIndices.push_back(idx + 2);
+        cylIndices.push_back(idx + 1);
+        cylIndices.push_back(idx + 3);
+        cylIndices.push_back(idx + 2);
+    }
+    m_DefaultCylinderMeshHandle = m_Renderer->createProceduralMesh(cylVerts, cylIndices);
+    m_LoadedMeshes["DefaultCylinder"] = m_DefaultCylinderMeshHandle;
+    m_LoadedMeshes["cylinder"] = m_DefaultCylinderMeshHandle;
+    m_LoadedMeshes["Engine/DefaultCylinder"] = m_DefaultCylinderMeshHandle;
+    m_LoadedMeshes["primitives/cylinder.zmesh"] = m_DefaultCylinderMeshHandle;
+
+    // Create default Cone mesh (r=0.5, h=1.0)
+    std::vector<zegfx::ProceduralVertex> coneVerts;
+    std::vector<uint32_t> coneIndices;
+    const int coneSlices = 16;
+    zegfx::ProceduralVertex apex = { 0.0f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 0.0f, whiteColor };
+    coneVerts.push_back(apex);
+    for (int i = 0; i <= coneSlices; ++i) {
+        float u = (float)i / (float)coneSlices;
+        float theta = u * 2.0f * PI;
+        float cosT = std::cos(theta);
+        float sinT = std::sin(theta);
+        zegfx::ProceduralVertex v = { cosT * 0.5f, -0.5f, sinT * 0.5f, cosT, 0.5f, sinT, u, 1.0f, whiteColor };
+        coneVerts.push_back(v);
+    }
+    for (int i = 1; i <= coneSlices; ++i) {
+        coneIndices.push_back(0);
+        coneIndices.push_back(i);
+        coneIndices.push_back(i + 1);
+    }
+    m_DefaultConeMeshHandle = m_Renderer->createProceduralMesh(coneVerts, coneIndices);
+    m_LoadedMeshes["DefaultCone"] = m_DefaultConeMeshHandle;
+    m_LoadedMeshes["cone"] = m_DefaultConeMeshHandle;
+    m_LoadedMeshes["Engine/DefaultCone"] = m_DefaultConeMeshHandle;
+    m_LoadedMeshes["primitives/cone.zmesh"] = m_DefaultConeMeshHandle;
+}
+
+void ZeGFXAdapter::SetLightingDebugMode(int mode) {
+    EditorState::Get().settings.lightingDebugMode = mode;
+    if (m_Renderer) {
+        m_Renderer->setLightingDebugMode((zegfx::LightingDebugMode)mode);
+    }
 }
 
 zegfx::RenderMeshHandle ZeGFXAdapter::LoadMeshAsset(const std::string& meshPath) {
     if (meshPath.empty()) return m_DefaultMeshHandle;
-
+    
+    // Check map cache first
     auto it = m_LoadedMeshes.find(meshPath);
     if (it != m_LoadedMeshes.end()) return it->second;
 
@@ -186,38 +315,67 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
 
     const auto& edSettings = EditorState::Get().settings;
 
-    // Check if any renderer settings actually changed before calling expensive updateSettings()
+    // Set offscreen RTV target on ZeGFX backend
+    if (m_ActiveRtvHandle.ptr != 0) {
+        m_Renderer->setExternalRenderTargetCPU(m_ActiveRtvHandle.ptr);
+    }
+
+    // Set lighting debug mode
+    m_Renderer->setLightingDebugMode((zegfx::LightingDebugMode)edSettings.lightingDebugMode);
+
     static bool s_FirstSync = true;
     static uint32_t s_LastWidth = 0, s_LastHeight = 0;
-    static bool s_LastRtAO = false, s_LastRtRefl = false, s_LastRtGI = false, s_LastFog = false;
-    static int s_LastShadowRes = 0;
+    static RenderSettings s_LastSettings = {};
 
     bool rtAO = (edSettings.ao.mode == 2) || edSettings.rtAO;
     bool rtRefl = edSettings.rtReflections;
     bool rtGI = edSettings.rtGI;
     bool fog = edSettings.fog.enableVolumetric;
-    int shadowRes = edSettings.shadow.cascadeResolution;
 
     bool settingsChanged = s_FirstSync ||
                            (s_LastWidth != m_Width) ||
                            (s_LastHeight != m_Height) ||
-                           (s_LastRtAO != rtAO) ||
-                           (s_LastRtRefl != rtRefl) ||
-                           (s_LastRtGI != rtGI) ||
-                           (s_LastFog != fog) ||
-                           (s_LastShadowRes != shadowRes);
+                           (s_LastSettings.qualityPreset != edSettings.qualityPreset) ||
+                           (s_LastSettings.rtAO != edSettings.rtAO) ||
+                           (s_LastSettings.rtReflections != edSettings.rtReflections) ||
+                           (s_LastSettings.rtGI != edSettings.rtGI) ||
+                           (s_LastSettings.giRaysPerProbe != edSettings.giRaysPerProbe) ||
+                           (s_LastSettings.giProbesUpdatedPerFrame != edSettings.giProbesUpdatedPerFrame) ||
+                           (s_LastSettings.fog.enableVolumetric != edSettings.fog.enableVolumetric) ||
+                           (s_LastSettings.fog.density != edSettings.fog.density) ||
+                           (s_LastSettings.fog.color[0] != edSettings.fog.color[0]) ||
+                           (s_LastSettings.fog.color[1] != edSettings.fog.color[1]) ||
+                           (s_LastSettings.fog.color[2] != edSettings.fog.color[2]) ||
+                           (s_LastSettings.shadow.cascadeResolution != edSettings.shadow.cascadeResolution) ||
+                           (s_LastSettings.shadow.cascadeCount != edSettings.shadow.cascadeCount) ||
+                           (s_LastSettings.shadow.maxDistance != edSettings.shadow.maxDistance) ||
+                           (s_LastSettings.shadow.constantBias != edSettings.shadow.constantBias) ||
+                           (s_LastSettings.shadow.slopeBias != edSettings.shadow.slopeBias) ||
+                           (s_LastSettings.shadow.normalBias != edSettings.shadow.normalBias) ||
+                           (s_LastSettings.shadow.filterSoftness != edSettings.shadow.filterSoftness) ||
+                           (s_LastSettings.ao.mode != edSettings.ao.mode) ||
+                           (s_LastSettings.ao.radius != edSettings.ao.radius) ||
+                           (s_LastSettings.ao.intensity != edSettings.ao.intensity) ||
+                           (s_LastSettings.ao.temporalFiltering != edSettings.ao.temporalFiltering) ||
+                           (s_LastSettings.postFX.autoExposure != edSettings.postFX.autoExposure) ||
+                           (s_LastSettings.postFX.exposureEV != edSettings.postFX.exposureEV) ||
+                           (s_LastSettings.postFX.bloomIntensity != edSettings.postFX.bloomIntensity) ||
+                           (s_LastSettings.postFX.bloomThreshold != edSettings.postFX.bloomThreshold);
 
     if (settingsChanged) {
         s_FirstSync = false;
         s_LastWidth = m_Width;
         s_LastHeight = m_Height;
-        s_LastRtAO = rtAO;
-        s_LastRtRefl = rtRefl;
-        s_LastRtGI = rtGI;
-        s_LastFog = fog;
-        s_LastShadowRes = shadowRes;
+        s_LastSettings = edSettings;
 
-        zegfx::RendererSettings rSettings = m_Renderer->getSettings();
+        int preset = edSettings.qualityPreset;
+        zegfx::QualityPreset qp = zegfx::QualityPreset::Ultra;
+        if (preset == 0) qp = zegfx::QualityPreset::Low;
+        else if (preset == 1) qp = zegfx::QualityPreset::Medium;
+        else if (preset == 2) qp = zegfx::QualityPreset::High;
+        else qp = zegfx::QualityPreset::Ultra;
+
+        zegfx::RendererSettings rSettings = zegfx::RendererSettings::fromPreset(qp);
         rSettings.outputWidth = m_Width;
         rSettings.outputHeight = m_Height;
 
@@ -299,14 +457,78 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
 
     auto traverseNodes = [&](auto& self, const std::vector<SceneNode>& nodes) -> void {
         for (const auto& node : nodes) {
-            if (node.type == SceneNodeType::Actor || node.type == SceneNodeType::Terrain) {
-                zegfx::RenderInstance inst = {};
-                inst.mesh = LoadMeshAsset(node.meshPath);
-                inst.material = LoadMaterialAsset(node.materialPath);
+            const TransformComponent* transformComp = ComponentRegistry::Get().GetComponent<TransformComponent>(node.id);
+            const MeshComponent* meshComp = ComponentRegistry::Get().GetComponent<MeshComponent>(node.id);
+            const MaterialComponent* matComp = ComponentRegistry::Get().GetComponent<MaterialComponent>(node.id);
+            const LightComponent* lightComp = ComponentRegistry::Get().GetComponent<LightComponent>(node.id);
 
-                float pitch = node.rotation[0] * 3.14159265f / 180.0f;
-                float yaw   = node.rotation[1] * 3.14159265f / 180.0f;
-                float roll  = node.rotation[2] * 3.14159265f / 180.0f;
+            float loc[3] = { node.location[0], node.location[1], node.location[2] };
+            float rot[3] = { node.rotation[0], node.rotation[1], node.rotation[2] };
+            float scl[3] = { node.scale[0], node.scale[1], node.scale[2] };
+            std::string meshPath = node.meshPath;
+            std::string matPath = node.materialPath;
+
+            if (transformComp) {
+                loc[0] = transformComp->location[0]; loc[1] = transformComp->location[1]; loc[2] = transformComp->location[2];
+                rot[0] = transformComp->rotation[0]; rot[1] = transformComp->rotation[1]; rot[2] = transformComp->rotation[2];
+                scl[0] = transformComp->scale[0];    scl[1] = transformComp->scale[1];    scl[2] = transformComp->scale[2];
+            }
+            if (meshComp && !meshComp->meshPath.empty()) {
+                meshPath = meshComp->meshPath;
+            }
+            if (matComp && !matComp->materialPath.empty()) {
+                matPath = matComp->materialPath;
+            }
+
+            if (node.type == SceneNodeType::FoliageCluster) {
+                // High-density foliage instancing (trees, shrubs, grass) across 500m-1km area
+                const int numTrees = node.treeCount > 0 ? node.treeCount : 100;
+                std::string foliageMesh = meshPath.empty() ? "Engine/DefaultCone" : meshPath;
+                std::string foliageMat = matPath.empty() ? "DefaultPBRMaterial" : matPath;
+                for (int i = 0; i < numTrees; ++i) {
+                    float angle = (float)i * 0.125f;
+                    float dist = 20.0f + (float)(i % 50) * 15.0f; // Spans up to 770m
+                    float px = loc[0] + std::cos(angle) * dist;
+                    float pz = loc[2] + std::sin(angle) * dist;
+                    float py = loc[1] + (std::sin(px * 0.05f) + std::cos(pz * 0.05f)) * 3.5f;
+
+                    zegfx::RenderInstance inst = {};
+                    inst.mesh = LoadMeshAsset(foliageMesh);
+                    inst.material = LoadMaterialAsset(foliageMat);
+                    inst.world = zegfx::Mat4::identity();
+                    inst.world.m[0][0] = 1.0f + (float)(i % 3) * 0.4f; // Scale variation
+                    inst.world.m[1][1] = 1.5f + (float)(i % 4) * 0.5f; // Tree height variation
+                    inst.world.m[2][2] = 1.0f + (float)(i % 3) * 0.4f;
+                    inst.world.m[3][0] = px;
+                    inst.world.m[3][1] = py;
+                    inst.world.m[3][2] = pz;
+                    inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
+                    inst.visibilityFlags = 1; // Enables ExecuteIndirect / GPU compute culling
+                    m_OpaqueInstances.push_back(inst);
+                }
+            } else if (node.type == SceneNodeType::PathPoint) {
+                // Forest trail path marker
+                std::string pathMesh = meshPath.empty() ? "Engine/DefaultPlane" : meshPath;
+                std::string pathMat = matPath.empty() ? "DefaultPBRMaterial" : matPath;
+                zegfx::RenderInstance inst = {};
+                inst.mesh = LoadMeshAsset(pathMesh);
+                inst.material = LoadMaterialAsset(pathMat);
+                inst.world = zegfx::Mat4::identity();
+                inst.world.m[0][0] = 0.5f; inst.world.m[1][1] = 0.1f; inst.world.m[2][2] = 0.5f; // Flat path stone
+                inst.world.m[3][0] = loc[0];
+                inst.world.m[3][1] = loc[1];
+                inst.world.m[3][2] = loc[2];
+                inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
+                inst.visibilityFlags = 1;
+                m_OpaqueInstances.push_back(inst);
+            } else if (node.type == SceneNodeType::Actor || node.type == SceneNodeType::Terrain || meshComp != nullptr) {
+                zegfx::RenderInstance inst = {};
+                inst.mesh = LoadMeshAsset(meshPath);
+                inst.material = LoadMaterialAsset(matPath);
+
+                float pitch = rot[0] * 3.14159265f / 180.0f;
+                float yaw   = rot[1] * 3.14159265f / 180.0f;
+                float roll  = rot[2] * 3.14159265f / 180.0f;
 
                 float cx = std::cos(pitch), sx = std::sin(pitch);
                 float cy = std::cos(yaw),   sy = std::sin(yaw);
@@ -325,67 +547,39 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
                 float r22 = cy * cx;
 
                 inst.world = zegfx::Mat4::identity();
-                inst.world.m[0][0] = r00 * node.scale[0]; inst.world.m[0][1] = r01 * node.scale[0]; inst.world.m[0][2] = r02 * node.scale[0]; inst.world.m[0][3] = 0.0f;
-                inst.world.m[1][0] = r10 * node.scale[1]; inst.world.m[1][1] = r11 * node.scale[1]; inst.world.m[1][2] = r12 * node.scale[1]; inst.world.m[1][3] = 0.0f;
-                inst.world.m[2][0] = r20 * node.scale[2]; inst.world.m[2][1] = r21 * node.scale[2]; inst.world.m[2][2] = r22 * node.scale[2]; inst.world.m[2][3] = 0.0f;
-                inst.world.m[3][0] = node.location[0];    inst.world.m[3][1] = node.location[1];    inst.world.m[3][2] = node.location[2];    inst.world.m[3][3] = 1.0f;
+                inst.world.m[0][0] = r00 * scl[0]; inst.world.m[0][1] = r01 * scl[0]; inst.world.m[0][2] = r02 * scl[0]; inst.world.m[0][3] = 0.0f;
+                inst.world.m[1][0] = r10 * scl[1]; inst.world.m[1][1] = r11 * scl[1]; inst.world.m[1][2] = r12 * scl[1]; inst.world.m[1][3] = 0.0f;
+                inst.world.m[2][0] = r20 * scl[2]; inst.world.m[2][1] = r21 * scl[2]; inst.world.m[2][2] = r22 * scl[2]; inst.world.m[2][3] = 0.0f;
+                inst.world.m[3][0] = loc[0];       inst.world.m[3][1] = loc[1];       inst.world.m[3][2] = loc[2];       inst.world.m[3][3] = 1.0f;
 
                 inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
                 inst.visibilityFlags = 1;
                 m_OpaqueInstances.push_back(inst);
-            } else if (node.type == SceneNodeType::FoliageCluster) {
-                // High-density foliage instancing (trees, shrubs, grass) across 500m-1km area
-                const int numTrees = 0; // Default 0 for empty scene; set via foliage settings when enabled
-                for (int i = 0; i < numTrees; ++i) {
-                    float angle = (float)i * 0.125f;
-                    float dist = 20.0f + (float)(i % 50) * 15.0f; // Spans up to 770m
-                    float px = node.location[0] + std::cos(angle) * dist;
-                    float pz = node.location[2] + std::sin(angle) * dist;
-                    float py = node.location[1] + (std::sin(px * 0.05f) + std::cos(pz * 0.05f)) * 3.5f;
-
-                    zegfx::RenderInstance inst = {};
-                    inst.mesh = LoadMeshAsset(node.meshPath);
-                    inst.material = LoadMaterialAsset(node.materialPath);
-                    inst.world = zegfx::Mat4::identity();
-                    inst.world.m[0][0] = 1.0f + (float)(i % 3) * 0.4f; // Scale variation
-                    inst.world.m[1][1] = 1.5f + (float)(i % 4) * 0.5f; // Tree height variation
-                    inst.world.m[2][2] = 1.0f + (float)(i % 3) * 0.4f;
-                    inst.world.m[3][0] = px;
-                    inst.world.m[3][1] = py;
-                    inst.world.m[3][2] = pz;
-                    inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
-                    inst.visibilityFlags = 1; // Enables ExecuteIndirect / GPU compute culling
-                    m_OpaqueInstances.push_back(inst);
-                }
-            } else if (node.type == SceneNodeType::PathPoint) {
-                // Forest trail path marker
-                zegfx::RenderInstance inst = {};
-                inst.mesh = LoadMeshAsset(node.meshPath);
-                inst.material = LoadMaterialAsset(node.materialPath);
-                inst.world = zegfx::Mat4::identity();
-                inst.world.m[0][0] = 0.5f; inst.world.m[1][1] = 0.1f; inst.world.m[2][2] = 0.5f; // Flat path stone
-                inst.world.m[3][0] = node.location[0];
-                inst.world.m[3][1] = node.location[1];
-                inst.world.m[3][2] = node.location[2];
-                inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
-                inst.visibilityFlags = 1;
-                m_OpaqueInstances.push_back(inst);
-            } else if (node.type == SceneNodeType::Light) {
+            } else if (node.type == SceneNodeType::Light || lightComp != nullptr) {
                 zegfx::LocalLightData localLight = {};
-                if (node.name.find("Spot") != std::string::npos) {
-                    localLight.type = zegfx::LightType::Spot;
-                    localLight.range = 25.0f;
-                    localLight.intensity = 5000.0f;
-                    localLight.innerConeCos = 0.90f;
-                    localLight.outerConeCos = 0.70f;
+                if (lightComp) {
+                    localLight.type = (lightComp->lightType == 2) ? zegfx::LightType::Spot : zegfx::LightType::Point;
+                    localLight.range = lightComp->range;
+                    localLight.intensity = lightComp->intensity;
+                    localLight.innerConeCos = std::cos(lightComp->innerCone * 3.14159265f / 180.0f);
+                    localLight.outerConeCos = std::cos(lightComp->outerCone * 3.14159265f / 180.0f);
+                    localLight.color = { lightComp->color[0], lightComp->color[1], lightComp->color[2] };
                 } else {
-                    localLight.type = zegfx::LightType::Point;
-                    localLight.range = 15.0f;
-                    localLight.intensity = 2500.0f;
+                    if (node.name.find("Spot") != std::string::npos) {
+                        localLight.type = zegfx::LightType::Spot;
+                        localLight.range = 25.0f;
+                        localLight.intensity = 5000.0f;
+                        localLight.innerConeCos = 0.90f;
+                        localLight.outerConeCos = 0.70f;
+                    } else {
+                        localLight.type = zegfx::LightType::Point;
+                        localLight.range = 15.0f;
+                        localLight.intensity = 2500.0f;
+                    }
+                    localLight.color = { 1.0f, 0.90f, 0.70f };
                 }
-                localLight.position = { node.location[0], node.location[1] + 4.0f, node.location[2] };
+                localLight.position = { loc[0], loc[1] + 4.0f, loc[2] };
                 localLight.direction = { 0.0f, -1.0f, 0.0f };
-                localLight.color = { 1.0f, 0.90f, 0.70f };
                 m_LocalLights.push_back(localLight);
             }
             if (!node.children.empty()) {
@@ -455,6 +649,7 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
         }
     }
 
+    stats.entityCount = (uint32_t)m_OpaqueInstances.size();
     stats.gpuName = "DirectX 12 (ZeGFX Engine)";
     stats.apiTag = "ZeGFX v1.0.0 (DX12)";
 }
@@ -480,8 +675,15 @@ void ZeGFXAdapter::Render(ID3D12GraphicsCommandList* cmdList, uint32_t width, ui
     SyncEngineState(deltaTime);
 
     if (m_PhysicsWorld && deltaTime > 0.0f) {
-        float stepTime = (deltaTime > 0.033f) ? 0.033f : deltaTime;
-        m_PhysicsWorld->StepSimulation(stepTime);
+        constexpr float fixedStep = 1.0f / 60.0f;
+        constexpr float maxAccumulatedTime = 0.25f;
+        float frameTime = (deltaTime > maxAccumulatedTime) ? maxAccumulatedTime : deltaTime;
+
+        m_PhysicsAccumulator += frameTime;
+        while (m_PhysicsAccumulator >= fixedStep) {
+            m_PhysicsWorld->StepSimulation(fixedStep);
+            m_PhysicsAccumulator -= fixedStep;
+        }
     }
 }
 

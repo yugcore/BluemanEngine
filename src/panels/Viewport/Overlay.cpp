@@ -38,7 +38,7 @@ void RenderViewport3DOverlays(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 vie
 
     const auto& camera = EditorState::Get().camera;
     camera.GetViewMatrix(viewMat);
-    float aspect = viewportAvail.x / viewportAvail.y;
+    float aspect = (viewportAvail.y > 0.0f) ? (viewportAvail.x / viewportAvail.y) : 1.777f;
     camera.GetProjectionMatrix(aspect, projMat);
 
     bool showGrid = (showFlags & 1) != 0;
@@ -232,8 +232,21 @@ void RenderViewport3DOverlays(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 vie
             std::string nameLower = node.name;
             std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), ::tolower);
 
-            // Shape A: Cube / Box
-            if (nameLower.find("cube") != std::string::npos || (node.type == SceneNodeType::Actor && nameLower.find("sphere") == std::string::npos && nameLower.find("cylinder") == std::string::npos && nameLower.find("plane") == std::string::npos && nameLower.find("cone") == std::string::npos)) {
+            bool isPrimitiveMesh = node.meshPath.rfind("primitives/", 0) == 0 ||
+                                   node.meshPath == "DefaultCube" || node.meshPath == "cube" || node.meshPath == "Engine/DefaultCube" ||
+                                   node.meshPath == "DefaultPlane" || node.meshPath == "plane" || node.meshPath == "Engine/DefaultPlane" ||
+                                   node.meshPath == "DefaultSphere" || node.meshPath == "sphere" || node.meshPath == "Engine/DefaultSphere" ||
+                                   node.meshPath == "DefaultCylinder" || node.meshPath == "cylinder" || node.meshPath == "Engine/DefaultCylinder" ||
+                                   node.meshPath == "DefaultCone" || node.meshPath == "cone" || node.meshPath == "Engine/DefaultCone";
+
+            bool isCustomMesh = !node.meshPath.empty() && !isPrimitiveMesh &&
+                                (node.meshPath.find(".zmesh") != std::string::npos || 
+                                 node.meshPath.find(".gltf") != std::string::npos || 
+                                 node.meshPath.find(".glb") != std::string::npos || 
+                                 node.meshPath.find(".obj") != std::string::npos);
+
+            // Shape A: Cube / Box (only for primitive cubes or non-custom primitive actors)
+            if (!isCustomMesh && (nameLower.find("cube") != std::string::npos || (node.type == SceneNodeType::Actor && nameLower.find("sphere") == std::string::npos && nameLower.find("cylinder") == std::string::npos && nameLower.find("plane") == std::string::npos && nameLower.find("cone") == std::string::npos))) {
                 static float localVerts[8][3] = {
                     {-0.5f, -0.5f, -0.5f}, { 0.5f, -0.5f, -0.5f}, { 0.5f,  0.5f, -0.5f}, {-0.5f,  0.5f, -0.5f},
                     {-0.5f, -0.5f,  0.5f}, { 0.5f, -0.5f,  0.5f}, { 0.5f,  0.5f,  0.5f}, {-0.5f,  0.5f,  0.5f}
@@ -411,9 +424,6 @@ void RenderViewport3DOverlays(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 vie
     if (EditorState::Get().isMeasurementToolActive) {
         // Measurement rendering handled by ViewportMeasurement
     }
-}
-
-void RenderViewportStatsHUD(ImVec2 /*cursorPos*/) {
 }
 
 } // namespace EngineEditor::Panels

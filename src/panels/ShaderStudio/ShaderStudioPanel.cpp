@@ -1,6 +1,6 @@
 #include "ShaderStudioPanel.h"
 #include "core/EditorState.h"
-#include "core/Logger.h"
+#include "engine/core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Fonts.h"
 #include "theme/Metrics.h"

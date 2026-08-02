@@ -1,6 +1,6 @@
 #include "CommandStack.h"
-#include "SceneGraph.h"
-#include "Logger.h"
+#include "engine/scene/SceneGraph.h"
+#include "engine/core/Logger.h"
 #include <iostream>
 
 namespace EngineEditor {

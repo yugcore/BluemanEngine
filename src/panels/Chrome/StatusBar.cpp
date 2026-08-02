@@ -1,6 +1,6 @@
 #include "StatusBar.h"
 #include "core/EditorState.h"
-#include "core/BackgroundAssetCooker.h"
+#include "engine/assets/BackgroundAssetCooker.h"
 #include "panels/Codebase/CodeHighlighter.h"
 #include "theme/Fonts.h"
 #include "theme/Colors.h"

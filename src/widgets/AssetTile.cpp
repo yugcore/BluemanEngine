@@ -1,7 +1,7 @@
 #include "AssetTile.h"
 #include "theme/Colors.h"
-#include "core/SceneGraph.h"
-#include "core/Logger.h"
+#include "engine/scene/SceneGraph.h"
+#include "engine/core/Logger.h"
 #include "core/EditorState.h"
 #include <imgui_internal.h>
 #include <cmath>

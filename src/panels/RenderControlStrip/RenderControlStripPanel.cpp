@@ -1,7 +1,8 @@
 #include "RenderControlStripPanel.h"
+#include "render/ZeGFXAdapter.h"
 #include "core/EditorState.h"
-#include "core/SceneGraph.h"
-#include "core/Logger.h"
+#include "engine/scene/SceneGraph.h"
+#include "engine/core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 #include "theme/Fonts.h"
@@ -100,6 +101,13 @@ void RenderRenderControlStripPanel(bool* pOpen) {
                 settings.fog.enableVolumetric = true;
                 settings.shadow.cascadeResolution = 2048;
                 settings.shadow.cascadeCount = 4;
+            } else if (index == 3) { // Ultra (Cinematic 4K CSM)
+                settings.rtGI = true;
+                settings.rtAO = true;
+                settings.rtReflections = true;
+                settings.fog.enableVolumetric = true;
+                settings.shadow.cascadeResolution = 4096;
+                settings.shadow.cascadeCount = 4;
             }
             Logger::Get().Info(std::string("[RenderControlStrip] Quality Preset set to ") + label);
         }
@@ -109,6 +117,26 @@ void RenderRenderControlStripPanel(bool* pOpen) {
     presetBtn("Low", 0); ImGui::SameLine();
     presetBtn("Medium", 1); ImGui::SameLine();
     presetBtn("High", 2); ImGui::SameLine();
+    presetBtn("Ultra", 3);
+
+    ImGui::Spacing();
+    const char* debugModes[] = {
+        "0: Default (Lit)",
+        "1: Unlit",
+        "2: Lighting Only",
+        "3: World Normals",
+        "4: Roughness",
+        "5: Metallic",
+        "6: Albedo (Base Color)",
+        "7: Scene Depth",
+        "8: Shadow Cascades",
+        "9: SSAO Buffer",
+        "10: Volumetric Fog"
+    };
+    int currentDebug = settings.lightingDebugMode;
+    if (ImGui::Combo("Buffer Visualization", &currentDebug, debugModes, 11)) {
+        ZeGFXAdapter::Get().SetLightingDebugMode(currentDebug);
+    }
 
     ImGui::Checkbox("Enable VSync", &settings.enableVSync);
 

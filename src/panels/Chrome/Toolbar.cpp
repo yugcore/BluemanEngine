@@ -2,10 +2,10 @@
 #include "CustomTitleBar.h"
 #include "WorkspaceBar.h"
 #include "core/EditorState.h"
-#include "core/SceneGraph.h"
+#include "engine/scene/SceneGraph.h"
 #include "core/CommandStack.h"
 #include "core/WindowsFileDialog.h"
-#include "core/Logger.h"
+#include "engine/core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 

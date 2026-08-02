@@ -3,7 +3,7 @@
 
 #include <string>
 #include <imgui.h>
-#include "core/AssetRegistry.h"
+#include "engine/assets/AssetRegistry.h"
 
 namespace EngineEditor::Widgets {
 

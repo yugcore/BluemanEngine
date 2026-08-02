@@ -1,13 +1,19 @@
 #include "DetailsPanel.h"
 #include "core/EditorState.h"
-#include "core/SceneGraph.h"
-#include "core/Logger.h"
+#include "core/ComponentRegistry.h"
+#include "engine/scene/SceneGraph.h"
+#include "engine/core/Logger.h"
 #include "widgets/PropertyRow.h"
 #include "theme/Fonts.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
+#include "third_party/IconsFontAwesome6.h"
 
 #include <unordered_map>
+#include <functional>
+#include <string>
+#include <algorithm>
+#include <cctype>
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -31,6 +37,9 @@ void RenderDetailsPanel(bool* pOpen) {
         ImGui::End();
         return;
     }
+
+    SceneNode* activeNode = SceneGraph::Get().FindNodeMutable(selectedNodeName);
+    uint64_t entityId = activeNode ? activeNode->id : 0;
 
     // 1. Header Block: Stacked Name & Type Layout with Type Icon + Right-aligned "Edit in C++"
     ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
@@ -97,10 +106,12 @@ void RenderDetailsPanel(bool* pOpen) {
     ImGui::Spacing();
     ImGui::Separator();
 
-    auto RenderCollapsibleHeader = [&](const char* label, bool defaultOpen = true) -> bool {
+    // Collapsible Header Helper with Gear Options Menu
+    auto RenderCollapsibleHeaderWithGear = [&](const char* label, const char* compId, std::function<void()> onReset, std::function<void()> onRemove) -> bool {
         static std::unordered_map<std::string, bool> s_States;
-        if (s_States.find(label) == s_States.end()) s_States[label] = defaultOpen;
-        bool& open = s_States[label];
+        std::string stateKey = std::string(label) + "_" + std::to_string(entityId);
+        if (s_States.find(stateKey) == s_States.end()) s_States[stateKey] = true;
+        bool& open = s_States[stateKey];
 
         ImGui::Spacing();
 
@@ -110,7 +121,7 @@ void RenderDetailsPanel(bool* pOpen) {
         ImVec2 hMax = ImVec2(hMin.x + availW, hMin.y + hHeight);
 
         ImGui::ItemSize(ImVec2(availW, hHeight));
-        ImGui::ItemAdd(ImRect(hMin, hMax), ImGui::GetID(label));
+        ImGui::ItemAdd(ImRect(hMin, hMax), ImGui::GetID(stateKey.c_str()));
 
         bool hovered = ImGui::IsItemHovered();
         bool clicked = ImGui::IsItemClicked();
@@ -119,40 +130,71 @@ void RenderDetailsPanel(bool* pOpen) {
             open = !open;
         }
 
-        // Left-aligned header background fill
+        // Header background fill
         ImU32 bgCol = ImGui::ColorConvertFloat4ToU32(hovered ? pal.bgElevated : pal.bgHeader);
         dl->AddRectFilled(hMin, hMax, bgCol, 2.0f);
 
-        // Vector Triangle Disclosure Caret
+        // Caret Triangle
         float caretX = hMin.x + Theme::Metrics::panelLeftMargin;
         float centerY = hMin.y + hHeight * 0.5f;
         ImU32 caretCol = ImGui::ColorConvertFloat4ToU32(pal.textSecondary);
 
         if (open) {
-            // Down-pointing triangle
             ImVec2 p1(caretX, centerY - 3.0f);
             ImVec2 p2(caretX + 8.0f, centerY - 3.0f);
             ImVec2 p3(caretX + 4.0f, centerY + 3.0f);
             dl->AddTriangleFilled(p1, p2, p3, caretCol);
         } else {
-            // Right-pointing triangle
             ImVec2 p1(caretX + 2.0f, centerY - 4.0f);
             ImVec2 p2(caretX + 7.0f, centerY);
             ImVec2 p3(caretX + 2.0f, centerY + 4.0f);
             dl->AddTriangleFilled(p1, p2, p3, caretCol);
         }
 
-        // Left-aligned section header title
+        // Title text
         ImVec2 textPos = ImVec2(caretX + 16.0f, hMin.y + (hHeight - ImGui::GetTextLineHeight()) * 0.5f);
         dl->AddText(textPos, ImGui::ColorConvertFloat4ToU32(pal.textPrimary), label);
+
+        // Gear Option Menu on right side
+        if (onReset || onRemove) {
+            std::string gearBtnId = std::string("##Gear_") + label + "_" + std::to_string(entityId);
+            std::string gearPopupId = std::string("GearMenu_") + label + "_" + std::to_string(entityId);
+
+            float gearWidth = 22.0f;
+            ImGui::SetCursorScreenPos(ImVec2(hMax.x - gearWidth - 4.0f, hMin.y + 2.0f));
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 1.0f));
+
+            if (ImGui::Button(gearBtnId.c_str(), ImVec2(20.0f, 22.0f))) {
+                ImGui::OpenPopup(gearPopupId.c_str());
+            }
+            // Draw gear icon over button
+            dl->AddText(ImVec2(hMax.x - gearWidth + 2.0f, textPos.y), ImGui::ColorConvertFloat4ToU32(pal.textDisabled), ICON_FA_GEAR);
+
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor(2);
+
+            if (ImGui::BeginPopup(gearPopupId.c_str())) {
+                if (onReset && ImGui::MenuItem("Reset to Default")) {
+                    onReset();
+                }
+                if (onRemove && ImGui::MenuItem("Remove Component")) {
+                    onRemove();
+                }
+                ImGui::EndPopup();
+            }
+        }
 
         ImGui::Spacing();
         return open;
     };
 
-    // 2. Transition (Transform Block)
-    bool transitionOpen = RenderCollapsibleHeader("Transition", true);
+    // 2. Transform Component ("Transition")
+    TransformComponent* transformComp = entityId ? ComponentRegistry::Get().GetComponent<TransformComponent>(entityId) : nullptr;
 
+    bool transitionOpen = RenderCollapsibleHeaderWithGear("Transition", "Transform", nullptr, nullptr);
     if (transitionOpen) {
         ImGui::Indent(Theme::Metrics::panelLeftMargin);
         ImGui::Spacing();
@@ -165,241 +207,502 @@ void RenderDetailsPanel(bool* pOpen) {
         ImGui::Spacing();
         Widgets::RenderVector3PropertyRow("Scale", transform.scale, 1.0f, &transform.lockAspect);
 
-        // Sync back to active SceneNode in SceneGraph
-        SceneNode* activeNode = SceneGraph::Get().FindNodeMutable(selectedNodeName);
+        // Sync back to SceneNode & ComponentRegistry
         if (activeNode) {
             activeNode->location[0] = transform.location[0];
             activeNode->location[1] = transform.location[1];
             activeNode->location[2] = transform.location[2];
-
             activeNode->rotation[0] = transform.rotation[0];
             activeNode->rotation[1] = transform.rotation[1];
             activeNode->rotation[2] = transform.rotation[2];
+            activeNode->scale[0]    = transform.scale[0];
+            activeNode->scale[1]    = transform.scale[1];
+            activeNode->scale[2]    = transform.scale[2];
 
-            activeNode->scale[0] = transform.scale[0];
-            activeNode->scale[1] = transform.scale[1];
-            activeNode->scale[2] = transform.scale[2];
-        }
-
-        ImGui::Spacing();
-        ImGui::Unindent(Theme::Metrics::panelLeftMargin);
-    }
-
-    // 3. Component-Specific Section
-    if (selectedNodeName == "SkyAtmosphere" || selectedNodeType == "SkyAtmosphere") {
-        bool skyOpen = RenderCollapsibleHeader("Sky Atmosphere", true);
-
-        if (skyOpen) {
-            ImGui::Indent(Theme::Metrics::panelLeftMargin);
-            ImGui::Spacing();
-
-            auto& skyProps = EditorState::Get().skyAtmosphereProps;
-
-            ImGui::Columns(2, "##SkyProps", false);
-            ImGui::SetColumnWidth(0, Theme::Metrics::labelColumnWidth * 2.0f);
-
-            ImGui::TextUnformatted("Rayleigh Scattering (10\xE2\x81\xBB\xE2\x81\xB6 m\xE2\x81\xBB\xC2\xB9)");
-            ImGui::NextColumn();
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##RayleighScattering", &skyProps.rayleighScattering, 0.001f, 0.000f, 1.000f, "%.4f");
-            ImGui::NextColumn();
-
-            ImGui::TextUnformatted("Aerosol Scattering Scale");
-            ImGui::NextColumn();
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##AerosolScattering", &skyProps.aerosolScattering, 0.001f, 0.000f, 1.000f, "%.1f");
-            ImGui::NextColumn();
-
-            ImGui::TextUnformatted("Aerosol Absorption Scale");
-            ImGui::NextColumn();
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##AerosolAbsorption", &skyProps.aerosolAbsorption, 0.001f, 0.000f, 1.000f, "%.1f");
-            ImGui::NextColumn();
-
-            ImGui::TextUnformatted("Atmosphere Height");
-            ImGui::NextColumn();
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##AtmosphereHeight", &skyProps.atmosphereHeightKm, 0.5f, 1.0f, 100.0f, "%.1f km");
-            ImGui::NextColumn();
-
-            ImGui::TextUnformatted("Aerial Perspective Scale");
-            ImGui::NextColumn();
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##AerialPerspective", &skyProps.aerialPerspectiveDistanceScale, 0.05f, 0.1f, 10.0f, "%.2f");
-
-            ImGui::Columns(1);
-            ImGui::Spacing();
-
-            // Toggles
-            static bool showTransition = true;
-            ImGui::Checkbox("Transition", &showTransition);
-            ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
-            
-            static bool showSkyAtm = true;
-            ImGui::Checkbox("Sky Atmosphere", &showSkyAtm);
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            if (ImGui::BeginTabBar("SkyAtmosphereTabs")) {
-                if (ImGui::BeginTabItem("Ray Tracing")) {
-                    ImGui::Spacing();
-                    ImGui::TextDisabled("Ray Traced Atmospheric Single/Multi-Scattering Active");
-                    static bool rtSkyIllum = true;
-                    ImGui::Checkbox("RT Sky Atmosphere Illumination", &rtSkyIllum);
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Global Illumination")) {
-                    ImGui::Spacing();
-                    ImGui::TextDisabled("Sky Light Realtime Capture & Luminance Integration");
-                    static float skyIntensity = 1.0f;
-                    ImGui::SliderFloat("Sky Luminance Multiplier", &skyIntensity, 0.0f, 10.0f);
-                    ImGui::EndTabItem();
-                }
-                ImGui::EndTabBar();
+            if (transformComp) {
+                transformComp->location[0] = transform.location[0];
+                transformComp->location[1] = transform.location[1];
+                transformComp->location[2] = transform.location[2];
+                transformComp->rotation[0] = transform.rotation[0];
+                transformComp->rotation[1] = transform.rotation[1];
+                transformComp->rotation[2] = transform.rotation[2];
+                transformComp->scale[0]    = transform.scale[0];
+                transformComp->scale[1]    = transform.scale[1];
+                transformComp->scale[2]    = transform.scale[2];
             }
-
-            ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
         }
-    } else if (selectedNodeType == "Material" || selectedNodeName.find("Material") != std::string::npos || selectedNodeName.find("Mat") != std::string::npos) {
-        bool matOpen = RenderCollapsibleHeader("Material Inspector", true);
-        if (matOpen) {
-            ImGui::Indent(Theme::Metrics::panelLeftMargin);
-            ImGui::Spacing();
-            static float albedo[3] = { 0.85f, 0.20f, 0.20f };
-            static float roughness = 0.40f;
-            static float metallic = 0.80f;
-            ImGui::TextUnformatted("Albedo Color:");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::ColorEdit3("##MatAlbedo", albedo);
-            ImGui::TextUnformatted("Roughness:");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::SliderFloat("##MatRoughness", &roughness, 0.0f, 1.0f);
-            ImGui::TextUnformatted("Metallic:");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::SliderFloat("##MatMetallic", &metallic, 0.0f, 1.0f);
-            ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
-        }
-    } else if (selectedNodeType == "Animation" || selectedNodeName.find("Anim") != std::string::npos || selectedNodeName.find("Character") != std::string::npos) {
-        bool animOpen = RenderCollapsibleHeader("Animation Properties", true);
-        if (animOpen) {
-            ImGui::Indent(Theme::Metrics::panelLeftMargin);
-            ImGui::Spacing();
-            static float playRate = 1.0f;
-            static bool loopAnim = true;
-            ImGui::TextUnformatted("Playback Speed:");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::SliderFloat("##AnimRate", &playRate, 0.1f, 3.0f, "%.2fx");
-            ImGui::Checkbox("Looping Animation", &loopAnim);
-            ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
-        }
-    } else if (selectedNodeType == "Terrain" || selectedNodeName.find("Terrain") != std::string::npos || selectedNodeName.find("Landscape") != std::string::npos) {
-        bool terrainOpen = RenderCollapsibleHeader("Terrain Properties", true);
-        if (terrainOpen) {
-            ImGui::Indent(Theme::Metrics::panelLeftMargin);
-            ImGui::Spacing();
-            static float heightScale = 100.0f;
-            static int gridResolution = 2048;
-            ImGui::TextUnformatted("Heightmap Elevation Scale:");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##TerrainHeight", &heightScale, 1.0f, 1.0f, 1000.0f, "%.0f m");
-            ImGui::TextUnformatted("Terrain Mesh Grid Resolution:");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::InputInt("##TerrainRes", &gridResolution);
-            ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
-        }
-    } else if (selectedNodeType == "VFX" || selectedNodeType == "Particle" || selectedNodeName.find("Particle") != std::string::npos || selectedNodeName.find("VFX") != std::string::npos) {
-        bool vfxOpen = RenderCollapsibleHeader("Particle System Properties", true);
-        if (vfxOpen) {
-            ImGui::Indent(Theme::Metrics::panelLeftMargin);
-            ImGui::Spacing();
-            static int maxParticles = 50000;
-            static float spawnRate = 1200.0f;
-            ImGui::TextUnformatted("Max Particle Capacity:");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::InputInt("##VFXMaxPart", &maxParticles);
-            ImGui::TextUnformatted("Spawn Rate (Particles / Sec):");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##VFXSpawnRate", &spawnRate, 10.0f, 10.0f, 50000.0f, "%.0f / s");
-            ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
-        }
-    } else if (selectedNodeType == "Light" || selectedNodeName == "SunLight" || selectedNodeName == "SkyLight") {
-        bool lightOpen = RenderCollapsibleHeader("Directional Light Component", true);
-
-        if (lightOpen) {
-            ImGui::Indent(Theme::Metrics::panelLeftMargin);
-            ImGui::Spacing();
-            static float intensity = 100000.0f;
-            static float lightColor[3] = { 1.0f, 0.95f, 0.85f };
-
-            ImGui::TextUnformatted("Intensity (Lux):");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##LightIntensity", &intensity, 500.0f, 0.0f, 500000.0f, "%.0f Lux");
-
-            ImGui::TextUnformatted("Light Color:");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::ColorEdit3("##LightColor", lightColor);
-
-            ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
-        }
-    } else {
-        bool actorOpen = RenderCollapsibleHeader("Actor Component", true);
-
-        if (actorOpen) {
-            ImGui::Indent(Theme::Metrics::panelLeftMargin);
-            ImGui::Spacing();
-            ImGui::TextDisabled("Generic Component Properties for %s", selectedNodeName.c_str());
-            ImGui::Spacing();
-            static bool isStatic = true;
-            ImGui::Checkbox("Static Mobility", &isStatic);
-            ImGui::Spacing();
-            ImGui::Unindent(Theme::Metrics::panelLeftMargin);
-        }
-    }
-
-    // 4. ZePhysics 3D Component
-    bool physOpen = RenderCollapsibleHeader("ZePhysics 3D Component", true);
-    if (physOpen) {
-        ImGui::Indent(Theme::Metrics::panelLeftMargin);
-        ImGui::Spacing();
-
-        static bool simulatePhysics = false;
-        static bool enableGravity = true;
-        static float massKg = 10.0f;
-        static float friction = 0.50f;
-        static float bounciness = 0.20f;
-        static int collisionLayer = 2;
-
-        ImGui::Checkbox("Simulate 3D RigidBody Physics", &simulatePhysics);
-        ImGui::Checkbox("Enable Gravity Force", &enableGravity);
-
-        ImGui::Spacing();
-        ImGui::TextUnformatted("Mass (kg) [0 = Static Body]:");
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::DragFloat("##PhysicsMass", &massKg, 0.5f, 0.0f, 10000.0f, "%.1f kg");
-
-        ImGui::TextUnformatted("Friction Coefficient:");
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderFloat("##PhysicsFriction", &friction, 0.0f, 1.0f, "%.2f");
-
-        ImGui::TextUnformatted("Restitution (Bounciness):");
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderFloat("##PhysicsBounciness", &bounciness, 0.0f, 1.0f, "%.2f");
-
-        const char* layerNames[] = { "Default (Layer 0)", "Static Geometry (Layer 1)", "Dynamic RigidBody (Layer 2)", "Trigger Sensor (Layer 3)" };
-        ImGui::TextUnformatted("Collision Layer:");
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::Combo("##PhysicsCollisionLayer", &collisionLayer, layerNames, 4);
 
         ImGui::Spacing();
         ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+    }
+
+    // 3. Dynamic Component Inspectors (Driven by ComponentRegistry)
+    if (entityId != 0) {
+
+        // --- MeshComponent Inspector ---
+        MeshComponent* meshComp = ComponentRegistry::Get().GetComponent<MeshComponent>(entityId);
+        if (meshComp) {
+            bool meshOpen = RenderCollapsibleHeaderWithGear(
+                "Mesh Component", "Mesh",
+                [meshComp]() { *meshComp = MeshComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<MeshComponent>(entityId); }
+            );
+
+            if (meshOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                char meshPathBuf[256];
+                strncpy_s(meshPathBuf, meshComp->meshPath.c_str(), sizeof(meshPathBuf));
+                ImGui::TextUnformatted("Mesh Asset Path:");
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::InputText("##MeshPath", meshPathBuf, sizeof(meshPathBuf))) {
+                    meshComp->meshPath = meshPathBuf;
+                    if (activeNode) activeNode->meshPath = meshPathBuf;
+                }
+
+                ImGui::TextUnformatted("LOD Bias:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##LodBias", &meshComp->lodBias, -2.0f, 2.0f, "%.2f");
+
+                ImGui::Checkbox("Cast Shadows", &meshComp->castShadows);
+                ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
+                ImGui::Checkbox("Receive Shadows", &meshComp->receiveShadows);
+                ImGui::Checkbox("Show Bounding Box", &meshComp->showBoundingBox);
+
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // --- MaterialComponent Inspector ---
+        MaterialComponent* matComp = ComponentRegistry::Get().GetComponent<MaterialComponent>(entityId);
+        if (matComp) {
+            bool matOpen = RenderCollapsibleHeaderWithGear(
+                "Material Component", "Material",
+                [matComp]() { *matComp = MaterialComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<MaterialComponent>(entityId); }
+            );
+
+            if (matOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                char matPathBuf[256];
+                strncpy_s(matPathBuf, matComp->materialPath.c_str(), sizeof(matPathBuf));
+                ImGui::TextUnformatted("Material Path:");
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::InputText("##MatPath", matPathBuf, sizeof(matPathBuf))) {
+                    matComp->materialPath = matPathBuf;
+                    if (activeNode) activeNode->materialPath = matPathBuf;
+                }
+
+                ImGui::TextUnformatted("Base Color:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::ColorEdit4("##BaseColor", matComp->baseColor);
+
+                ImGui::TextUnformatted("Roughness:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##Roughness", &matComp->roughness, 0.0f, 1.0f);
+
+                ImGui::TextUnformatted("Metallic:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##Metallic", &matComp->metallic, 0.0f, 1.0f);
+
+                ImGui::TextUnformatted("Specular:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##Specular", &matComp->specular, 0.0f, 1.0f);
+
+                ImGui::TextUnformatted("Emissive Color:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::ColorEdit3("##EmissiveColor", matComp->emissiveColor);
+
+                ImGui::TextUnformatted("Emissive Intensity:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##EmissiveIntensity", &matComp->emissiveIntensity, 0.1f, 0.0f, 100.0f, "%.1f");
+
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // --- LightComponent Inspector ---
+        LightComponent* lightComp = ComponentRegistry::Get().GetComponent<LightComponent>(entityId);
+        if (lightComp) {
+            bool lightOpen = RenderCollapsibleHeaderWithGear(
+                "Light Component", "Light",
+                [lightComp]() { *lightComp = LightComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<LightComponent>(entityId); }
+            );
+
+            if (lightOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                const char* lightTypes[] = { "Directional Light", "Point Light", "Spot Light" };
+                ImGui::TextUnformatted("Light Type:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::Combo("##LightType", &lightComp->lightType, lightTypes, 3);
+
+                ImGui::TextUnformatted("Light Color:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::ColorEdit3("##LightColor", lightComp->color);
+
+                ImGui::TextUnformatted("Intensity (Lux):");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##LightIntensity", &lightComp->intensity, 10.0f, 0.0f, 500000.0f, "%.0f Lux");
+
+                ImGui::TextUnformatted("Range (m):");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##LightRange", &lightComp->range, 0.5f, 0.1f, 1000.0f, "%.1f m");
+
+                if (lightComp->lightType == 2) { // Spot Light
+                    ImGui::TextUnformatted("Inner Cone Angle:");
+                    ImGui::SetNextItemWidth(-1.0f);
+                    ImGui::SliderFloat("##InnerCone", &lightComp->innerCone, 0.0f, 80.0f, "%.1f deg");
+
+                    ImGui::TextUnformatted("Outer Cone Angle:");
+                    ImGui::SetNextItemWidth(-1.0f);
+                    ImGui::SliderFloat("##OuterCone", &lightComp->outerCone, 0.0f, 89.0f, "%.1f deg");
+                }
+
+                ImGui::Checkbox("Cast Shadows", &lightComp->castShadows);
+
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // --- CameraComponent Inspector ---
+        CameraComponent* camComp = ComponentRegistry::Get().GetComponent<CameraComponent>(entityId);
+        if (camComp) {
+            bool camOpen = RenderCollapsibleHeaderWithGear(
+                "Camera Component", "Camera",
+                [camComp]() { *camComp = CameraComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<CameraComponent>(entityId); }
+            );
+
+            if (camOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                ImGui::TextUnformatted("Field of View (FOV):");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##CamFov", &camComp->fov, 10.0f, 170.0f, "%.1f deg");
+
+                ImGui::TextUnformatted("Near Clip Plane:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##CamNear", &camComp->nearPlane, 0.01f, 0.001f, 10.0f, "%.3f m");
+
+                ImGui::TextUnformatted("Far Clip Plane:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##CamFar", &camComp->farPlane, 10.0f, 1.0f, 100000.0f, "%.0f m");
+
+                const char* projModes[] = { "Perspective", "Orthographic" };
+                ImGui::TextUnformatted("Projection Mode:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::Combo("##CamProj", &camComp->projectionMode, projModes, 2);
+
+                ImGui::TextUnformatted("Camera Priority:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragInt("##CamPriority", &camComp->priority, 1, 0, 100);
+
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // --- RigidBodyComponent Inspector ---
+        RigidBodyComponent* rbComp = ComponentRegistry::Get().GetComponent<RigidBodyComponent>(entityId);
+        if (rbComp) {
+            bool rbOpen = RenderCollapsibleHeaderWithGear(
+                "RigidBody Component", "RigidBody",
+                [rbComp]() { *rbComp = RigidBodyComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<RigidBodyComponent>(entityId); }
+            );
+
+            if (rbOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                ImGui::TextUnformatted("Mass (kg):");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##RBMass", &rbComp->mass, 0.5f, 0.0f, 10000.0f, "%.1f kg");
+
+                ImGui::TextUnformatted("Linear Damping:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##RBLinearDamping", &rbComp->linearDamping, 0.01f, 0.0f, 10.0f, "%.2f");
+
+                ImGui::TextUnformatted("Angular Damping:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##RBAngularDamping", &rbComp->angularDamping, 0.01f, 0.0f, 10.0f, "%.2f");
+
+                ImGui::Checkbox("Is Kinematic", &rbComp->isKinematic);
+                ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
+                ImGui::Checkbox("Use Gravity", &rbComp->useGravity);
+
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // --- ColliderComponent Inspector ---
+        ColliderComponent* colComp = ComponentRegistry::Get().GetComponent<ColliderComponent>(entityId);
+        if (colComp) {
+            bool colOpen = RenderCollapsibleHeaderWithGear(
+                "Collider Component", "Collider",
+                [colComp]() { *colComp = ColliderComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<ColliderComponent>(entityId); }
+            );
+
+            if (colOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                const char* shapeTypes[] = { "Box", "Sphere", "Capsule", "Mesh" };
+                ImGui::TextUnformatted("Collider Shape:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::Combo("##ColShape", &colComp->shapeType, shapeTypes, 4);
+
+                if (colComp->shapeType == 0) { // Box
+                    Widgets::RenderVector3PropertyRow("Box Size", colComp->size, 1.0f);
+                } else if (colComp->shapeType == 1) { // Sphere
+                    ImGui::TextUnformatted("Radius:");
+                    ImGui::SetNextItemWidth(-1.0f);
+                    ImGui::DragFloat("##ColRadius", &colComp->radius, 0.1f, 0.01f, 100.0f, "%.2f m");
+                } else if (colComp->shapeType == 2) { // Capsule
+                    ImGui::TextUnformatted("Radius:");
+                    ImGui::SetNextItemWidth(-1.0f);
+                    ImGui::DragFloat("##ColCapRadius", &colComp->radius, 0.1f, 0.01f, 100.0f, "%.2f m");
+                    ImGui::TextUnformatted("Height:");
+                    ImGui::SetNextItemWidth(-1.0f);
+                    ImGui::DragFloat("##ColCapHeight", &colComp->height, 0.1f, 0.01f, 100.0f, "%.2f m");
+                }
+
+                ImGui::Checkbox("Is Trigger Volume", &colComp->isTrigger);
+
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // --- AudioSourceComponent Inspector ---
+        AudioSourceComponent* audioComp = ComponentRegistry::Get().GetComponent<AudioSourceComponent>(entityId);
+        if (audioComp) {
+            bool audioOpen = RenderCollapsibleHeaderWithGear(
+                "Audio Source Component", "AudioSource",
+                [audioComp]() { *audioComp = AudioSourceComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<AudioSourceComponent>(entityId); }
+            );
+
+            if (audioOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                char clipBuf[256];
+                strncpy_s(clipBuf, audioComp->clipPath.c_str(), sizeof(clipBuf));
+                ImGui::TextUnformatted("Audio Clip Path:");
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::InputText("##AudioClip", clipBuf, sizeof(clipBuf))) {
+                    audioComp->clipPath = clipBuf;
+                }
+
+                ImGui::TextUnformatted("Volume:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##AudioVolume", &audioComp->volume, 0.0f, 1.0f, "%.2f");
+
+                ImGui::TextUnformatted("Pitch:");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##AudioPitch", &audioComp->pitch, 0.1f, 3.0f, "%.2fx");
+
+                ImGui::TextUnformatted("Spatial Blend (2D <-> 3D):");
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##AudioSpatial", &audioComp->spatialBlend, 0.0f, 1.0f, "%.2f");
+
+                ImGui::Checkbox("Looping", &audioComp->loop);
+                ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
+                ImGui::Checkbox("Play On Awake", &audioComp->playOnAwake);
+
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // --- ScriptComponent Inspector ---
+        ScriptComponent* scriptComp = ComponentRegistry::Get().GetComponent<ScriptComponent>(entityId);
+        if (scriptComp) {
+            bool scriptOpen = RenderCollapsibleHeaderWithGear(
+                "Script Component", "Script",
+                [scriptComp]() { *scriptComp = ScriptComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<ScriptComponent>(entityId); }
+            );
+
+            if (scriptOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                char scriptBuf[256];
+                strncpy_s(scriptBuf, scriptComp->scriptPath.c_str(), sizeof(scriptBuf));
+                ImGui::TextUnformatted("Script File Path:");
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::InputText("##ScriptPath", scriptBuf, sizeof(scriptBuf))) {
+                    scriptComp->scriptPath = scriptBuf;
+                }
+
+                char classBuf[128];
+                strncpy_s(classBuf, scriptComp->className.c_str(), sizeof(classBuf));
+                ImGui::TextUnformatted("Class Name:");
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::InputText("##ClassName", classBuf, sizeof(classBuf))) {
+                    scriptComp->className = classBuf;
+                }
+
+                ImGui::Checkbox("Script Enabled", &scriptComp->enabled);
+
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // Retain SkyAtmosphere Section for SkyAtmosphere Nodes
+        if (selectedNodeName == "SkyAtmosphere" || selectedNodeType == "SkyAtmosphere") {
+            bool skyOpen = RenderCollapsibleHeaderWithGear("Sky Atmosphere", "Sky", nullptr, nullptr);
+            if (skyOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                auto& skyProps = EditorState::Get().skyAtmosphereProps;
+
+                ImGui::Columns(2, "##SkyProps", false);
+                ImGui::SetColumnWidth(0, Theme::Metrics::labelColumnWidth * 2.0f);
+
+                ImGui::TextUnformatted("Rayleigh Scattering Scale");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##RayleighScattering", &skyProps.rayleighScattering, 0.001f, 0.000f, 1.000f, "%.4f");
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("Aerosol Scattering Scale");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##AerosolScattering", &skyProps.aerosolScattering, 0.001f, 0.000f, 1.000f, "%.1f");
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("Atmosphere Height");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##AtmosphereHeight", &skyProps.atmosphereHeightKm, 0.5f, 1.0f, 100.0f, "%.1f km");
+
+                ImGui::Columns(1);
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+    }
+
+    // 4. "+ Add Component" Button & Popup Menu
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::SetCursorPosX(Theme::Metrics::panelLeftMargin);
+    float availWidth = ImGui::GetContentRegionAvail().x;
+
+    ImGui::PushStyleColor(ImGuiCol_Button, pal.bgHeader);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.bgElevated);
+    ImGui::PushStyleColor(ImGuiCol_Text, pal.accent);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 6.0f));
+
+    if (ImGui::Button("+ Add Component", ImVec2(availWidth, 30.0f))) {
+        ImGui::OpenPopup("AddComponentPopup");
+    }
+
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(3);
+
+    if (ImGui::BeginPopup("AddComponentPopup")) {
+        ImGui::TextColored(pal.textDisabled, "SELECT COMPONENT TO ADD");
+        ImGui::Separator();
+
+        static char searchFilter[64] = "";
+        ImGui::SetNextItemWidth(220.0f);
+        ImGui::InputTextWithHint("##CompSearch", "Search components...", searchFilter, sizeof(searchFilter));
+        ImGui::Separator();
+
+        std::string filter = searchFilter;
+        std::transform(filter.begin(), filter.end(), filter.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+
+        auto MatchesFilter = [&](const char* name) -> bool {
+            if (filter.empty()) return true;
+            std::string n = name;
+            std::transform(n.begin(), n.end(), n.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            return n.find(filter) != std::string::npos;
+        };
+
+        if (ImGui::BeginMenu("Rendering")) {
+            if (MatchesFilter("Static Mesh") && ImGui::MenuItem(ICON_FA_CUBE " Static Mesh")) {
+                ComponentRegistry::Get().AddComponent<MeshComponent>(entityId);
+            }
+            if (MatchesFilter("Material") && ImGui::MenuItem(ICON_FA_PALETTE " Material")) {
+                ComponentRegistry::Get().AddComponent<MaterialComponent>(entityId);
+            }
+            if (MatchesFilter("Camera") && ImGui::MenuItem(ICON_FA_CAMERA " Camera")) {
+                ComponentRegistry::Get().AddComponent<CameraComponent>(entityId);
+            }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Lighting")) {
+            if (MatchesFilter("Point Light") && ImGui::MenuItem(ICON_FA_LIGHTBULB " Point Light")) {
+                LightComponent lc; lc.lightType = 1;
+                ComponentRegistry::Get().AddComponent<LightComponent>(entityId, lc);
+            }
+            if (MatchesFilter("Spot Light") && ImGui::MenuItem(ICON_FA_LIGHTBULB " Spot Light")) {
+                LightComponent lc; lc.lightType = 2;
+                ComponentRegistry::Get().AddComponent<LightComponent>(entityId, lc);
+            }
+            if (MatchesFilter("Directional Light") && ImGui::MenuItem(ICON_FA_SUN " Directional Light")) {
+                LightComponent lc; lc.lightType = 0;
+                ComponentRegistry::Get().AddComponent<LightComponent>(entityId, lc);
+            }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Physics")) {
+            if (MatchesFilter("RigidBody 3D") && ImGui::MenuItem(ICON_FA_CUBE " RigidBody 3D")) {
+                ComponentRegistry::Get().AddComponent<RigidBodyComponent>(entityId);
+            }
+            if (MatchesFilter("Box Collider") && ImGui::MenuItem(ICON_FA_CUBE " Box Collider")) {
+                ColliderComponent cc; cc.shapeType = 0;
+                ComponentRegistry::Get().AddComponent<ColliderComponent>(entityId, cc);
+            }
+            if (MatchesFilter("Sphere Collider") && ImGui::MenuItem(ICON_FA_CUBE " Sphere Collider")) {
+                ColliderComponent cc; cc.shapeType = 1;
+                ComponentRegistry::Get().AddComponent<ColliderComponent>(entityId, cc);
+            }
+            if (MatchesFilter("Capsule Collider") && ImGui::MenuItem(ICON_FA_CUBE " Capsule Collider")) {
+                ColliderComponent cc; cc.shapeType = 2;
+                ComponentRegistry::Get().AddComponent<ColliderComponent>(entityId, cc);
+            }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Audio")) {
+            if (MatchesFilter("Audio Source") && ImGui::MenuItem(ICON_FA_VOLUME_HIGH " Audio Source")) {
+                ComponentRegistry::Get().AddComponent<AudioSourceComponent>(entityId);
+            }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Scripting")) {
+            if (MatchesFilter("Script") && ImGui::MenuItem(ICON_FA_CODE " Script")) {
+                ComponentRegistry::Get().AddComponent<ScriptComponent>(entityId);
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndPopup();
     }
 
     ImGui::End();

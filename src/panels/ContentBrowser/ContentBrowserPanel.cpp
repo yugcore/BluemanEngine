@@ -1,8 +1,8 @@
 #include "ContentBrowserPanel.h"
-#include "core/AssetRegistry.h"
+#include "engine/assets/AssetRegistry.h"
 #include "core/EditorState.h"
-#include "core/SceneGraph.h"
-#include "core/Logger.h"
+#include "engine/scene/SceneGraph.h"
+#include "engine/core/Logger.h"
 #include "widgets/SearchBar.h"
 #include "widgets/AssetTile.h"
 #include "theme/Colors.h"
@@ -15,6 +15,23 @@
 #include <cctype>
 
 namespace EngineEditor {
+
+static ImVec4 GetAssetTypeColor(AssetItemType type) {
+    switch (type) {
+        case AssetItemType::Material:    return ImVec4(0.22f, 0.63f, 0.41f, 1.00f); // Green (#38A169)
+        case AssetItemType::Mesh:        return ImVec4(0.19f, 0.51f, 0.81f, 1.00f); // Blue (#3182CE)
+        case AssetItemType::Texture:     return ImVec4(0.84f, 0.62f, 0.18f, 1.00f); // Amber/Gold (#D69E2E)
+        case AssetItemType::Script:      return ImVec4(0.50f, 0.35f, 0.84f, 1.00f); // Purple (#805AD5)
+        case AssetItemType::Animation:   return ImVec4(0.84f, 0.25f, 0.55f, 1.00f); // Pink (#D53F8C)
+        case AssetItemType::Audio:       return ImVec4(0.19f, 0.59f, 0.58f, 1.00f); // Teal (#319795)
+        case AssetItemType::Level:       return ImVec4(0.90f, 0.24f, 0.24f, 1.00f); // Red (#E53E3E)
+        case AssetItemType::VFX:         return ImVec4(0.87f, 0.42f, 0.13f, 1.00f); // Orange (#DD6B20)
+        case AssetItemType::Physics:     return ImVec4(0.18f, 0.52f, 0.35f, 1.00f); // Emerald (#2F855A)
+        case AssetItemType::UI:          return ImVec4(0.30f, 0.32f, 0.75f, 1.00f); // Indigo (#4C51BF)
+        case AssetItemType::Folder:      return ImVec4(0.44f, 0.50f, 0.59f, 1.00f); // Warm Gray (#718096)
+        default:                         return ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
+    }
+}
 
 static char s_SearchFilter[128] = "";
 
@@ -190,6 +207,7 @@ void RenderContentBrowserPanel(bool* pOpen) {
     const auto& rootFolder = AssetRegistry::Get().GetRootFolder();
     auto collectItems = [&](auto& self, const AssetFolder& folder) -> void {
         for (const auto& item : folder.items) {
+            if (item.isDependencyOnly) continue;
             if (searchQuery.empty() || CaseInsensitiveContains(item.name, searchQuery) || CaseInsensitiveContains(folder.name, searchQuery)) {
                 itemsToDisplay.push_back(item);
             }
@@ -202,7 +220,11 @@ void RenderContentBrowserPanel(bool* pOpen) {
     if (!searchQuery.empty()) {
         collectItems(collectItems, rootFolder);
     } else if (currentFolder) {
-        itemsToDisplay = currentFolder->items;
+        for (const auto& item : currentFolder->items) {
+            if (!item.isDependencyOnly) {
+                itemsToDisplay.push_back(item);
+            }
+        }
     }
 
     // Filter items by active category filter
@@ -253,7 +275,7 @@ void RenderContentBrowserPanel(bool* pOpen) {
             const auto& item = itemsToDisplay[i];
             bool isSelected = (EditorState::Get().selectedAssetPath == item.path);
 
-            ImVec4 typeColor = AssetRegistry::GetTypeColor(item.type);
+            ImVec4 typeColor = GetAssetTypeColor(item.type);
             const char* typeName = AssetRegistry::GetTypeName(item.type);
 
             std::string tileId = "Tile_" + std::to_string(i);

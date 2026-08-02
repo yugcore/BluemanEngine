@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(engine_editor C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_definitions(WITH_DX12_BACKEND=1 ZEGFX_WITH_ASSIMP=0)
+add_compile_definitions(WITH_DX12_BACKEND=1 ZEGFX_WITH_ASSIMP=0 IMGUI_DEFINE_MATH_OPERATORS)
 
 include(FetchContent)
 
@@ -55,8 +55,11 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/widgets/*.cpp"
     "src/layout/*.cpp"
     "src/core/*.cpp"
+    "src/engine/core/*.cpp"
+    "src/engine/scene/*.cpp"
+    "src/engine/assets/*.cpp"
     "src/render/*.cpp"
-    "src/third_party/ImGuizmo/*.cpp"
+    "src/third_party/ImGuizmo/src/ImGuizmo.cpp"
     "src/panels/*.cpp"
     "src/panels/Chrome/*.cpp"
     "src/panels/Codebase/*.cpp"
@@ -74,6 +77,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/panels/ProjectWizard/*.cpp"
     "src/panels/ProjectSettings/*.cpp"
     "src/panels/ImportProgress/*.cpp"
+    "src/panels/AssetCooking/*.cpp"
 
     # ZeGFX Graphics Engine Core Sources
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx.cpp"
@@ -137,6 +141,8 @@ add_executable(engine_editor ${SOURCES})
 target_include_directories(engine_editor PRIVATE
     src
     src/third_party
+    src/third_party/ImGuizmo
+    src/third_party/ImGuizmo/src
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
