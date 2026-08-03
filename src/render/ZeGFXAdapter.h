@@ -9,6 +9,7 @@
 #include <vector>
 #include <unordered_map>
 #include "render_scene_snapshot.h"
+#include "heightmap_importer.h"
 
 namespace zegfx {
     class Renderer;
@@ -36,6 +37,7 @@ public:
     // GPU Asset Bridge methods
     zegfx::RenderMeshHandle LoadMeshAsset(const std::string& meshPath);
     zegfx::RenderMaterialHandle LoadMaterialAsset(const std::string& matPath);
+    std::string CreateTerrainFromHeightmap(const std::string& name, const std::string& filePath, const zegfx::HeightmapImportSettings& settings, std::string& outError);
     void CreateDefaultPrimitives();
     void SetLightingDebugMode(int mode);
 

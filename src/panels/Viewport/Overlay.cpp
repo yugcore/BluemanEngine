@@ -1,5 +1,6 @@
 #include "Overlay.h"
 #include "core/EditorState.h"
+#include "engine/scene/SceneGraph.h"
 #include "third_party/IconsFontAwesome6.h"
 #include <cmath>
 #include <algorithm>
@@ -62,9 +63,17 @@ void RenderViewport3DOverlays(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 vie
         };
 
         // Directional Sun Light Vector for Surface Shading
+        const SceneNode* sunNode = SceneGraph::Get().FindNode("DirectionalSunLight");
         float sunDir[3] = { -0.5f, -0.8f, -0.3f };
+        if (sunNode) {
+            float pitchRad = sunNode->rotation[0] * 3.14159265f / 180.0f;
+            float yawRad   = sunNode->rotation[1] * 3.14159265f / 180.0f;
+            sunDir[0] = std::cos(pitchRad) * std::sin(yawRad);
+            sunDir[1] = -std::sin(pitchRad);
+            sunDir[2] = -std::cos(pitchRad) * std::cos(yawRad);
+        }
         float sunLength = std::sqrt(sunDir[0]*sunDir[0] + sunDir[1]*sunDir[1] + sunDir[2]*sunDir[2]);
-        sunDir[0] /= sunLength; sunDir[1] /= sunLength; sunDir[2] /= sunLength;
+        if (sunLength > 0.001f) { sunDir[0] /= sunLength; sunDir[1] /= sunLength; sunDir[2] /= sunLength; }
 
         // Structure for depth-sorted Landscape quads (Painters Algorithm)
         struct LandscapeQuad {
@@ -152,11 +161,7 @@ void RenderViewport3DOverlays(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 vie
             bool v4 = WorldToScreen(q.p4, viewMat, projMat, cursorPos, viewportAvail, s4);
 
             if (v1 && v2 && v3 && v4) {
-                // 1. Draw Solid Landscape Quad Surface
-                ImVec2 polyPts[4] = { s1, s2, s3, s4 };
-                drawList->AddConvexPolyFilled(polyPts, 4, q.fillColor);
-
-                // 2. Draw Overlaid Grid Wireframe Edges
+                // Draw Overlaid Grid Wireframe Edges only (transparent background for ZeGFX 3D GPU render)
                 ImU32 lineCol = q.isMajorGrid ? ridgeLineColor : gridLineColor;
                 float lineThick = q.isMajorGrid ? 1.5f : 1.0f;
 
@@ -171,8 +176,19 @@ void RenderViewport3DOverlays(ImDrawList* drawList, ImVec2 cursorPos, ImVec2 vie
 
     // 2. Render Directional Sun Light Visual Icon & Light Ray Direction Vector
     if (showLights) {
+        const SceneNode* sunNodeVis = SceneGraph::Get().FindNode("DirectionalSunLight");
         float sunPos[3] = { 8.0f, 15.0f, -8.0f };
         float sunDir[3] = { -0.5f, -0.8f, -0.3f };
+        if (sunNodeVis) {
+            sunPos[0] = sunNodeVis->location[0];
+            sunPos[1] = sunNodeVis->location[1];
+            sunPos[2] = sunNodeVis->location[2];
+            float pitchRad = sunNodeVis->rotation[0] * 3.14159265f / 180.0f;
+            float yawRad   = sunNodeVis->rotation[1] * 3.14159265f / 180.0f;
+            sunDir[0] = std::cos(pitchRad) * std::sin(yawRad);
+            sunDir[1] = -std::sin(pitchRad);
+            sunDir[2] = -std::cos(pitchRad) * std::cos(yawRad);
+        }
         float sunEnd[3] = { sunPos[0] + sunDir[0] * 6.0f, sunPos[1] + sunDir[1] * 6.0f, sunPos[2] + sunDir[2] * 6.0f };
 
         ImVec2 sunScr, endScr;

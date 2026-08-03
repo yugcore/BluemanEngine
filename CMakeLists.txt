@@ -105,6 +105,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/assimp_importer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/hot_reload.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/terrain_system.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/heightmap_importer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/binding_layout.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/platform_win32.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/dx12_pipeline.cpp"

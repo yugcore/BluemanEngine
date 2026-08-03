@@ -75,13 +75,16 @@ void SceneGraph::SyncNodeComponents(SceneNode& node) {
                 newLight.lightType = 2;
                 newLight.intensity = 5000.0f;
                 newLight.range = 25.0f;
+                newLight.color[0] = 1.0f; newLight.color[1] = 0.90f; newLight.color[2] = 0.70f;
             } else if (node.name.find("Sun") != std::string::npos || node.name.find("Directional") != std::string::npos) {
                 newLight.lightType = 0;
                 newLight.intensity = 100000.0f;
+                newLight.color[0] = 1.0f; newLight.color[1] = 0.95f; newLight.color[2] = 0.85f;
             } else {
                 newLight.lightType = 1;
-                newLight.intensity = 1500.0f;
+                newLight.intensity = 2500.0f;
                 newLight.range = 15.0f;
+                newLight.color[0] = 1.0f; newLight.color[1] = 0.90f; newLight.color[2] = 0.70f;
             }
             ComponentRegistry::Get().AddComponent<LightComponent>(node.id, newLight);
         }

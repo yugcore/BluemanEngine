@@ -201,14 +201,16 @@ void RenderDetailsPanel(bool* pOpen) {
 
         auto& transform = EditorState::Get().activeTransform;
 
-        Widgets::RenderVector3PropertyRow("Location", transform.location, 0.0f);
+        bool locChanged = Widgets::RenderVector3PropertyRow("Location", transform.location, 0.0f);
         ImGui::Spacing();
-        Widgets::RenderVector3PropertyRow("Rotation", transform.rotation, 0.0f);
+        bool rotChanged = Widgets::RenderVector3PropertyRow("Rotation", transform.rotation, 0.0f);
         ImGui::Spacing();
-        Widgets::RenderVector3PropertyRow("Scale", transform.scale, 1.0f, &transform.lockAspect);
+        bool sclChanged = Widgets::RenderVector3PropertyRow("Scale", transform.scale, 1.0f, &transform.lockAspect);
+
+        bool transformChanged = locChanged || rotChanged || sclChanged;
 
         // Sync back to SceneNode & ComponentRegistry
-        if (activeNode) {
+        if (activeNode && transformChanged) {
             activeNode->location[0] = transform.location[0];
             activeNode->location[1] = transform.location[1];
             activeNode->location[2] = transform.location[2];
@@ -655,15 +657,15 @@ void RenderDetailsPanel(bool* pOpen) {
 
         if (ImGui::BeginMenu("Lighting")) {
             if (MatchesFilter("Point Light") && ImGui::MenuItem(ICON_FA_LIGHTBULB " Point Light")) {
-                LightComponent lc; lc.lightType = 1;
+                LightComponent lc; lc.lightType = 1; lc.intensity = 2500.0f; lc.range = 15.0f; lc.color[0] = 1.0f; lc.color[1] = 0.90f; lc.color[2] = 0.70f;
                 ComponentRegistry::Get().AddComponent<LightComponent>(entityId, lc);
             }
             if (MatchesFilter("Spot Light") && ImGui::MenuItem(ICON_FA_LIGHTBULB " Spot Light")) {
-                LightComponent lc; lc.lightType = 2;
+                LightComponent lc; lc.lightType = 2; lc.intensity = 5000.0f; lc.range = 25.0f; lc.color[0] = 1.0f; lc.color[1] = 0.90f; lc.color[2] = 0.70f;
                 ComponentRegistry::Get().AddComponent<LightComponent>(entityId, lc);
             }
             if (MatchesFilter("Directional Light") && ImGui::MenuItem(ICON_FA_SUN " Directional Light")) {
-                LightComponent lc; lc.lightType = 0;
+                LightComponent lc; lc.lightType = 0; lc.intensity = 100000.0f; lc.color[0] = 1.0f; lc.color[1] = 0.95f; lc.color[2] = 0.85f;
                 ComponentRegistry::Get().AddComponent<LightComponent>(entityId, lc);
             }
             ImGui::EndMenu();

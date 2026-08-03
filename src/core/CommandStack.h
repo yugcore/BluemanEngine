@@ -45,11 +45,13 @@ public:
     void Execute() override {
         EditorState::Get().selectedNodeNames = m_NewSelection;
         EditorState::Get().selectedNodeName = m_NewSelection.empty() ? "" : m_NewSelection.back();
+        EditorState::Get().RefreshActiveTransform(EditorState::Get().selectedNodeName);
     }
 
     void Undo() override {
         EditorState::Get().selectedNodeNames = m_OldSelection;
         EditorState::Get().selectedNodeName = m_OldSelection.empty() ? "" : m_OldSelection.back();
+        EditorState::Get().RefreshActiveTransform(EditorState::Get().selectedNodeName);
     }
 
     const char* GetName() const override { return "Selection Change"; }

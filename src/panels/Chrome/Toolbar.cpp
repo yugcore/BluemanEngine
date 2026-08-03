@@ -125,6 +125,10 @@ void RenderToolbar() {
                     EditorState::Get().TriggerImportFileDialog();
                     Logger::Get().Info("[Toolbar] Import Texture triggered.");
                 }
+                if (ImGui::MenuItem("Import Terrain Heightmap (PNG/RAW)...")) {
+                    EditorState::Get().TriggerImportHeightmapDialog();
+                    Logger::Get().Info("[Toolbar] Import Heightmap triggered.");
+                }
                 ImGui::EndPopup();
             }
 

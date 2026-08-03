@@ -319,8 +319,14 @@ struct EditorState {
     bool showProjectWizardModal = false;
     bool showProjectSettingsModal = false;
     bool requestImportFileDialog = false;
+    bool showImportHeightmapModal = false;
+    std::string activeHeightmapImportPath = "";
 
     void TriggerImportFileDialog() { requestImportFileDialog = true; }
+    void TriggerImportHeightmapDialog(const std::string& path = "") {
+        activeHeightmapImportPath = path;
+        showImportHeightmapModal = true;
+    }
 
     // Always Visible (Default)
     bool showViewportPanel = true;
@@ -367,22 +373,8 @@ struct EditorState {
         activeTransform = TransformData();
     }
 
-    void SetSelection(const std::string& name, const std::string& type, const std::string& path = "") {
-        selectedNodeNames.clear();
-        if (name.empty()) {
-            selectedNodeName.clear();
-            selectedNodeType.clear();
-            return;
-        }
-        selectedNodeNames.push_back(name);
-        selectedNodeName = name;
-        selectedNodeType = type;
-        
-        selectedAssetName = name;
-        selectedAssetType = type;
-        selectedAssetPath = path.empty() ? ("Scene/" + name) : path;
-        showDetailsPanel = true;
-
+    void RefreshActiveTransform(const std::string& name) {
+        if (name.empty()) return;
         const SceneNode* node = SceneGraph::Get().FindNode(name);
         if (node) {
             activeTransform.location[0] = node->location[0];
@@ -399,6 +391,25 @@ struct EditorState {
         }
     }
 
+    void SetSelection(const std::string& name, const std::string& type, const std::string& path = "") {
+        selectedNodeNames.clear();
+        if (name.empty()) {
+            selectedNodeName.clear();
+            selectedNodeType.clear();
+            return;
+        }
+        selectedNodeNames.push_back(name);
+        selectedNodeName = name;
+        selectedNodeType = type;
+        
+        selectedAssetName = name;
+        selectedAssetType = type;
+        selectedAssetPath = path.empty() ? ("Scene/" + name) : path;
+        showDetailsPanel = true;
+
+        RefreshActiveTransform(name);
+    }
+
     void AddSelection(const std::string& name, const std::string& type = "Actor") {
         if (name.empty()) return;
         if (!IsSelected(name)) {
@@ -407,6 +418,8 @@ struct EditorState {
         selectedNodeName = name;
         selectedNodeType = type;
         showDetailsPanel = true;
+
+        RefreshActiveTransform(name);
     }
 
     void ToggleSelection(const std::string& name, const std::string& type = "Actor") {
@@ -422,6 +435,9 @@ struct EditorState {
             selectedNodeName = name;
             selectedNodeType = type;
         }
+        showDetailsPanel = true;
+
+        RefreshActiveTransform(selectedNodeName);
     }
 
     static EditorState& Get() {

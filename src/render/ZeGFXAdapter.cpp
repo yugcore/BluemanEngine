@@ -1,5 +1,6 @@
 #include "ZeGFXAdapter.h"
 #include "zegfx.h"
+#include "cooker/asset_cooker.h"
 #include "core/EditorState.h"
 #include "core/ComponentRegistry.h"
 #include "engine/scene/SceneGraph.h"
@@ -8,6 +9,8 @@
 #include <vector>
 #include <cmath>
 #include <chrono>
+#include <filesystem>
+#include <algorithm>
 
 #include "physics/physics_world.h"
 
@@ -68,6 +71,9 @@ void ZeGFXAdapter::CreateDefaultPrimitives() {
 
     // Create default PBR material
     m_DefaultMaterialHandle = m_Renderer->createMaterial("DefaultPBRMaterial");
+    m_Renderer->setMaterialColor(m_DefaultMaterialHandle, "baseColor", zegfx::Color(200, 200, 200, 255));
+    m_Renderer->setMaterialFloat(m_DefaultMaterialHandle, "roughness", 0.5f);
+    m_Renderer->setMaterialFloat(m_DefaultMaterialHandle, "metallic", 0.0f);
     m_LoadedMaterials["DefaultPBRMaterial"] = m_DefaultMaterialHandle;
 
     // Create default Cube mesh (unit cube)
@@ -260,13 +266,40 @@ zegfx::RenderMeshHandle ZeGFXAdapter::LoadMeshAsset(const std::string& meshPath)
 
     if (!m_Renderer) return m_DefaultMeshHandle;
 
+    namespace fs = std::filesystem;
+    std::string cookPath = meshPath;
+    std::string ext = fs::path(meshPath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    // If raw 3D mesh format, cook it to .zmesh first using AssetCooker if not already cooked
+    if (ext == ".gltf" || ext == ".glb" || ext == ".obj" || ext == ".fbx" || ext == ".vox") {
+        std::string projectDir = "CookedAssets";
+        std::error_code ec;
+        fs::create_directories(projectDir, ec);
+        std::string stem = fs::path(meshPath).stem().string();
+        std::string targetOut = projectDir + "/" + stem + ".zmesh";
+
+        if (fs::exists(targetOut)) {
+            cookPath = targetOut;
+        } else {
+            zegfx::cooker::AssetCooker cooker;
+            std::cout << "[ZeGFXAdapter] Cooking raw asset '" << meshPath << "' to '" << targetOut << "'..." << std::endl;
+            if (cooker.CookMesh(meshPath, targetOut)) {
+                cookPath = targetOut;
+            } else {
+                std::cerr << "[ZeGFXAdapter] AssetCooker fallback for '" << meshPath << "'" << std::endl;
+            }
+        }
+    }
+
     std::string err;
-    zegfx::RenderMeshHandle handle = m_Renderer->loadMesh(meshPath, err);
+    zegfx::RenderMeshHandle handle = m_Renderer->loadMesh(cookPath, err);
     if (handle.valid()) {
         m_LoadedMeshes[meshPath] = handle;
+        m_LoadedMeshes[cookPath] = handle;
         return handle;
     } else {
-        std::cerr << "[ZeGFXAdapter] Failed to load mesh asset (" << meshPath << "): " << err << std::endl;
+        std::cerr << "[ZeGFXAdapter] Failed to load mesh asset (" << cookPath << "): " << err << std::endl;
         return m_DefaultMeshHandle;
     }
 }
@@ -286,6 +319,106 @@ zegfx::RenderMaterialHandle ZeGFXAdapter::LoadMaterialAsset(const std::string& m
     } else {
         return m_DefaultMaterialHandle;
     }
+}
+
+std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, const std::string& filePath, const zegfx::HeightmapImportSettings& settings, std::string& outError) {
+    if (!m_Renderer) {
+        outError = "Renderer not initialized.";
+        return "";
+    }
+
+    zegfx::HeightmapImportResult importRes = zegfx::HeightmapImporter::LoadFromFile(filePath, settings);
+    if (!importRes.success) {
+        outError = importRes.errorMessage;
+        return "";
+    }
+
+    int W = importRes.targetWidth;
+    int H = importRes.targetHeight;
+    float cellSize = settings.cellSize;
+    float heightScale = settings.heightScale;
+
+    float halfSizeX = (W - 1) * cellSize * 0.5f;
+    float halfSizeZ = (H - 1) * cellSize * 0.5f;
+
+    std::vector<zegfx::ProceduralVertex> vertices;
+    vertices.reserve(W * H);
+
+    for (int r = 0; r < H; ++r) {
+        float localZ = r * cellSize - halfSizeZ;
+        for (int c = 0; c < W; ++c) {
+            float localX = c * cellSize - halfSizeX;
+            float y = importRes.heights[r * W + c] * heightScale;
+
+            // Finite difference normals
+            float eps = cellSize;
+            float hL = importRes.heights[r * W + std::max(0, c - 1)] * heightScale;
+            float hR = importRes.heights[r * W + std::min(W - 1, c + 1)] * heightScale;
+            float hD = importRes.heights[std::max(0, r - 1) * W + c] * heightScale;
+            float hU = importRes.heights[std::min(H - 1, r + 1) * W + c] * heightScale;
+
+            float nvx = hL - hR;
+            float nvy = 2.0f * eps;
+            float nvz = hD - hU;
+            float len = std::sqrt(nvx * nvx + nvy * nvy + nvz * nvz);
+            float nx = (len > 0.0f) ? nvx / len : 0.0f;
+            float ny = (len > 0.0f) ? nvy / len : 1.0f;
+            float nz = (len > 0.0f) ? nvz / len : 0.0f;
+
+            zegfx::ProceduralVertex v = {};
+            v.x = localX;
+            v.y = y;
+            v.z = localZ;
+            v.nx = nx;
+            v.ny = ny;
+            v.nz = nz;
+            v.u = (float)c / (W - 1);
+            v.v = (float)r / (H - 1);
+
+            // Slope color blending (grass green vs rocky brown)
+            float slope = 1.0f - ny;
+            float blend = std::clamp(slope * 3.0f, 0.0f, 1.0f);
+            uint8_t vr = static_cast<uint8_t>(64.0f + blend * (115.0f - 64.0f));
+            uint8_t vg = static_cast<uint8_t>(128.0f + blend * (105.0f - 128.0f));
+            uint8_t vb = static_cast<uint8_t>(72.0f + blend * (95.0f - 72.0f));
+            v.color = zegfx::Color(vr, vg, vb, 255);
+
+            vertices.push_back(v);
+        }
+    }
+
+    std::vector<uint32_t> indices;
+    indices.reserve((W - 1) * (H - 1) * 6);
+    for (int r = 0; r < H - 1; ++r) {
+        for (int c = 0; c < W - 1; ++c) {
+            uint32_t i0 = r * W + c;
+            uint32_t i1 = r * W + (c + 1);
+            uint32_t i2 = (r + 1) * W + c;
+            uint32_t i3 = (r + 1) * W + (c + 1);
+
+            indices.push_back(i0);
+            indices.push_back(i2);
+            indices.push_back(i1);
+
+            indices.push_back(i1);
+            indices.push_back(i2);
+            indices.push_back(i3);
+        }
+    }
+
+    zegfx::RenderMeshHandle handle = m_Renderer->createProceduralMesh(vertices, indices);
+    if (!handle.valid()) {
+        outError = "Failed to create procedural mesh on GPU renderer.";
+        return "";
+    }
+
+    std::string meshKey = "TerrainMesh_" + name;
+    m_LoadedMeshes[meshKey] = handle;
+
+    std::cout << "[ZeGFXAdapter] Created terrain mesh key: " << meshKey
+              << " vertices=" << vertices.size() << " indices=" << indices.size() << "\n";
+
+    return meshKey;
 }
 
 void ZeGFXAdapter::Shutdown() {
@@ -392,7 +525,9 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
         }
 
         rSettings.fog.enabled = fog;
-        rSettings.fog.density = edSettings.fog.density;
+        rSettings.fog.density = (edSettings.fog.density > 0.0001f) ? edSettings.fog.density : 0.005f;
+        rSettings.fog.heightFalloff = 0.08f;
+        rSettings.fog.cameraHeight = EditorState::Get().camera.GetPosition().y;
         rSettings.fog.inScatteringColor = zegfx::Color(
             (uint8_t)(edSettings.fog.color[0] * 255.0f),
             (uint8_t)(edSettings.fog.color[1] * 255.0f),
@@ -433,27 +568,6 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
 
     // 1. Traversal of SceneGraph Nodes for Directional Lights, Mesh Entities, Foliage, Terrain & Local Lights
     const auto& rootNodes = SceneGraph::Get().GetRootNodes();
-
-    // Look for Directional Light in SceneGraph first
-    const SceneNode* sunNode = SceneGraph::Get().FindNode("DirectionalSunLight");
-    zegfx::DirectionalLightData sunLight = {};
-    if (sunNode) {
-        // Calculate direction vector from Euler rotation (degrees)
-        float pitchRad = sunNode->rotation[0] * 3.14159265f / 180.0f;
-        float yawRad   = sunNode->rotation[1] * 3.14159265f / 180.0f;
-        sunLight.direction = {
-            std::cos(pitchRad) * std::sin(yawRad),
-            -std::sin(pitchRad),
-            -std::cos(pitchRad) * std::cos(yawRad)
-        };
-        sunLight.color = { 1.0f, 0.95f, 0.85f };
-        sunLight.illuminanceLux = 100000.0f;
-    } else {
-        sunLight.direction = { -0.5f, -0.8f, -0.3f };
-        sunLight.color = { 1.0f, 0.95f, 0.85f };
-        sunLight.illuminanceLux = 100000.0f;
-    }
-    m_DirectionalLights.push_back(sunLight);
 
     auto traverseNodes = [&](auto& self, const std::vector<SceneNode>& nodes) -> void {
         for (const auto& node : nodes) {
@@ -555,32 +669,68 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
                 inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
                 inst.visibilityFlags = 1;
                 m_OpaqueInstances.push_back(inst);
-            } else if (node.type == SceneNodeType::Light || lightComp != nullptr) {
-                zegfx::LocalLightData localLight = {};
-                if (lightComp) {
-                    localLight.type = (lightComp->lightType == 2) ? zegfx::LightType::Spot : zegfx::LightType::Point;
-                    localLight.range = lightComp->range;
-                    localLight.intensity = lightComp->intensity;
-                    localLight.innerConeCos = std::cos(lightComp->innerCone * 3.14159265f / 180.0f);
-                    localLight.outerConeCos = std::cos(lightComp->outerCone * 3.14159265f / 180.0f);
-                    localLight.color = { lightComp->color[0], lightComp->color[1], lightComp->color[2] };
-                } else {
-                    if (node.name.find("Spot") != std::string::npos) {
-                        localLight.type = zegfx::LightType::Spot;
-                        localLight.range = 25.0f;
-                        localLight.intensity = 5000.0f;
-                        localLight.innerConeCos = 0.90f;
-                        localLight.outerConeCos = 0.70f;
-                    } else {
-                        localLight.type = zegfx::LightType::Point;
-                        localLight.range = 15.0f;
-                        localLight.intensity = 2500.0f;
+            } else if (node.type == SceneNodeType::Light || node.type == SceneNodeType::SkyAtmosphere || lightComp != nullptr) {
+                bool isDirectional = (lightComp && lightComp->lightType == 0) ||
+                                     (node.name.find("Sun") != std::string::npos || node.name.find("Directional") != std::string::npos);
+                if (isDirectional) {
+                    float pitchRad = rot[0] * 3.14159265f / 180.0f;
+                    float yawRad   = rot[1] * 3.14159265f / 180.0f;
+                    zegfx::DirectionalLightData sunLight = {};
+                    sunLight.direction = {
+                        std::cos(pitchRad) * std::sin(yawRad),
+                        -std::sin(pitchRad),
+                        -std::cos(pitchRad) * std::cos(yawRad)
+                    };
+                    if (node.name == "DirectionalSunLight") {
+                        std::cout << "[SUN DEBUG] id=" << node.id
+                                  << " rot={" << rot[0] << "," << rot[1] << "," << rot[2] << "}"
+                                  << " dir={" << sunLight.direction.x << "," << sunLight.direction.y << "," << sunLight.direction.z << "}"
+                                  << " meshComp=" << (void*)meshComp
+                                  << " lightComp=" << (void*)lightComp
+                                  << " lType=" << (lightComp ? lightComp->lightType : -1)
+                                  << " isDir=" << isDirectional << std::endl;
                     }
-                    localLight.color = { 1.0f, 0.90f, 0.70f };
+                    if (lightComp) {
+                        float r = lightComp->color[0];
+                        float g = lightComp->color[1];
+                        float b = lightComp->color[2];
+                        if (r <= 0.001f && g <= 0.001f && b <= 0.001f) {
+                            r = 1.0f; g = 0.95f; b = 0.85f;
+                        }
+                        sunLight.color = { r, g, b };
+                        sunLight.illuminanceLux = (lightComp->intensity > 0.0f) ? lightComp->intensity : 100000.0f;
+                    } else {
+                        sunLight.color = { 1.0f, 0.95f, 0.85f };
+                        sunLight.illuminanceLux = 100000.0f;
+                    }
+                    m_DirectionalLights.push_back(sunLight);
+                } else {
+                    zegfx::LocalLightData localLight = {};
+                    if (lightComp) {
+                        localLight.type = (lightComp->lightType == 2) ? zegfx::LightType::Spot : zegfx::LightType::Point;
+                        localLight.range = lightComp->range;
+                        localLight.intensity = lightComp->intensity;
+                        localLight.innerConeCos = std::cos(lightComp->innerCone * 3.14159265f / 180.0f);
+                        localLight.outerConeCos = std::cos(lightComp->outerCone * 3.14159265f / 180.0f);
+                        localLight.color = { lightComp->color[0], lightComp->color[1], lightComp->color[2] };
+                    } else {
+                        if (node.name.find("Spot") != std::string::npos) {
+                            localLight.type = zegfx::LightType::Spot;
+                            localLight.range = 25.0f;
+                            localLight.intensity = 5000.0f;
+                            localLight.innerConeCos = 0.90f;
+                            localLight.outerConeCos = 0.70f;
+                        } else {
+                            localLight.type = zegfx::LightType::Point;
+                            localLight.range = 15.0f;
+                            localLight.intensity = 2500.0f;
+                        }
+                        localLight.color = { 1.0f, 0.90f, 0.70f };
+                    }
+                    localLight.position = { loc[0], loc[1] + 4.0f, loc[2] };
+                    localLight.direction = { 0.0f, -1.0f, 0.0f };
+                    m_LocalLights.push_back(localLight);
                 }
-                localLight.position = { loc[0], loc[1] + 4.0f, loc[2] };
-                localLight.direction = { 0.0f, -1.0f, 0.0f };
-                m_LocalLights.push_back(localLight);
             }
             if (!node.children.empty()) {
                 self(self, node.children);
@@ -589,11 +739,45 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
     };
     traverseNodes(traverseNodes, rootNodes);
 
+    static zegfx::DirectionalLightData s_LastSunLight = []() {
+        zegfx::DirectionalLightData sun = {};
+        sun.direction = { -0.5f, -0.8f, -0.3f };
+        sun.illuminanceLux = 100000.0f;
+        sun.color = { 1.0f, 0.95f, 0.85f };
+        return sun;
+    }();
+    static bool s_SunFirstSync = true;
+
+    if (!m_DirectionalLights.empty()) {
+        const auto& activeSun = m_DirectionalLights[0];
+        bool sunChanged = s_SunFirstSync ||
+                          std::abs(activeSun.direction.x - s_LastSunLight.direction.x) > 0.0001f ||
+                          std::abs(activeSun.direction.y - s_LastSunLight.direction.y) > 0.0001f ||
+                          std::abs(activeSun.direction.z - s_LastSunLight.direction.z) > 0.0001f ||
+                          std::abs(activeSun.color.x - s_LastSunLight.color.x) > 0.001f ||
+                          std::abs(activeSun.color.y - s_LastSunLight.color.y) > 0.001f ||
+                          std::abs(activeSun.color.z - s_LastSunLight.color.z) > 0.001f ||
+                          std::abs(activeSun.illuminanceLux - s_LastSunLight.illuminanceLux) > 0.1f;
+
+        if (sunChanged) {
+            s_SunFirstSync = false;
+            s_LastSunLight = activeSun;
+            if (m_Renderer) {
+                m_Renderer->setDirectionalLight(activeSun);
+            }
+        }
+    } else {
+        // Maintain active user/UI sun light state without clobbering with hardcoded defaults
+        m_DirectionalLights.push_back(s_LastSunLight);
+    }
+
     // 3. Assemble RenderSceneSnapshot
     zegfx::RenderSceneSnapshot snapshot = {};
     snapshot.opaque = zegfx::Span<const zegfx::RenderInstance>(m_OpaqueInstances.data(), m_OpaqueInstances.size());
     snapshot.directionalLights = zegfx::Span<const zegfx::DirectionalLightData>(m_DirectionalLights.data(), m_DirectionalLights.size());
     snapshot.localLights = zegfx::Span<const zegfx::LocalLightData>(m_LocalLights.data(), m_LocalLights.size());
+    snapshot.environment.ambientColor = zegfx::Color(140, 170, 205, 255);
+    snapshot.environment.intensityMultiplier = 1.0f;
 
     // 4. Camera Render Data
     const auto& edCam = EditorState::Get().camera;
@@ -611,6 +795,7 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
             camera.projection.m[r][c] = projMatRaw[r * 4 + c];
         }
     }
+    camera.viewProjection = camera.view * camera.projection;
     EngineEditor::Vec3f camPos = edCam.GetPosition();
     camera.position = { camPos.x, camPos.y, camPos.z };
     camera.nearPlane = 0.1f;
@@ -657,6 +842,9 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
 void ZeGFXAdapter::SetOutputRenderTarget(ID3D12Resource* rtResource, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle) {
     m_ActiveRenderTargetResource = rtResource;
     m_ActiveRtvHandle = rtvHandle;
+    if (m_Renderer) {
+        m_Renderer->setExternalRenderTargetCPU(rtvHandle.ptr);
+    }
 }
 
 void ZeGFXAdapter::Render(ID3D12GraphicsCommandList* cmdList, uint32_t width, uint32_t height, float deltaTime) {

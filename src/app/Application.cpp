@@ -19,6 +19,7 @@
 // Editor Panels
 #include "panels/Viewport/ViewportPanel.h"
 #include "panels/ImportProgress/ImportProgressModal.h"
+#include "panels/ImportProgress/ImportHeightmapModal.h"
 #include "panels/ContentBrowser/ContentBrowserPanel.h"
 #include "panels/Outliner/OutlinerPanel.h"
 #include "panels/Details/DetailsPanel.h"
@@ -133,6 +134,7 @@ void RenderApplicationLayout() {
 
     // Render Modals
     RenderImportProgressModal();
+    RenderImportHeightmapModal();
     RenderProjectWizardModal(&state.showProjectWizardModal);
     RenderProjectSettingsModal(&state.showProjectSettingsModal);
 

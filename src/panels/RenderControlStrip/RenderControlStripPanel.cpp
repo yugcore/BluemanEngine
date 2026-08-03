@@ -280,6 +280,11 @@ void RenderRenderControlStripPanel(bool* pOpen) {
             SceneGraph::Get().AddNode(terrainNode);
             Logger::Get().Info("[Terrain] Spawned 1KM Forest Terrain Chunk: " + terrainNode.name);
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Import External Heightmap...", ImVec2(240.0f, Theme::Metrics::rowHeight))) {
+            EditorState::Get().TriggerImportHeightmapDialog();
+            Logger::Get().Info("[Terrain] Import External Heightmap triggered from Control Strip.");
+        }
         ImGui::PopStyleColor(2);
 
         ImGui::Spacing();

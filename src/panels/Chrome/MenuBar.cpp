@@ -108,6 +108,10 @@ void RenderMenuBarContents() {
             EditorState::Get().TriggerImportFileDialog();
             Logger::Get().Info("[Menu] File > Import Assets dialog opened.");
         }
+        if (ImGui::MenuItem("Import Heightmap (PNG/RAW)...")) {
+            EditorState::Get().TriggerImportHeightmapDialog();
+            Logger::Get().Info("[Menu] File > Import Heightmap requested.");
+        }
         if (ImGui::MenuItem("Import Asset with Options...")) {
             EditorState::Get().TriggerImportFileDialog();
             Logger::Get().Info("[Menu] File > Import Asset with Options requested.");

@@ -1,6 +1,7 @@
 #include "RunViewportPanel.h"
 #include "render/ViewportRenderer.h"
 #include "core/EditorState.h"
+#include "engine/core/Logger.h"
 #include "theme/Colors.h"
 #include "theme/Metrics.h"
 
@@ -31,6 +32,12 @@ void RenderRunViewportPanel(bool* pOpen) {
     uint64_t textureID = ViewportRenderer::Get().GetTextureID();
     if (textureID != 0) {
         ImGui::Image((ImTextureID)textureID, viewportAvail, ImVec2(0, 1), ImVec2(1, 0));
+    } else {
+        static bool s_LoggedRunViewportErr = false;
+        if (!s_LoggedRunViewportErr) {
+            s_LoggedRunViewportErr = true;
+            Logger::Get().Error("[Run Viewport] ERROR: Render texture handle is null (0)! Game viewport output unavailable.");
+        }
     }
 
     ImGui::End();

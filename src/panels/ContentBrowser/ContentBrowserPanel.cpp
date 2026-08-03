@@ -72,6 +72,10 @@ void RenderContentBrowserPanel(bool* pOpen) {
             EditorState::Get().TriggerImportFileDialog();
             Logger::Get().Info("[ContentBrowser] Native Windows File Import triggered from +Add menu.");
         }
+        if (ImGui::MenuItem("Import Heightmap for Terrain (PNG/RAW)...")) {
+            EditorState::Get().TriggerImportHeightmapDialog();
+            Logger::Get().Info("[ContentBrowser] Import Heightmap triggered from +Add menu.");
+        }
         ImGui::Separator();
         if (ImGui::MenuItem("New PBR Material")) {
             Logger::Get().Info("[ContentBrowser] Created new Material asset");

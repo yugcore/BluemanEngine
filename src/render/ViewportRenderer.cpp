@@ -121,14 +121,24 @@ void ViewportRenderer::Resize(uint32_t width, uint32_t height) {
 
 void ViewportRenderer::RenderScene(float deltaTime, ID3D12GraphicsCommandList* cmdList) {
     ID3D12GraphicsCommandList* cl = cmdList ? cmdList : m_ActiveCmdList;
-    if (m_Width == 0 || m_Height == 0 || !cl) return;
+    if (m_Width == 0 || m_Height == 0 || !cl) {
+        std::cerr << "[ViewportRenderer] RenderScene early-out: width=" << m_Width
+                  << " height=" << m_Height << " cl=" << (void*)cl << std::endl;
+        return;
+    }
 
     if (m_RenderCallback) {
+        std::cerr << "[ViewportRenderer] RenderScene: using m_RenderCallback, bypassing m_ColorTexture entirely!" << std::endl;
         m_RenderCallback(cl, m_Width, m_Height, deltaTime);
         return;
     }
 
-    if (!m_ColorTexture) return;
+    if (!m_ColorTexture) {
+        std::cerr << "[ViewportRenderer] RenderScene early-out: m_ColorTexture is null" << std::endl;
+        return;
+    }
+
+    std::cerr << "[ViewportRenderer] RenderScene: proceeding to render into m_ColorTexture (width=" << m_Width << ", height=" << m_Height << ")" << std::endl;
 
     // Transition offscreen target to RENDER_TARGET state
     if (m_CurrentState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
@@ -143,8 +153,8 @@ void ViewportRenderer::RenderScene(float deltaTime, ID3D12GraphicsCommandList* c
         m_CurrentState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
-    // Clear offscreen render target with atmospheric Blue Sky clear color
-    float skyClearColor[4] = { 0.38f, 0.62f, 0.92f, 1.00f };
+    // Clear offscreen render target with dark atmospheric clear color
+    float skyClearColor[4] = { 0.05f, 0.07f, 0.10f, 1.00f };
     cl->ClearRenderTargetView(m_RtvHandle, skyClearColor, 0, nullptr);
 
     // Bind viewport offscreen render target to command list & register target

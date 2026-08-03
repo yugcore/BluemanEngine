@@ -47,8 +47,8 @@ struct MaterialComponent {
 
 struct LightComponent {
     int lightType = 0; // 0: Directional, 1: Point, 2: Spot
-    float color[3] = { 1.00f, 1.00f, 1.00f };
-    float intensity = 1.00f;
+    float color[3] = { 1.00f, 0.95f, 0.85f };
+    float intensity = 100000.00f;
     float range = 10.00f;
     float innerCone = 15.00f;
     float outerCone = 45.00f;

@@ -160,68 +160,28 @@ void RenderViewportPanel(bool* pOpen) {
         }
     }
 
-    ViewportRenderer::Get().RenderScene(deltaTime);
-
-    uint64_t textureID = ViewportRenderer::Get().GetTextureID();
-    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-
-    if (textureID != 0) {
-        ImGui::Image((ImTextureID)textureID, viewportAvail, ImVec2(0, 1), ImVec2(1, 0));
-    } else {
-        ImGui::Dummy(viewportAvail);
+    if (!ZeGFXAdapter::Get().IsInitialized()) {
+        static bool s_LoggedUninitErr = false;
+        if (!s_LoggedUninitErr) {
+            s_LoggedUninitErr = true;
+            Logger::Get().Error("[Viewport] ERROR: ZeGFX Engine Adapter is uninitialized!");
+        }
     }
 
-    // Viewport "No Content" Helper Overlay
-    if (SceneGraph::Get().GetRootNodes().empty()) {
-        const auto& pal = Theme::GetPalette();
-        ImVec2 centerPos = ImVec2(cursorPos.x + viewportAvail.x * 0.5f, cursorPos.y + viewportAvail.y * 0.5f);
-        
-        ImGui::SetCursorScreenPos(ImVec2(centerPos.x - 220.0f, centerPos.y - 45.0f));
-        ImGui::BeginGroup();
-        
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(pal.bgElevated.x, pal.bgElevated.y, pal.bgElevated.z, 0.85f));
-        
-        if (ImGui::BeginChild("##EmptyViewportHelper", ImVec2(440.0f, 90.0f), true, ImGuiWindowFlags_NoScrollbar)) {
-            ImGui::SetCursorPosY(12.0f);
-            ImGui::TextColored(pal.textSecondary, "    Drag 3D assets here or use Create > 3D Object");
-            ImGui::Spacing();
-            ImGui::SetCursorPosX(35.0f);
-            
-            if (ImGui::Button("+ Cube", ImVec2(100.0f, 26.0f))) {
-                SceneNode node;
-                node.id = SceneGraph::Get().GenerateNodeId();
-                node.name = "Cube";
-                node.type = SceneNodeType::Actor;
-                node.meshPath = "Engine/DefaultCube";
-                SceneGraph::Get().AddNode(node);
-                ZeGFXAdapter::Get().CreateDefaultPrimitives();
-            }
-            ImGui::SameLine(0.0f, 12.0f);
-            if (ImGui::Button("+ Sphere", ImVec2(100.0f, 26.0f))) {
-                SceneNode node;
-                node.id = SceneGraph::Get().GenerateNodeId();
-                node.name = "Sphere";
-                node.type = SceneNodeType::Actor;
-                node.meshPath = "Engine/DefaultSphere";
-                SceneGraph::Get().AddNode(node);
-                ZeGFXAdapter::Get().CreateDefaultPrimitives();
-            }
-            ImGui::SameLine(0.0f, 12.0f);
-            if (ImGui::Button("+ Plane", ImVec2(100.0f, 26.0f))) {
-                SceneNode node;
-                node.id = SceneGraph::Get().GenerateNodeId();
-                node.name = "Plane";
-                node.type = SceneNodeType::Actor;
-                node.meshPath = "Engine/DefaultPlane";
-                SceneGraph::Get().AddNode(node);
-                ZeGFXAdapter::Get().CreateDefaultPrimitives();
-            }
+    ViewportRenderer::Get().RenderScene(deltaTime);
+
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+
+    uint64_t textureID = ViewportRenderer::Get().GetTextureID();
+    if (textureID == 0) {
+        static bool s_LoggedTexErr = false;
+        if (!s_LoggedTexErr) {
+            s_LoggedTexErr = true;
+            Logger::Get().Error("[Viewport] ERROR: Viewport SRV texture handle is null (0)! ZeGFX rendering output unavailable.");
         }
-        ImGui::EndChild();
-        ImGui::PopStyleColor();
-        ImGui::PopStyleVar();
-        ImGui::EndGroup();
+        ImGui::Dummy(viewportAvail);
+    } else {
+        ImGui::Image((ImTextureID)textureID, viewportAvail, ImVec2(0, 1), ImVec2(1, 0));
     }
 
     // Drag-and-drop target handling
