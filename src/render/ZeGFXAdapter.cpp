@@ -4,6 +4,7 @@
 #include "core/EditorState.h"
 #include "core/ComponentRegistry.h"
 #include "engine/scene/SceneGraph.h"
+#include "engine/scene/SunOrbitController.h"
 
 #include <iostream>
 #include <vector>
@@ -67,7 +68,21 @@ bool ZeGFXAdapter::Initialize(ID3D12Device* device, HWND hwnd, uint32_t width, u
     sunLight.direction = { sDir[0], sDir[1], sDir[2] };
     sunLight.color = { 1.0f, 0.95f, 0.85f };
     sunLight.illuminanceLux = 100000.0f;
+    sunLight.angularDiameterRadians = 0.0093f;
     m_Renderer->setDirectionalLight(sunLight);
+
+    // Phase 5: Register Sky/Atmosphere Observer (Decoupled Event, No Hard Reference)
+    SunOrbitController::Get().RegisterSunChangeListener([this](const float dir[3], float elevationDeg) {
+        float elevNorm = std::max(0.0f, std::min(1.0f, (elevationDeg + 10.0f) / 100.0f));
+        if (elevationDeg > 0.0f) {
+            uint8_t r = static_cast<uint8_t>(51.0f * elevNorm + 245.0f * (1.0f - elevNorm));
+            uint8_t g = static_cast<uint8_t>(107.0f * elevNorm + 160.0f * (1.0f - elevNorm));
+            uint8_t b = static_cast<uint8_t>(191.0f * elevNorm + 100.0f * (1.0f - elevNorm));
+            m_SkyAmbientColor = zegfx::Color(r, g, b, 255);
+        } else {
+            m_SkyAmbientColor = zegfx::Color(10, 15, 30, 255);
+        }
+    });
 
     CreateDefaultPrimitives();
 
@@ -258,6 +273,62 @@ void ZeGFXAdapter::CreateDefaultPrimitives() {
     m_LoadedMeshes["cone"] = m_DefaultConeMeshHandle;
     m_LoadedMeshes["Engine/DefaultCone"] = m_DefaultConeMeshHandle;
     m_LoadedMeshes["primitives/cone.zmesh"] = m_DefaultConeMeshHandle;
+
+    // Create default 32x32 solid terrain mesh (32x32 vertices, 32m x 32m grid)
+    std::vector<zegfx::ProceduralVertex> terrainVerts;
+    std::vector<uint32_t> terrainIndices;
+    const int terrainResX = 32;
+    const int terrainResZ = 32;
+    const float terrainSizeX = 32.0f;
+    const float terrainSizeZ = 32.0f;
+    const float halfTerrainX = terrainSizeX * 0.5f;
+    const float halfTerrainZ = terrainSizeZ * 0.5f;
+    const zegfx::Color terrainColor(75, 125, 75, 255); // Lush terrain ground green
+
+    terrainVerts.reserve(terrainResX * terrainResZ);
+    for (int r = 0; r < terrainResZ; ++r) {
+        float normZ = (float)r / (float)(terrainResZ - 1);
+        float z = normZ * terrainSizeZ - halfTerrainZ;
+        for (int c = 0; c < terrainResX; ++c) {
+            float normX = (float)c / (float)(terrainResX - 1);
+            float x = normX * terrainSizeX - halfTerrainX;
+
+            zegfx::ProceduralVertex v = {};
+            v.x = x;
+            v.y = 0.0f; // Solid ground plane
+            v.z = z;
+            v.nx = 0.0f; v.ny = 1.0f; v.nz = 0.0f;
+            v.u = normX * 8.0f; // 8x UV texture tiling
+            v.v = normZ * 8.0f;
+            v.color = terrainColor;
+            terrainVerts.push_back(v);
+        }
+    }
+
+    terrainIndices.reserve((terrainResX - 1) * (terrainResZ - 1) * 6);
+    for (int r = 0; r < terrainResZ - 1; ++r) {
+        for (int c = 0; c < terrainResX - 1; ++c) {
+            uint32_t i0 = r * terrainResX + c;
+            uint32_t i1 = r * terrainResX + (c + 1);
+            uint32_t i2 = (r + 1) * terrainResX + c;
+            uint32_t i3 = (r + 1) * terrainResX + (c + 1);
+
+            terrainIndices.push_back(i0);
+            terrainIndices.push_back(i2);
+            terrainIndices.push_back(i1);
+
+            terrainIndices.push_back(i1);
+            terrainIndices.push_back(i2);
+            terrainIndices.push_back(i3);
+        }
+    }
+
+    m_DefaultTerrain32x32MeshHandle = m_Renderer->createProceduralMesh(terrainVerts, terrainIndices);
+    m_LoadedMeshes["DefaultTerrain32x32"] = m_DefaultTerrain32x32MeshHandle;
+    m_LoadedMeshes["Engine/DefaultTerrain32x32"] = m_DefaultTerrain32x32MeshHandle;
+    m_LoadedMeshes["DefaultTerrain"] = m_DefaultTerrain32x32MeshHandle;
+    m_LoadedMeshes["Engine/DefaultTerrain"] = m_DefaultTerrain32x32MeshHandle;
+    m_LoadedMeshes["primitives/terrain32x32.zmesh"] = m_DefaultTerrain32x32MeshHandle;
 }
 
 void ZeGFXAdapter::SetLightingDebugMode(int mode) {
@@ -621,6 +692,10 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
 
     auto traverseNodes = [&](auto& self, const std::vector<SceneNode>& nodes) -> void {
         for (const auto& node : nodes) {
+            if (!node.visible) {
+                continue;
+            }
+
             const TransformComponent* transformComp = ComponentRegistry::Get().GetComponent<TransformComponent>(node.id);
             const MeshComponent* meshComp = ComponentRegistry::Get().GetComponent<MeshComponent>(node.id);
             const MaterialComponent* matComp = ComponentRegistry::Get().GetComponent<MaterialComponent>(node.id);
@@ -686,64 +761,95 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
                 inst.visibilityFlags = 1;
                 m_OpaqueInstances.push_back(inst);
             } else if (node.type == SceneNodeType::Actor || node.type == SceneNodeType::Terrain || meshComp != nullptr) {
-                zegfx::RenderInstance inst = {};
-                inst.mesh = LoadMeshAsset(meshPath);
-                inst.material = LoadMaterialAsset(matPath);
+                if (!meshPath.empty()) {
+                    zegfx::RenderInstance inst = {};
+                    inst.mesh = LoadMeshAsset(meshPath);
+                    inst.material = LoadMaterialAsset(matPath);
 
-                float pitch = rot[0] * 3.14159265f / 180.0f;
-                float yaw   = rot[1] * 3.14159265f / 180.0f;
-                float roll  = rot[2] * 3.14159265f / 180.0f;
+                    float pitch = rot[0] * 3.14159265f / 180.0f;
+                    float yaw   = rot[1] * 3.14159265f / 180.0f;
+                    float roll  = rot[2] * 3.14159265f / 180.0f;
 
-                float cx = std::cos(pitch), sx = std::sin(pitch);
-                float cy = std::cos(yaw),   sy = std::sin(yaw);
-                float cz = std::cos(roll),  sz = std::sin(roll);
+                    float cx = std::cos(pitch), sx = std::sin(pitch);
+                    float cy = std::cos(yaw),   sy = std::sin(yaw);
+                    float cz = std::cos(roll),  sz = std::sin(roll);
 
-                float r00 = cy * cz + sy * sx * sz;
-                float r01 = cx * sz;
-                float r02 = -sy * cz + cy * sx * sz;
+                    float r00 = cy * cz + sy * sx * sz;
+                    float r01 = cx * sz;
+                    float r02 = -sy * cz + cy * sx * sz;
 
-                float r10 = -cy * sz + sy * sx * cz;
-                float r11 = cx * cz;
-                float r12 = sy * sz + cy * sx * cz;
+                    float r10 = -cy * sz + sy * sx * cz;
+                    float r11 = cx * cz;
+                    float r12 = sy * sz + cy * sx * cz;
 
-                float r20 = sy * cx;
-                float r21 = -sx;
-                float r22 = cy * cx;
+                    float r20 = sy * cx;
+                    float r21 = -sx;
+                    float r22 = cy * cx;
 
-                inst.world = zegfx::Mat4::identity();
-                inst.world.m[0][0] = r00 * scl[0]; inst.world.m[0][1] = r01 * scl[0]; inst.world.m[0][2] = r02 * scl[0]; inst.world.m[0][3] = 0.0f;
-                inst.world.m[1][0] = r10 * scl[1]; inst.world.m[1][1] = r11 * scl[1]; inst.world.m[1][2] = r12 * scl[1]; inst.world.m[1][3] = 0.0f;
-                inst.world.m[2][0] = r20 * scl[2]; inst.world.m[2][1] = r21 * scl[2]; inst.world.m[2][2] = r22 * scl[2]; inst.world.m[2][3] = 0.0f;
-                inst.world.m[3][0] = loc[0];       inst.world.m[3][1] = loc[1];       inst.world.m[3][2] = loc[2];       inst.world.m[3][3] = 1.0f;
+                    inst.world = zegfx::Mat4::identity();
+                    inst.world.m[0][0] = r00 * scl[0]; inst.world.m[0][1] = r01 * scl[0]; inst.world.m[0][2] = r02 * scl[0]; inst.world.m[0][3] = 0.0f;
+                    inst.world.m[1][0] = r10 * scl[1]; inst.world.m[1][1] = r11 * scl[1]; inst.world.m[1][2] = r12 * scl[1]; inst.world.m[1][3] = 0.0f;
+                    inst.world.m[2][0] = r20 * scl[2]; inst.world.m[2][1] = r21 * scl[2]; inst.world.m[2][2] = r22 * scl[2]; inst.world.m[2][3] = 0.0f;
+                    inst.world.m[3][0] = loc[0];       inst.world.m[3][1] = loc[1];       inst.world.m[3][2] = loc[2];       inst.world.m[3][3] = 1.0f;
 
-                inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
-                inst.visibilityFlags = 1;
-                m_OpaqueInstances.push_back(inst);
-            } else if (node.type == SceneNodeType::Light || lightComp != nullptr) {
+                    inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
+                    inst.visibilityFlags = 1;
+                    m_OpaqueInstances.push_back(inst);
+                }
+            }
+
+            // Process light components independently for any node
+            DirectionalLightComponent* dirLightComp = ComponentRegistry::Get().GetComponent<DirectionalLightComponent>(node.id);
+            TransformComponent* transCompMutable = ComponentRegistry::Get().GetComponent<TransformComponent>(node.id);
+
+            if (node.type == SceneNodeType::Light || lightComp != nullptr || dirLightComp != nullptr) {
                 int lightType = lightComp ? lightComp->lightType : 0; // 0: Directional, 1: Point, 2: Spot
                 if (lightType == 0) {
-                    float pitchRad = rot[0] * 3.14159265f / 180.0f;
-                    float yawRad   = rot[1] * 3.14159265f / 180.0f;
-                    zegfx::DirectionalLightData sunLight = {};
-                    float dx = std::cos(pitchRad) * std::sin(yawRad);
-                    float dy = -std::sin(pitchRad);
-                    float dz = -std::cos(pitchRad) * std::cos(yawRad);
-                    float dLen = std::sqrt(dx * dx + dy * dy + dz * dz);
-                    if (dLen > 0.0001f) { dx /= dLen; dy /= dLen; dz /= dLen; }
-                    sunLight.direction = { dx, dy, dz };
-                    if (lightComp) {
-                        float r = lightComp->color[0];
-                        float g = lightComp->color[1];
-                        float b = lightComp->color[2];
-                        if (r <= 0.001f && g <= 0.001f && b <= 0.001f) {
-                            r = 1.0f; g = 0.95f; b = 0.85f;
-                        }
-                        sunLight.color = { r, g, b };
-                        sunLight.illuminanceLux = (lightComp->intensity > 0.0f) ? lightComp->intensity : 100000.0f;
-                    } else {
-                        sunLight.color = { 1.0f, 0.95f, 0.85f };
-                        sunLight.illuminanceLux = 100000.0f;
+                    // Drive Time-of-Day orbit rotation via OrbitController (Phase 3)
+                    SunOrbitController::Get().Tick(deltaTime, dirLightComp, transCompMutable);
+
+                    // Re-fetch updated rotation from transform component
+                    if (transCompMutable) {
+                        rot[0] = transCompMutable->rotation[0];
+                        rot[1] = transCompMutable->rotation[1];
+                        rot[2] = transCompMutable->rotation[2];
                     }
+
+                    // Phase 4: Decoupled Render Proxy Extraction (Component -> Proxy POD -> GPU)
+                    DirectionalLightProxy proxy = {};
+                    DirectionalLightComponent::ComputeDirectionFromRotation(rot, proxy.direction);
+
+                    if (dirLightComp) {
+                        proxy.color[0] = dirLightComp->color[0];
+                        proxy.color[1] = dirLightComp->color[1];
+                        proxy.color[2] = dirLightComp->color[2];
+                        proxy.illuminanceLux = dirLightComp->illuminanceLux;
+                        proxy.angularDiameterRadians = dirLightComp->angularDiameterRadians;
+                        proxy.castShadows = dirLightComp->castShadows;
+                        proxy.cascadeCount = dirLightComp->cascadeCount;
+                        proxy.shadowDistance = dirLightComp->shadowDistance;
+                        proxy.cascadeDistributionExponent = dirLightComp->cascadeDistributionExponent;
+                    } else if (lightComp) {
+                        proxy.color[0] = lightComp->color[0];
+                        proxy.color[1] = lightComp->color[1];
+                        proxy.color[2] = lightComp->color[2];
+                        proxy.illuminanceLux = (lightComp->intensity > 0.0f) ? lightComp->intensity : 100000.0f;
+                        proxy.castShadows = lightComp->castShadows;
+                    } else {
+                        proxy.color[0] = 1.0f; proxy.color[1] = 0.95f; proxy.color[2] = 0.85f;
+                        proxy.illuminanceLux = 100000.0f;
+                        proxy.castShadows = true;
+                    }
+                    proxy.flags = proxy.castShadows ? 1u : 0u;
+
+                    // Convert proxy to renderer snapshot format
+                    zegfx::DirectionalLightData sunLight = {};
+                    sunLight.direction = { proxy.direction[0], proxy.direction[1], proxy.direction[2] };
+                    sunLight.color = { proxy.color[0], proxy.color[1], proxy.color[2] };
+                    sunLight.illuminanceLux = proxy.illuminanceLux;
+                    sunLight.angularDiameterRadians = proxy.angularDiameterRadians;
+                    sunLight.flags = proxy.flags;
+
                     m_DirectionalLights.push_back(sunLight);
                 } else {
                     zegfx::LocalLightData localLight = {};
@@ -762,11 +868,12 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
                         localLight.outerConeCos = 0.70f;
                         localLight.color = { 1.0f, 0.90f, 0.70f };
                     }
-                    localLight.position = { loc[0], loc[1] + 4.0f, loc[2] };
+                    localLight.position = { loc[0], loc[1] + 1.5f, loc[2] };
                     localLight.direction = { 0.0f, -1.0f, 0.0f };
                     m_LocalLights.push_back(localLight);
                 }
             }
+
             if (!node.children.empty()) {
                 self(self, node.children);
             }
@@ -780,16 +887,13 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
             m_Renderer->setDirectionalLight(activeSun);
         }
     } else {
-        zegfx::DirectionalLightData sun = {};
-        float sDir[3] = { -0.5f, -0.8f, -0.3f };
-        float sLen = std::sqrt(sDir[0]*sDir[0] + sDir[1]*sDir[1] + sDir[2]*sDir[2]);
-        if (sLen > 0.0001f) { sDir[0] /= sLen; sDir[1] /= sLen; sDir[2] /= sLen; }
-        sun.direction = { sDir[0], sDir[1], sDir[2] };
-        sun.illuminanceLux = 100000.0f;
-        sun.color = { 1.0f, 0.95f, 0.85f };
-        m_DirectionalLights.push_back(sun);
+        // Strict Component-Based Sunlight: No hardcoded sunlight when directional light is deleted/absent!
+        zegfx::DirectionalLightData disabledSun = {};
+        disabledSun.direction = { 0.0f, -1.0f, 0.0f };
+        disabledSun.illuminanceLux = 0.0f;
+        disabledSun.color = { 0.0f, 0.0f, 0.0f };
         if (m_Renderer) {
-            m_Renderer->setDirectionalLight(sun);
+            m_Renderer->setDirectionalLight(disabledSun);
         }
     }
 
@@ -798,7 +902,7 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
     snapshot.opaque = zegfx::Span<const zegfx::RenderInstance>(m_OpaqueInstances.data(), m_OpaqueInstances.size());
     snapshot.directionalLights = zegfx::Span<const zegfx::DirectionalLightData>(m_DirectionalLights.data(), m_DirectionalLights.size());
     snapshot.localLights = zegfx::Span<const zegfx::LocalLightData>(m_LocalLights.data(), m_LocalLights.size());
-    snapshot.environment.ambientColor = zegfx::Color(140, 170, 205, 255);
+    snapshot.environment.ambientColor = m_SkyAmbientColor;
     snapshot.environment.intensityMultiplier = 1.0f;
 
     // 4. Camera Render Data

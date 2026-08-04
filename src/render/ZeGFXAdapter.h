@@ -21,6 +21,19 @@ namespace zephysics {
 
 namespace EngineEditor {
 
+// Phase 4: Decoupled Render Proxy POD Snapshot
+struct DirectionalLightProxy {
+    float direction[3] = { 0.0f, -1.0f, 0.0f };
+    float color[3] = { 1.0f, 0.95f, 0.85f };
+    float illuminanceLux = 100000.0f;
+    float angularDiameterRadians = 0.0093f;
+    bool castShadows = true;
+    int cascadeCount = 4;
+    float shadowDistance = 200.0f;
+    float cascadeDistributionExponent = 0.5f;
+    uint32_t flags = 1u;
+};
+
 class ZeGFXAdapter {
 public:
     static ZeGFXAdapter& Get();
@@ -68,6 +81,7 @@ private:
     zegfx::RenderMeshHandle m_DefaultSphereMeshHandle = {};
     zegfx::RenderMeshHandle m_DefaultCylinderMeshHandle = {};
     zegfx::RenderMeshHandle m_DefaultConeMeshHandle = {};
+    zegfx::RenderMeshHandle m_DefaultTerrain32x32MeshHandle = {};
 
     std::unordered_map<std::string, zegfx::RenderMeshHandle> m_LoadedMeshes;
     std::unordered_map<std::string, zegfx::RenderMaterialHandle> m_LoadedMaterials;
@@ -75,6 +89,7 @@ private:
     std::vector<zegfx::RenderInstance> m_OpaqueInstances;
     std::vector<zegfx::LocalLightData> m_LocalLights;
     std::vector<zegfx::DirectionalLightData> m_DirectionalLights;
+    zegfx::Color m_SkyAmbientColor = zegfx::Color(140, 170, 205, 255);
 };
 
 } // namespace EngineEditor

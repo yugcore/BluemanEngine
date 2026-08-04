@@ -136,28 +136,51 @@ void RenderToolbar() {
             if (ToolbarButton("+ Add", "Add Actor or Component", false, 0.0f)) ImGui::OpenPopup("AddPopup");
             if (ImGui::BeginPopup("AddPopup")) {
                 if (ImGui::MenuItem("Cube")) {
-                    SceneNode n; n.name = "Cube_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor; n.meshPath = "primitives/cube.zmesh";
+                    SceneNode n; n.name = "Cube_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor;
+                    n.location[0] = 0.0f; n.location[1] = 1.0f; n.location[2] = 0.0f;
+                    n.meshPath = "Engine/DefaultCube"; n.materialPath = "DefaultPBRMaterial";
                     SceneGraph::Get().AddNode(n); EditorState::Get().SetSelection(n.name, "Actor");
                 }
                 if (ImGui::MenuItem("Sphere")) {
-                    SceneNode n; n.name = "Sphere_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor; n.meshPath = "primitives/sphere.zmesh";
+                    SceneNode n; n.name = "Sphere_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor;
+                    n.location[0] = 0.0f; n.location[1] = 1.0f; n.location[2] = 0.0f;
+                    n.meshPath = "Engine/DefaultSphere"; n.materialPath = "DefaultPBRMaterial";
                     SceneGraph::Get().AddNode(n); EditorState::Get().SetSelection(n.name, "Actor");
                 }
                 if (ImGui::MenuItem("Cylinder")) {
-                    SceneNode n; n.name = "Cylinder_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor; n.meshPath = "primitives/cylinder.zmesh";
+                    SceneNode n; n.name = "Cylinder_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor;
+                    n.location[0] = 0.0f; n.location[1] = 1.0f; n.location[2] = 0.0f;
+                    n.meshPath = "Engine/DefaultCylinder"; n.materialPath = "DefaultPBRMaterial";
                     SceneGraph::Get().AddNode(n); EditorState::Get().SetSelection(n.name, "Actor");
                 }
                 if (ImGui::MenuItem("Plane")) {
-                    SceneNode n; n.name = "Plane_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor; n.meshPath = "primitives/plane.zmesh";
+                    SceneNode n; n.name = "Plane_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor;
+                    n.location[0] = 0.0f; n.location[1] = 0.05f; n.location[2] = 0.0f;
+                    n.meshPath = "Engine/DefaultPlane"; n.materialPath = "DefaultPBRMaterial";
                     SceneGraph::Get().AddNode(n); EditorState::Get().SetSelection(n.name, "Actor");
                 }
                 if (ImGui::MenuItem("Cone")) {
-                    SceneNode n; n.name = "Cone_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor; n.meshPath = "primitives/cone.zmesh";
+                    SceneNode n; n.name = "Cone_" + std::to_string(rand() % 1000); n.type = SceneNodeType::Actor;
+                    n.location[0] = 0.0f; n.location[1] = 1.0f; n.location[2] = 0.0f;
+                    n.meshPath = "Engine/DefaultCone"; n.materialPath = "DefaultPBRMaterial";
                     SceneGraph::Get().AddNode(n); EditorState::Get().SetSelection(n.name, "Actor");
                 }
                 ImGui::Separator();
-                if (ImGui::MenuItem("Add Light")) {
+                if (ImGui::MenuItem("Directional Sun Light")) {
+                    SceneNode lightNode; lightNode.name = "DirectionalSunLight_" + std::to_string(rand() % 1000); lightNode.type = SceneNodeType::Light;
+                    lightNode.location[0] = 0.0f; lightNode.location[1] = 10.0f; lightNode.location[2] = 0.0f;
+                    lightNode.rotation[0] = 53.0f; lightNode.rotation[1] = -59.0f; lightNode.rotation[2] = 0.0f;
+                    SceneGraph::Get().AddNode(lightNode); EditorState::Get().SetSelection(lightNode.name, "Light");
+                }
+                if (ImGui::MenuItem("Point Light")) {
                     SceneNode lightNode; lightNode.name = "PointLight_" + std::to_string(rand() % 1000); lightNode.type = SceneNodeType::Light;
+                    lightNode.location[0] = 0.0f; lightNode.location[1] = 3.0f; lightNode.location[2] = 0.0f;
+                    SceneGraph::Get().AddNode(lightNode); EditorState::Get().SetSelection(lightNode.name, "Light");
+                }
+                if (ImGui::MenuItem("Spot Light")) {
+                    SceneNode lightNode; lightNode.name = "SpotLight_" + std::to_string(rand() % 1000); lightNode.type = SceneNodeType::Light;
+                    lightNode.location[0] = 0.0f; lightNode.location[1] = 3.0f; lightNode.location[2] = 0.0f;
+                    lightNode.rotation[0] = 45.0f; lightNode.rotation[1] = 0.0f; lightNode.rotation[2] = 0.0f;
                     SceneGraph::Get().AddNode(lightNode); EditorState::Get().SetSelection(lightNode.name, "Light");
                 }
                 if (ImGui::MenuItem("Add Camera")) {

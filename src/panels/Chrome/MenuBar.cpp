@@ -198,7 +198,9 @@ void RenderMenuBarContents() {
                 SceneNode cubeNode;
                 cubeNode.name = "Cube_" + std::to_string(rand() % 1000);
                 cubeNode.type = SceneNodeType::Actor;
-                cubeNode.meshPath = "primitives/cube.zmesh";
+                cubeNode.location[0] = 0.0f; cubeNode.location[1] = 1.0f; cubeNode.location[2] = 0.0f;
+                cubeNode.meshPath = "Engine/DefaultCube";
+                cubeNode.materialPath = "DefaultPBRMaterial";
                 SceneGraph::Get().AddNode(cubeNode);
                 EditorState::Get().SetSelection(cubeNode.name, "Actor");
             }
@@ -206,7 +208,9 @@ void RenderMenuBarContents() {
                 SceneNode sphereNode;
                 sphereNode.name = "Sphere_" + std::to_string(rand() % 1000);
                 sphereNode.type = SceneNodeType::Actor;
-                sphereNode.meshPath = "primitives/sphere.zmesh";
+                sphereNode.location[0] = 0.0f; sphereNode.location[1] = 1.0f; sphereNode.location[2] = 0.0f;
+                sphereNode.meshPath = "Engine/DefaultSphere";
+                sphereNode.materialPath = "DefaultPBRMaterial";
                 SceneGraph::Get().AddNode(sphereNode);
                 EditorState::Get().SetSelection(sphereNode.name, "Actor");
             }
@@ -214,7 +218,9 @@ void RenderMenuBarContents() {
                 SceneNode cylNode;
                 cylNode.name = "Cylinder_" + std::to_string(rand() % 1000);
                 cylNode.type = SceneNodeType::Actor;
-                cylNode.meshPath = "primitives/cylinder.zmesh";
+                cylNode.location[0] = 0.0f; cylNode.location[1] = 1.0f; cylNode.location[2] = 0.0f;
+                cylNode.meshPath = "Engine/DefaultCylinder";
+                cylNode.materialPath = "DefaultPBRMaterial";
                 SceneGraph::Get().AddNode(cylNode);
                 EditorState::Get().SetSelection(cylNode.name, "Actor");
             }
@@ -222,7 +228,9 @@ void RenderMenuBarContents() {
                 SceneNode planeNode;
                 planeNode.name = "Plane_" + std::to_string(rand() % 1000);
                 planeNode.type = SceneNodeType::Actor;
-                planeNode.meshPath = "primitives/plane.zmesh";
+                planeNode.location[0] = 0.0f; planeNode.location[1] = 0.05f; planeNode.location[2] = 0.0f;
+                planeNode.meshPath = "Engine/DefaultPlane";
+                planeNode.materialPath = "DefaultPBRMaterial";
                 SceneGraph::Get().AddNode(planeNode);
                 EditorState::Get().SetSelection(planeNode.name, "Actor");
             }
@@ -230,7 +238,9 @@ void RenderMenuBarContents() {
                 SceneNode coneNode;
                 coneNode.name = "Cone_" + std::to_string(rand() % 1000);
                 coneNode.type = SceneNodeType::Actor;
-                coneNode.meshPath = "primitives/cone.zmesh";
+                coneNode.location[0] = 0.0f; coneNode.location[1] = 1.0f; coneNode.location[2] = 0.0f;
+                coneNode.meshPath = "Engine/DefaultCone";
+                coneNode.materialPath = "DefaultPBRMaterial";
                 SceneGraph::Get().AddNode(coneNode);
                 EditorState::Get().SetSelection(coneNode.name, "Actor");
             }
@@ -239,8 +249,10 @@ void RenderMenuBarContents() {
         if (ImGui::BeginMenu("Light")) {
             if (ImGui::MenuItem("Directional Light")) {
                 SceneNode sunNode;
-                sunNode.name = "SunLight_" + std::to_string(rand() % 1000);
+                sunNode.name = "DirectionalSunLight_" + std::to_string(rand() % 1000);
                 sunNode.type = SceneNodeType::Light;
+                sunNode.location[0] = 0.0f; sunNode.location[1] = 10.0f; sunNode.location[2] = 0.0f;
+                sunNode.rotation[0] = 53.0f; sunNode.rotation[1] = -59.0f; sunNode.rotation[2] = 0.0f;
                 SceneGraph::Get().AddNode(sunNode);
                 EditorState::Get().SetSelection(sunNode.name, "Light");
             }
@@ -248,6 +260,7 @@ void RenderMenuBarContents() {
                 SceneNode ptNode;
                 ptNode.name = "PointLight_" + std::to_string(rand() % 1000);
                 ptNode.type = SceneNodeType::Light;
+                ptNode.location[0] = 0.0f; ptNode.location[1] = 3.0f; ptNode.location[2] = 0.0f;
                 SceneGraph::Get().AddNode(ptNode);
                 EditorState::Get().SetSelection(ptNode.name, "Light");
             }
@@ -255,6 +268,8 @@ void RenderMenuBarContents() {
                 SceneNode spotNode;
                 spotNode.name = "SpotLight_" + std::to_string(rand() % 1000);
                 spotNode.type = SceneNodeType::Light;
+                spotNode.location[0] = 0.0f; spotNode.location[1] = 3.0f; spotNode.location[2] = 0.0f;
+                spotNode.rotation[0] = 45.0f; spotNode.rotation[1] = 0.0f; spotNode.rotation[2] = 0.0f;
                 SceneGraph::Get().AddNode(spotNode);
                 EditorState::Get().SetSelection(spotNode.name, "Light");
             }

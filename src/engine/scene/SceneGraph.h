@@ -25,6 +25,7 @@ struct SceneNode {
     uint64_t id = 0;       // Unique node ID (monotonic counter)
     std::string name;
     SceneNodeType type;
+    bool visible = true;   // Node visibility toggle
     std::string world = "DefaultWorld";
     std::string panel = "MainPanel";
     std::string meshPath = "";
@@ -63,6 +64,10 @@ public:
     SceneNode* DuplicateNode(const std::string& name);
     void Clear();
     void SetRootNodes(const std::vector<SceneNode>& nodes);
+    bool ReparentNode(uint64_t childId, uint64_t newParentId);
+    bool RenameNode(uint64_t id, const std::string& newName);
+    bool ToggleVisibility(uint64_t id);
+    SceneNode* FindNodeParentMutable(uint64_t childId, std::vector<SceneNode>* nodes = nullptr);
 
     // Serialization & Persistence
     bool SaveToFile(const std::string& filepath) const;

@@ -82,10 +82,35 @@ void SceneGraph::SyncNodeComponents(SceneNode& node) {
         LightComponent* lightComp = ComponentRegistry::Get().GetComponent<LightComponent>(node.id);
         if (!lightComp) {
             LightComponent newLight;
-            newLight.lightType = 0; // Default Directional Sun Light
-            newLight.intensity = 100000.0f;
-            newLight.color[0] = 1.0f; newLight.color[1] = 0.95f; newLight.color[2] = 0.85f;
+            if (node.name.find("PointLight") != std::string::npos) {
+                newLight.lightType = 1; // Point Light
+                newLight.intensity = 2500.0f;
+                newLight.range = 15.0f;
+                newLight.color[0] = 1.0f; newLight.color[1] = 0.90f; newLight.color[2] = 0.70f;
+            } else if (node.name.find("SpotLight") != std::string::npos) {
+                newLight.lightType = 2; // Spot Light
+                newLight.intensity = 5000.0f;
+                newLight.range = 25.0f;
+                newLight.innerCone = 25.0f; newLight.outerCone = 45.0f;
+                newLight.color[0] = 1.0f; newLight.color[1] = 0.90f; newLight.color[2] = 0.70f;
+            } else {
+                newLight.lightType = 0; // Default Directional Sun Light
+                newLight.intensity = 100000.0f;
+                newLight.color[0] = 1.0f; newLight.color[1] = 0.95f; newLight.color[2] = 0.85f;
+            }
             ComponentRegistry::Get().AddComponent<LightComponent>(node.id, newLight);
+        }
+
+        DirectionalLightComponent* dirLightComp = ComponentRegistry::Get().GetComponent<DirectionalLightComponent>(node.id);
+        if (!dirLightComp && (!lightComp || lightComp->lightType == 0)) {
+            DirectionalLightComponent newDirLight;
+            newDirLight.illuminanceLux = lightComp ? lightComp->intensity : 100000.0f;
+            if (lightComp) {
+                newDirLight.color[0] = lightComp->color[0];
+                newDirLight.color[1] = lightComp->color[1];
+                newDirLight.color[2] = lightComp->color[2];
+            }
+            ComponentRegistry::Get().AddComponent<DirectionalLightComponent>(node.id, newDirLight);
         }
     }
 
@@ -109,16 +134,6 @@ SceneGraph::SceneGraph() {
     skyNode.type = SceneNodeType::SkyAtmosphere;
     m_RootNodes.push_back(skyNode);
 
-    SceneNode gridNode;
-    gridNode.id = GenerateNodeId();
-    gridNode.name = "FloorGrid_Ground";
-    gridNode.type = SceneNodeType::Actor;
-    gridNode.location[0] = 0.0f; gridNode.location[1] = 0.0f; gridNode.location[2] = 0.0f;
-    gridNode.scale[0] = 1.0f; gridNode.scale[1] = 1.0f; gridNode.scale[2] = 1.0f;
-    gridNode.meshPath = "Engine/DefaultPlane";
-    gridNode.materialPath = "DefaultPBRMaterial";
-    m_RootNodes.push_back(gridNode);
-
     SceneNode cubeNode;
     cubeNode.id = GenerateNodeId();
     cubeNode.name = "DefaultCube";
@@ -129,14 +144,14 @@ SceneGraph::SceneGraph() {
     cubeNode.materialPath = "DefaultPBRMaterial";
     m_RootNodes.push_back(cubeNode);
 
-    // Forest Walk Environment Nodes (500m - 1km Playable Area)
+    // Default 32x32 Solid Terrain (rendered via ZeGFX)
     SceneNode terrainNode;
     terrainNode.id = GenerateNodeId();
-    terrainNode.name = "Forest_Terrain_1KM";
+    terrainNode.name = "DefaultTerrain_32x32";
     terrainNode.type = SceneNodeType::Terrain;
-    terrainNode.location[0] = 0.0f; terrainNode.location[1] = -0.01f; terrainNode.location[2] = 0.0f;
-    terrainNode.scale[0] = 10.0f; terrainNode.scale[1] = 1.0f; terrainNode.scale[2] = 10.0f;
-    terrainNode.meshPath = "Engine/DefaultPlane";
+    terrainNode.location[0] = 0.0f; terrainNode.location[1] = 0.0f; terrainNode.location[2] = 0.0f;
+    terrainNode.scale[0] = 1.0f; terrainNode.scale[1] = 1.0f; terrainNode.scale[2] = 1.0f;
+    terrainNode.meshPath = "Engine/DefaultTerrain32x32";
     terrainNode.materialPath = "DefaultPBRMaterial";
     m_RootNodes.push_back(terrainNode);
 
@@ -204,6 +219,72 @@ SceneNode* SceneGraph::PasteClipboard() {
     SyncNodeComponents(pasted);
     m_RootNodes.push_back(pasted);
     return &m_RootNodes.back();
+}
+
+SceneNode* SceneGraph::FindNodeParentMutable(uint64_t childId, std::vector<SceneNode>* nodes) {
+    auto& searchList = nodes ? *nodes : m_RootNodes;
+    for (auto& node : searchList) {
+        for (const auto& child : node.children) {
+            if (child.id == childId) return &node;
+        }
+        SceneNode* parentInChild = FindNodeParentMutable(childId, &node.children);
+        if (parentInChild) return parentInChild;
+    }
+    return nullptr;
+}
+
+bool SceneGraph::ReparentNode(uint64_t childId, uint64_t newParentId) {
+    if (childId == 0 || childId == newParentId) return false;
+
+    SceneNode childNode;
+    bool found = false;
+
+    auto extract = [&](auto& self, std::vector<SceneNode>& list) -> bool {
+        for (auto it = list.begin(); it != list.end(); ++it) {
+            if (it->id == childId) {
+                childNode = *it;
+                list.erase(it);
+                return true;
+            }
+            if (self(self, it->children)) return true;
+        }
+        return false;
+    };
+
+    if (!extract(extract, m_RootNodes)) return false;
+
+    if (newParentId == 0) {
+        m_RootNodes.push_back(childNode);
+        return true;
+    }
+
+    SceneNode* targetParent = FindNodeByIdMutable(newParentId);
+    if (targetParent) {
+        targetParent->children.push_back(childNode);
+        return true;
+    } else {
+        m_RootNodes.push_back(childNode);
+        return false;
+    }
+}
+
+bool SceneGraph::RenameNode(uint64_t id, const std::string& newName) {
+    if (newName.empty()) return false;
+    SceneNode* node = FindNodeByIdMutable(id);
+    if (node) {
+        node->name = newName;
+        return true;
+    }
+    return false;
+}
+
+bool SceneGraph::ToggleVisibility(uint64_t id) {
+    SceneNode* node = FindNodeByIdMutable(id);
+    if (node) {
+        node->visible = !node->visible;
+        return true;
+    }
+    return false;
 }
 
 bool SceneGraph::SaveToFile(const std::string& filepath) const {

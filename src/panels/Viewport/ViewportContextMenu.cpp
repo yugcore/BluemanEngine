@@ -111,6 +111,92 @@ void ViewportContextMenu::Render() {
         } else {
             ImGui::TextDisabled("Viewport Options");
             ImGui::Separator();
+            if (ImGui::BeginMenu("Create")) {
+                if (ImGui::BeginMenu("3D Object")) {
+                    if (ImGui::MenuItem("Cube")) {
+                        SceneNode cubeNode;
+                        cubeNode.name = "Cube_" + std::to_string(rand() % 1000);
+                        cubeNode.type = SceneNodeType::Actor;
+                        cubeNode.location[0] = 0.0f; cubeNode.location[1] = 1.0f; cubeNode.location[2] = 0.0f;
+                        cubeNode.meshPath = "Engine/DefaultCube";
+                        cubeNode.materialPath = "DefaultPBRMaterial";
+                        SceneGraph::Get().AddNode(cubeNode);
+                        EditorState::Get().SetSelection(cubeNode.name, "Actor");
+                    }
+                    if (ImGui::MenuItem("Sphere")) {
+                        SceneNode sphereNode;
+                        sphereNode.name = "Sphere_" + std::to_string(rand() % 1000);
+                        sphereNode.type = SceneNodeType::Actor;
+                        sphereNode.location[0] = 0.0f; sphereNode.location[1] = 1.0f; sphereNode.location[2] = 0.0f;
+                        sphereNode.meshPath = "Engine/DefaultSphere";
+                        sphereNode.materialPath = "DefaultPBRMaterial";
+                        SceneGraph::Get().AddNode(sphereNode);
+                        EditorState::Get().SetSelection(sphereNode.name, "Actor");
+                    }
+                    if (ImGui::MenuItem("Cylinder")) {
+                        SceneNode cylNode;
+                        cylNode.name = "Cylinder_" + std::to_string(rand() % 1000);
+                        cylNode.type = SceneNodeType::Actor;
+                        cylNode.location[0] = 0.0f; cylNode.location[1] = 1.0f; cylNode.location[2] = 0.0f;
+                        cylNode.meshPath = "Engine/DefaultCylinder";
+                        cylNode.materialPath = "DefaultPBRMaterial";
+                        SceneGraph::Get().AddNode(cylNode);
+                        EditorState::Get().SetSelection(cylNode.name, "Actor");
+                    }
+                    if (ImGui::MenuItem("Plane")) {
+                        SceneNode planeNode;
+                        planeNode.name = "Plane_" + std::to_string(rand() % 1000);
+                        planeNode.type = SceneNodeType::Actor;
+                        planeNode.location[0] = 0.0f; planeNode.location[1] = 0.05f; planeNode.location[2] = 0.0f;
+                        planeNode.meshPath = "Engine/DefaultPlane";
+                        planeNode.materialPath = "DefaultPBRMaterial";
+                        SceneGraph::Get().AddNode(planeNode);
+                        EditorState::Get().SetSelection(planeNode.name, "Actor");
+                    }
+                    if (ImGui::MenuItem("Cone")) {
+                        SceneNode coneNode;
+                        coneNode.name = "Cone_" + std::to_string(rand() % 1000);
+                        coneNode.type = SceneNodeType::Actor;
+                        coneNode.location[0] = 0.0f; coneNode.location[1] = 1.0f; coneNode.location[2] = 0.0f;
+                        coneNode.meshPath = "Engine/DefaultCone";
+                        coneNode.materialPath = "DefaultPBRMaterial";
+                        SceneGraph::Get().AddNode(coneNode);
+                        EditorState::Get().SetSelection(coneNode.name, "Actor");
+                    }
+                    ImGui::EndMenu();
+                }
+                if (ImGui::BeginMenu("Light")) {
+                    if (ImGui::MenuItem("Directional Sun Light")) {
+                        SceneNode sunNode;
+                        sunNode.name = "DirectionalSunLight_" + std::to_string(rand() % 1000);
+                        sunNode.type = SceneNodeType::Light;
+                        sunNode.location[0] = 0.0f; sunNode.location[1] = 10.0f; sunNode.location[2] = 0.0f;
+                        sunNode.rotation[0] = 53.0f; sunNode.rotation[1] = -59.0f; sunNode.rotation[2] = 0.0f;
+                        SceneGraph::Get().AddNode(sunNode);
+                        EditorState::Get().SetSelection(sunNode.name, "Light");
+                    }
+                    if (ImGui::MenuItem("Point Light")) {
+                        SceneNode ptNode;
+                        ptNode.name = "PointLight_" + std::to_string(rand() % 1000);
+                        ptNode.type = SceneNodeType::Light;
+                        ptNode.location[0] = 0.0f; ptNode.location[1] = 3.0f; ptNode.location[2] = 0.0f;
+                        SceneGraph::Get().AddNode(ptNode);
+                        EditorState::Get().SetSelection(ptNode.name, "Light");
+                    }
+                    if (ImGui::MenuItem("Spot Light")) {
+                        SceneNode spotNode;
+                        spotNode.name = "SpotLight_" + std::to_string(rand() % 1000);
+                        spotNode.type = SceneNodeType::Light;
+                        spotNode.location[0] = 0.0f; spotNode.location[1] = 3.0f; spotNode.location[2] = 0.0f;
+                        spotNode.rotation[0] = 45.0f; spotNode.rotation[1] = 0.0f; spotNode.rotation[2] = 0.0f;
+                        SceneGraph::Get().AddNode(spotNode);
+                        EditorState::Get().SetSelection(spotNode.name, "Light");
+                    }
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::Separator();
             if (ImGui::MenuItem("Select All", "Ctrl+A")) ViewportSelection::Get().SelectAll();
             if (ImGui::MenuItem("Measure Tool", "Shift+M")) ViewportMeasurement::Get().Activate();
             if (ImGui::MenuItem("Reset Camera", "Home")) EditorState::Get().camera.ResetToDefault();

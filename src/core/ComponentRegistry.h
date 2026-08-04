@@ -55,6 +55,55 @@ struct LightComponent {
     bool castShadows = true;
 };
 
+struct DirectionalLightComponent {
+    float illuminanceLux = 100000.00f;          // Illuminance lux
+    float color[3] = { 1.00f, 0.95f, 0.85f };   // Linear RGB
+    float angularDiameterRadians = 0.0093f;     // ~0.53 deg physically-based sun disk size
+    
+    // Shadow configuration block
+    bool castShadows = true;
+    int cascadeCount = 4;
+    float shadowDistance = 200.00f;
+    float cascadeDistributionExponent = 0.50f;  // Logarithmic / linear blend exponent
+
+    // Atmosphere linkage flags
+    bool drivesAtmosphere = true;
+    int atmosphereIndex = 0;
+
+    // Decoupling dirty flag
+    bool isDirty = true;
+
+    // Phase 2: Derive Direction Purely From Transform Rotation (Pitch, Yaw, Roll in deg)
+    static inline void ComputeDirectionFromRotation(const float rotationDeg[3], float outDirection[3]) {
+        float pitchRad = rotationDeg[0] * 3.1415926535f / 180.0f;
+        float yawRad   = rotationDeg[1] * 3.1415926535f / 180.0f;
+
+        float dx =  std::cos(pitchRad) * std::sin(yawRad);
+        float dy = -std::sin(pitchRad);
+        float dz = -std::cos(pitchRad) * std::cos(yawRad);
+
+        float len = std::sqrt(dx*dx + dy*dy + dz*dz);
+        if (len > 0.0001f) {
+            dx /= len; dy /= len; dz /= len;
+        } else {
+            dx = 0.0f; dy = -1.0f; dz = 0.0f;
+        }
+
+        outDirection[0] = dx;
+        outDirection[1] = dy;
+        outDirection[2] = dz;
+    }
+
+    // Vector TOWARD light source: L = -D_light
+    static inline void ComputeLightVectorFromRotation(const float rotationDeg[3], float outLightVec[3]) {
+        float dir[3];
+        ComputeDirectionFromRotation(rotationDeg, dir);
+        outLightVec[0] = -dir[0];
+        outLightVec[1] = -dir[1];
+        outLightVec[2] = -dir[2];
+    }
+};
+
 struct CameraComponent {
     float fov = 60.00f;
     float nearPlane = 0.10f;
