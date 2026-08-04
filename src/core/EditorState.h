@@ -276,6 +276,8 @@ struct EditorState {
     TransformData activeTransform;
     SkyAtmosphereProperties skyAtmosphereProps;
     GizmoOperation gizmoOp = GizmoOperation::Translate;
+    int gizmoHoveredAxis = -1;
+    int gizmoActiveAxis = -1;
 
     // Asset Selection State
     std::string selectedFolderPath = "";

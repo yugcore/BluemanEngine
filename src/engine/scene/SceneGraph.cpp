@@ -16,6 +16,17 @@ uint64_t SceneGraph::GenerateNodeId() {
     return m_NextNodeId++;
 }
 
+size_t SceneGraph::GetTotalNodeCount(const std::vector<SceneNode>* nodes) const {
+    const auto& list = nodes ? *nodes : m_RootNodes;
+    size_t count = list.size();
+    for (const auto& node : list) {
+        if (!node.children.empty()) {
+            count += GetTotalNodeCount(&node.children);
+        }
+    }
+    return count;
+}
+
 void SceneGraph::SyncNodeComponents(SceneNode& node) {
     if (node.id == 0) return;
 
@@ -71,21 +82,9 @@ void SceneGraph::SyncNodeComponents(SceneNode& node) {
         LightComponent* lightComp = ComponentRegistry::Get().GetComponent<LightComponent>(node.id);
         if (!lightComp) {
             LightComponent newLight;
-            if (node.name.find("Spot") != std::string::npos) {
-                newLight.lightType = 2;
-                newLight.intensity = 5000.0f;
-                newLight.range = 25.0f;
-                newLight.color[0] = 1.0f; newLight.color[1] = 0.90f; newLight.color[2] = 0.70f;
-            } else if (node.name.find("Sun") != std::string::npos || node.name.find("Directional") != std::string::npos) {
-                newLight.lightType = 0;
-                newLight.intensity = 100000.0f;
-                newLight.color[0] = 1.0f; newLight.color[1] = 0.95f; newLight.color[2] = 0.85f;
-            } else {
-                newLight.lightType = 1;
-                newLight.intensity = 2500.0f;
-                newLight.range = 15.0f;
-                newLight.color[0] = 1.0f; newLight.color[1] = 0.90f; newLight.color[2] = 0.70f;
-            }
+            newLight.lightType = 0; // Default Directional Sun Light
+            newLight.intensity = 100000.0f;
+            newLight.color[0] = 1.0f; newLight.color[1] = 0.95f; newLight.color[2] = 0.85f;
             ComponentRegistry::Get().AddComponent<LightComponent>(node.id, newLight);
         }
     }
@@ -101,7 +100,7 @@ SceneGraph::SceneGraph() {
     sunNode.name = "DirectionalSunLight";
     sunNode.type = SceneNodeType::Light;
     sunNode.location[0] = 0.0f; sunNode.location[1] = 10.0f; sunNode.location[2] = 0.0f;
-    sunNode.rotation[0] = 45.0f; sunNode.rotation[1] = 35.0f; sunNode.rotation[2] = 0.0f;
+    sunNode.rotation[0] = 53.0f; sunNode.rotation[1] = -59.0f; sunNode.rotation[2] = 0.0f;
     m_RootNodes.push_back(sunNode);
 
     SceneNode skyNode;

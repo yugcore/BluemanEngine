@@ -43,6 +43,7 @@ public:
     SceneGraph();
 
     const std::vector<SceneNode>& GetRootNodes() const { return m_RootNodes; }
+    size_t GetTotalNodeCount(const std::vector<SceneNode>* nodes = nullptr) const;
     
     // Find node by name
     const SceneNode* FindNode(const std::string& name, const std::vector<SceneNode>* nodes = nullptr) const;

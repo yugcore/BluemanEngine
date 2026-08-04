@@ -1,6 +1,8 @@
 #include "ViewportRenderer.h"
 #include "ZeGFXAdapter.h"
 #include "DX12Host.h"
+#include "editor_overlay.h"
+#include "core/EditorState.h"
 #include <iostream>
 #include <cmath>
 
@@ -40,10 +42,14 @@ void ViewportRenderer::Init(ID3D12Device* device, ID3D12DescriptorHeap* srvHeap,
     }
     m_RtvHandle = m_RtvHeap->GetCPUDescriptorHandleForHeapStart();
 
+    m_EditorOverlay.Init(m_Device, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D32_FLOAT);
+
     Resize(1280, 720);
 }
 
+
 void ViewportRenderer::Shutdown() {
+    m_EditorOverlay.Shutdown();
     DeleteFramebuffer();
     m_RtvHeap.Reset();
 }
@@ -81,9 +87,9 @@ void ViewportRenderer::CreateFramebuffer(uint32_t width, uint32_t height) {
 
     D3D12_CLEAR_VALUE clearVal = {};
     clearVal.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    clearVal.Color[0] = 0.10f;
-    clearVal.Color[1] = 0.12f;
-    clearVal.Color[2] = 0.16f;
+    clearVal.Color[0] = 0.20f;
+    clearVal.Color[1] = 0.42f;
+    clearVal.Color[2] = 0.75f;
     clearVal.Color[3] = 1.00f;
 
     m_CurrentState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -153,10 +159,6 @@ void ViewportRenderer::RenderScene(float deltaTime, ID3D12GraphicsCommandList* c
         m_CurrentState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
-    // Clear offscreen render target with dark atmospheric clear color
-    float skyClearColor[4] = { 0.05f, 0.07f, 0.10f, 1.00f };
-    cl->ClearRenderTargetView(m_RtvHandle, skyClearColor, 0, nullptr);
-
     // Bind viewport offscreen render target to command list & register target
     cl->OMSetRenderTargets(1, &m_RtvHandle, FALSE, nullptr);
     D3D12_VIEWPORT vp = { 0.0f, 0.0f, (float)m_Width, (float)m_Height, 0.0f, 1.0f };
@@ -164,12 +166,28 @@ void ViewportRenderer::RenderScene(float deltaTime, ID3D12GraphicsCommandList* c
     cl->RSSetViewports(1, &vp);
     cl->RSSetScissorRects(1, &sr);
 
+    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    cl->ClearRenderTargetView(m_RtvHandle, clearColor, 0, nullptr);
+
     ZeGFXAdapter::Get().SetOutputRenderTarget(m_ColorTexture.Get(), m_RtvHandle);
 
-    // Execute ZeGFX Engine Rendering Pipeline
+    // Execute ZeGFX Engine Rendering Pipeline (Layer 0)
     ZeGFXAdapter::Get().Render(cl, m_Width, m_Height, deltaTime);
 
+    // Execute Layer 1 Editor Overlay Pass (D3D12 real 3D geometry overlay)
+    zegfx::overlay::OverlayCameraView cameraView = {};
+    const auto& edCam = EditorState::Get().camera;
+    edCam.GetViewMatrix(cameraView.viewMatrix);
+    float aspect = (m_Height > 0) ? ((float)m_Width / (float)m_Height) : 1.777f;
+    edCam.GetProjectionMatrix(aspect, cameraView.projMatrix);
+    EngineEditor::Vec3f pos = edCam.GetPosition();
+    cameraView.cameraPosition[0] = pos.x; cameraView.cameraPosition[1] = pos.y; cameraView.cameraPosition[2] = pos.z;
+    cameraView.aspectRatio = aspect;
+
+    m_EditorOverlay.Render(cl, cameraView, m_Width, m_Height);
+
     // Transition offscreen target back to PIXEL_SHADER_RESOURCE state for ImGui composition
+
     if (m_CurrentState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;

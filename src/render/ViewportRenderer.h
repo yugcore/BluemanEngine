@@ -1,6 +1,7 @@
 #ifndef VIEWPORT_RENDERER_H
 #define VIEWPORT_RENDERER_H
 
+#include "editor_overlay.h"
 #include <stdint.h>
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -19,6 +20,9 @@ public:
     void Resize(uint32_t width, uint32_t height);
     void SetCommandList(ID3D12GraphicsCommandList* cmdList) { m_ActiveCmdList = cmdList; }
     void RenderScene(float deltaTime, ID3D12GraphicsCommandList* cmdList = nullptr);
+
+    // Per-Viewport Layer 1 Editor Overlay Instance
+    zegfx::overlay::ZeEditorOverlay& GetEditorOverlay() { return m_EditorOverlay; }
 
     // Runtime Engine Integration Ports
     typedef void (*RenderCallbackFn)(ID3D12GraphicsCommandList* cmdList, uint32_t width, uint32_t height, float deltaTime);
@@ -53,7 +57,11 @@ private:
     RenderCallbackFn m_RenderCallback = nullptr;
     uint64_t m_ExternalTextureID = 0;
     bool m_UseExternalTexture = false;
+
+    // Layer 1 Overlay instance owned per-viewport
+    zegfx::overlay::ZeEditorOverlay m_EditorOverlay;
 };
+
 
 } // namespace EngineEditor
 

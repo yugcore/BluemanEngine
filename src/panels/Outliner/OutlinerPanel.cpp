@@ -227,7 +227,7 @@ void RenderOutlinerPanel(bool* pOpen) {
     ImGui::PushStyleColor(ImGuiCol_FrameBgActive, pal.bgElevated);
 
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextWithHint("##OutlinerSearch", "Search scene hierarchy...", s_OutlinerSearch, sizeof(s_OutlinerSearch));
+    ImGui::InputTextWithHint("##OutlinerSearch", "Search scene hierarchy...", s_OutlinerSearch, sizeof(s_OutlinerSearch), ImGuiInputTextFlags_EscapeClearsAll);
 
     ImVec2 sMin = ImGui::GetItemRectMin();
     ImVec2 sMax = ImGui::GetItemRectMax();
@@ -356,7 +356,7 @@ void RenderOutlinerPanel(bool* pOpen) {
             if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
                 SceneGraph::Get().RemoveNode(EditorState::Get().selectedNodeName);
                 Logger::Get().Info("[Outliner] Deleted actor via Del key: " + EditorState::Get().selectedNodeName);
-                EditorState::Get().selectedNodeName = "";
+                EditorState::Get().ClearSelection();
             }
             if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D)) {
                 SceneNode* dup = SceneGraph::Get().DuplicateNode(EditorState::Get().selectedNodeName);

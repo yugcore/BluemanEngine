@@ -32,7 +32,7 @@ public:
     void Shutdown();
     void Resize(uint32_t width, uint32_t height);
     void Render(ID3D12GraphicsCommandList* cmdList, uint32_t width, uint32_t height, float deltaTime);
-    void SyncEngineState(float deltaTime = 0.016f);
+    void SyncEngineState(float deltaTime = 0.016f, zegfx::ExternalCmdListHandle externalCmdList = {});
 
     // GPU Asset Bridge methods
     zegfx::RenderMeshHandle LoadMeshAsset(const std::string& meshPath);
@@ -41,8 +41,10 @@ public:
     void CreateDefaultPrimitives();
     void SetLightingDebugMode(int mode);
 
-    // Render target redirection
+    // Render target redirection & Clear API
     void SetOutputRenderTarget(ID3D12Resource* rtResource, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle);
+    void Clear(zegfx::Color color = zegfx::Color(51, 107, 191, 255));
+    zegfx::Color GetSkyColor() const;
 
     bool IsInitialized() const { return m_Initialized; }
     zephysics::PhysicsWorld* GetPhysicsWorld() { return m_PhysicsWorld.get(); }

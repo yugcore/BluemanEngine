@@ -138,8 +138,8 @@ void RenderStatusBar() {
         }
 
         // 3. GPU
-        char gpuVal[64];
-        snprintf(gpuVal, sizeof(gpuVal), "%s | RTX 4080", stats.apiTag.c_str());
+        char gpuVal[128];
+        snprintf(gpuVal, sizeof(gpuVal), "%s | %s", stats.apiTag.c_str(), stats.gpuName.c_str());
 
         // 4. FPS
         char fpsVal[64];

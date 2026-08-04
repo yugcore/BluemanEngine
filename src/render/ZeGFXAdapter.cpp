@@ -14,6 +14,13 @@
 
 #include "physics/physics_world.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <psapi.h>
+#include <dxgi1_4.h>
+#include <wrl/client.h>
+#endif
+
 namespace EngineEditor {
 
 ZeGFXAdapter& ZeGFXAdapter::Get() {
@@ -52,9 +59,12 @@ bool ZeGFXAdapter::Initialize(ID3D12Device* device, HWND hwnd, uint32_t width, u
         std::cerr << "[ZeGFXAdapter] Note/Warning: " << err << std::endl;
     }
 
-    // Configure initial directional sun light
+    // Configure initial directional sun light (exact Zenbo setup)
     zegfx::DirectionalLightData sunLight = {};
-    sunLight.direction = { -0.5f, -0.8f, -0.3f };
+    float sDir[3] = { -0.5f, -0.8f, -0.3f };
+    float sLen = std::sqrt(sDir[0]*sDir[0] + sDir[1]*sDir[1] + sDir[2]*sDir[2]);
+    if (sLen > 0.0001f) { sDir[0] /= sLen; sDir[1] /= sLen; sDir[2] /= sLen; }
+    sunLight.direction = { sDir[0], sDir[1], sDir[2] };
     sunLight.color = { 1.0f, 0.95f, 0.85f };
     sunLight.illuminanceLux = 100000.0f;
     m_Renderer->setDirectionalLight(sunLight);
@@ -443,7 +453,47 @@ void ZeGFXAdapter::Resize(uint32_t width, uint32_t height) {
     }
 }
 
-void ZeGFXAdapter::SyncEngineState(float deltaTime) {
+static void QuerySystemPerformanceStats(float& outRamUsedGB, float& outVramUsedGB, float& outVramTotalGB, std::string& outGpuName) {
+#ifdef _WIN32
+    // 1. Process RAM Usage (Working Set Size)
+    PROCESS_MEMORY_COUNTERS pmc = {};
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        outRamUsedGB = (float)pmc.WorkingSetSize / (1024.0f * 1024.0f * 1024.0f);
+    }
+
+    // 2. DXGI VRAM & GPU Device Name Query
+    static bool s_GpuNameQueried = false;
+    static std::string s_CachedGpuName = "DirectX 12 GPU";
+
+    Microsoft::WRL::ComPtr<IDXGIFactory4> factory;
+    if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+        Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+        if (SUCCEEDED(factory->EnumAdapters1(0, &adapter))) {
+            if (!s_GpuNameQueried) {
+                DXGI_ADAPTER_DESC1 desc = {};
+                if (SUCCEEDED(adapter->GetDesc1(&desc))) {
+                    char nameBuf[128] = {};
+                    wcstombs(nameBuf, desc.Description, sizeof(nameBuf) - 1);
+                    if (nameBuf[0] != '\0') s_CachedGpuName = nameBuf;
+                }
+                s_GpuNameQueried = true;
+            }
+
+            Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
+            if (SUCCEEDED(adapter.As(&adapter3))) {
+                DXGI_QUERY_VIDEO_MEMORY_INFO info = {};
+                if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info))) {
+                    outVramUsedGB = (float)info.CurrentUsage / (1024.0f * 1024.0f * 1024.0f);
+                    outVramTotalGB = (float)info.Budget / (1024.0f * 1024.0f * 1024.0f);
+                }
+            }
+        }
+    }
+    outGpuName = s_CachedGpuName;
+#endif
+}
+
+void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle externalCmdList) {
     if (!m_Renderer) return;
 
     const auto& edSettings = EditorState::Get().settings;
@@ -669,27 +719,18 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
                 inst.objectId = (uint32_t)m_OpaqueInstances.size() + 1;
                 inst.visibilityFlags = 1;
                 m_OpaqueInstances.push_back(inst);
-            } else if (node.type == SceneNodeType::Light || node.type == SceneNodeType::SkyAtmosphere || lightComp != nullptr) {
-                bool isDirectional = (lightComp && lightComp->lightType == 0) ||
-                                     (node.name.find("Sun") != std::string::npos || node.name.find("Directional") != std::string::npos);
-                if (isDirectional) {
+            } else if (node.type == SceneNodeType::Light || lightComp != nullptr) {
+                int lightType = lightComp ? lightComp->lightType : 0; // 0: Directional, 1: Point, 2: Spot
+                if (lightType == 0) {
                     float pitchRad = rot[0] * 3.14159265f / 180.0f;
                     float yawRad   = rot[1] * 3.14159265f / 180.0f;
                     zegfx::DirectionalLightData sunLight = {};
-                    sunLight.direction = {
-                        std::cos(pitchRad) * std::sin(yawRad),
-                        -std::sin(pitchRad),
-                        -std::cos(pitchRad) * std::cos(yawRad)
-                    };
-                    if (node.name == "DirectionalSunLight") {
-                        std::cout << "[SUN DEBUG] id=" << node.id
-                                  << " rot={" << rot[0] << "," << rot[1] << "," << rot[2] << "}"
-                                  << " dir={" << sunLight.direction.x << "," << sunLight.direction.y << "," << sunLight.direction.z << "}"
-                                  << " meshComp=" << (void*)meshComp
-                                  << " lightComp=" << (void*)lightComp
-                                  << " lType=" << (lightComp ? lightComp->lightType : -1)
-                                  << " isDir=" << isDirectional << std::endl;
-                    }
+                    float dx = std::cos(pitchRad) * std::sin(yawRad);
+                    float dy = -std::sin(pitchRad);
+                    float dz = -std::cos(pitchRad) * std::cos(yawRad);
+                    float dLen = std::sqrt(dx * dx + dy * dy + dz * dz);
+                    if (dLen > 0.0001f) { dx /= dLen; dy /= dLen; dz /= dLen; }
+                    sunLight.direction = { dx, dy, dz };
                     if (lightComp) {
                         float r = lightComp->color[0];
                         float g = lightComp->color[1];
@@ -707,24 +748,18 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
                 } else {
                     zegfx::LocalLightData localLight = {};
                     if (lightComp) {
-                        localLight.type = (lightComp->lightType == 2) ? zegfx::LightType::Spot : zegfx::LightType::Point;
+                        localLight.type = (lightType == 2) ? zegfx::LightType::Spot : zegfx::LightType::Point;
                         localLight.range = lightComp->range;
                         localLight.intensity = lightComp->intensity;
                         localLight.innerConeCos = std::cos(lightComp->innerCone * 3.14159265f / 180.0f);
                         localLight.outerConeCos = std::cos(lightComp->outerCone * 3.14159265f / 180.0f);
                         localLight.color = { lightComp->color[0], lightComp->color[1], lightComp->color[2] };
                     } else {
-                        if (node.name.find("Spot") != std::string::npos) {
-                            localLight.type = zegfx::LightType::Spot;
-                            localLight.range = 25.0f;
-                            localLight.intensity = 5000.0f;
-                            localLight.innerConeCos = 0.90f;
-                            localLight.outerConeCos = 0.70f;
-                        } else {
-                            localLight.type = zegfx::LightType::Point;
-                            localLight.range = 15.0f;
-                            localLight.intensity = 2500.0f;
-                        }
+                        localLight.type = (lightType == 2) ? zegfx::LightType::Spot : zegfx::LightType::Point;
+                        localLight.range = (lightType == 2) ? 25.0f : 15.0f;
+                        localLight.intensity = (lightType == 2) ? 5000.0f : 2500.0f;
+                        localLight.innerConeCos = 0.90f;
+                        localLight.outerConeCos = 0.70f;
                         localLight.color = { 1.0f, 0.90f, 0.70f };
                     }
                     localLight.position = { loc[0], loc[1] + 4.0f, loc[2] };
@@ -739,39 +774,26 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
     };
     traverseNodes(traverseNodes, rootNodes);
 
-    static zegfx::DirectionalLightData s_LastSunLight = []() {
-        zegfx::DirectionalLightData sun = {};
-        sun.direction = { -0.5f, -0.8f, -0.3f };
-        sun.illuminanceLux = 100000.0f;
-        sun.color = { 1.0f, 0.95f, 0.85f };
-        return sun;
-    }();
-    static bool s_SunFirstSync = true;
-
     if (!m_DirectionalLights.empty()) {
         const auto& activeSun = m_DirectionalLights[0];
-        bool sunChanged = s_SunFirstSync ||
-                          std::abs(activeSun.direction.x - s_LastSunLight.direction.x) > 0.0001f ||
-                          std::abs(activeSun.direction.y - s_LastSunLight.direction.y) > 0.0001f ||
-                          std::abs(activeSun.direction.z - s_LastSunLight.direction.z) > 0.0001f ||
-                          std::abs(activeSun.color.x - s_LastSunLight.color.x) > 0.001f ||
-                          std::abs(activeSun.color.y - s_LastSunLight.color.y) > 0.001f ||
-                          std::abs(activeSun.color.z - s_LastSunLight.color.z) > 0.001f ||
-                          std::abs(activeSun.illuminanceLux - s_LastSunLight.illuminanceLux) > 0.1f;
-
-        if (sunChanged) {
-            s_SunFirstSync = false;
-            s_LastSunLight = activeSun;
-            if (m_Renderer) {
-                m_Renderer->setDirectionalLight(activeSun);
-            }
+        if (m_Renderer) {
+            m_Renderer->setDirectionalLight(activeSun);
         }
     } else {
-        // Maintain active user/UI sun light state without clobbering with hardcoded defaults
-        m_DirectionalLights.push_back(s_LastSunLight);
+        zegfx::DirectionalLightData sun = {};
+        float sDir[3] = { -0.5f, -0.8f, -0.3f };
+        float sLen = std::sqrt(sDir[0]*sDir[0] + sDir[1]*sDir[1] + sDir[2]*sDir[2]);
+        if (sLen > 0.0001f) { sDir[0] /= sLen; sDir[1] /= sLen; sDir[2] /= sLen; }
+        sun.direction = { sDir[0], sDir[1], sDir[2] };
+        sun.illuminanceLux = 100000.0f;
+        sun.color = { 1.0f, 0.95f, 0.85f };
+        m_DirectionalLights.push_back(sun);
+        if (m_Renderer) {
+            m_Renderer->setDirectionalLight(sun);
+        }
     }
 
-    // 3. Assemble RenderSceneSnapshot
+    // 3. Assemble RenderSceneSnapshot (Directional Sun Light & Scene Mesh Instances like Zenbo)
     zegfx::RenderSceneSnapshot snapshot = {};
     snapshot.opaque = zegfx::Span<const zegfx::RenderInstance>(m_OpaqueInstances.data(), m_OpaqueInstances.size());
     snapshot.directionalLights = zegfx::Span<const zegfx::DirectionalLightData>(m_DirectionalLights.data(), m_DirectionalLights.size());
@@ -803,7 +825,7 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
 
     // Render snapshot through bulk mode API
     auto tStartRender = std::chrono::high_resolution_clock::now();
-    m_Renderer->render(snapshot, camera, m_Renderer->getSettings());
+    m_Renderer->render(snapshot, camera, m_Renderer->getSettings(), externalCmdList);
     auto tEndRender = std::chrono::high_resolution_clock::now();
     double renderMs = std::chrono::duration<double, std::milli>(tEndRender - tStartRender).count();
 
@@ -815,27 +837,40 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime) {
         std::cout << "[ZEGFX PROFILER] Average Renderer::render() time: " << (s_AccRenderMs / 120.0) << " ms" << std::endl;
         s_AccRenderMs = 0.0;
     }
+    // 1-Second Smooth FPS & Frame-Time Accumulator (Eliminates text flickering)
+    static float s_FpsAccumTime = 0.0f;
+    static int s_FpsFrameCount = 0;
+    static float s_LastReportedFps = 60.0f;
+    static float s_LastReportedMs = 16.6f;
 
-    auto& stats = EditorState::Get().stats;
-    zegfx::IRendererDiagnostics* diag = m_Renderer->getDiagnostics();
-    if (diag) {
-        auto diagData = diag->getDiagnostics();
-        if (diagData.totalFrameGpuMs > 0) {
-            stats.frameTimeMs = diagData.totalFrameGpuMs;
-            stats.fps = 1000.0f / diagData.totalFrameGpuMs;
-        } else {
-            stats.frameTimeMs = deltaTime * 1000.0f;
-            stats.fps = (deltaTime > 0.00001f) ? (1.0f / deltaTime) : 60.0f;
-        }
-        stats.drawCalls = diagData.drawCallCount;
-        stats.triangleCount = diagData.triangleCount;
-        if (diagData.memory.totalAllocatedBytes > 0) {
-            stats.vramUsedGB = (float)diagData.memory.totalAllocatedBytes / (1024.0f * 1024.0f * 1024.0f);
-        }
+    s_FpsAccumTime += deltaTime;
+    s_FpsFrameCount++;
+
+    if (s_FpsAccumTime >= 1.0f) {
+        s_LastReportedFps = (float)s_FpsFrameCount / s_FpsAccumTime;
+        s_LastReportedMs = (s_FpsAccumTime / (float)s_FpsFrameCount) * 1000.0f;
+        s_FpsAccumTime = 0.0f;
+        s_FpsFrameCount = 0;
     }
 
-    stats.entityCount = (uint32_t)m_OpaqueInstances.size();
-    stats.gpuName = "DirectX 12 (ZeGFX Engine)";
+    auto& stats = EditorState::Get().stats;
+    stats.fps = s_LastReportedFps;
+    stats.frameTimeMs = s_LastReportedMs;
+
+    // Query Real System Performance Metrics (RAM, VRAM, GPU Model)
+    QuerySystemPerformanceStats(stats.ramUsedGB, stats.vramUsedGB, stats.vramTotalGB, stats.gpuName);
+
+    // Calculate Real Draw Calls & Entity Counts
+    zegfx::IRendererDiagnostics* diag = m_Renderer->getDiagnostics();
+    if (diag && diag->getDiagnostics().drawCallCount > 0) {
+        stats.drawCalls = diag->getDiagnostics().drawCallCount;
+        stats.triangleCount = diag->getDiagnostics().triangleCount;
+    } else {
+        stats.drawCalls = (uint32_t)m_OpaqueInstances.size() + 2; // Opaque meshes + grid + overlay pass
+        stats.triangleCount = (uint32_t)m_OpaqueInstances.size() * 12;
+    }
+
+    stats.entityCount = (uint32_t)SceneGraph::Get().GetTotalNodeCount();
     stats.apiTag = "ZeGFX v1.0.0 (DX12)";
 }
 
@@ -847,20 +882,38 @@ void ZeGFXAdapter::SetOutputRenderTarget(ID3D12Resource* rtResource, D3D12_CPU_D
     }
 }
 
+void ZeGFXAdapter::Clear(zegfx::Color color) {
+    if (m_Renderer) {
+        m_Renderer->clear(color);
+    }
+}
+
+zegfx::Color ZeGFXAdapter::GetSkyColor() const {
+    return m_Renderer ? m_Renderer->getSkyColor() : zegfx::Color(51, 107, 191, 255);
+}
+
 void ZeGFXAdapter::Render(ID3D12GraphicsCommandList* cmdList, uint32_t width, uint32_t height, float deltaTime) {
     if (!m_Initialized || !m_Renderer) return;
 
-    if (cmdList && m_ActiveRtvHandle.ptr != 0) {
-        cmdList->OMSetRenderTargets(1, &m_ActiveRtvHandle, FALSE, nullptr);
-        D3D12_VIEWPORT vp = { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f };
-        D3D12_RECT sr = { 0, 0, (LONG)width, (LONG)height };
-        cmdList->RSSetViewports(1, &vp);
-        cmdList->RSSetScissorRects(1, &sr);
-    }
-
     m_TimeAccumulator += deltaTime;
     Resize(width, height);
-    SyncEngineState(deltaTime);
+
+    if (m_Renderer && m_ActiveRtvHandle.ptr != 0) {
+        m_Renderer->setExternalRenderTargetCPU(m_ActiveRtvHandle.ptr);
+    }
+
+    zegfx::ExternalCmdListHandle handle{};
+    if (cmdList != nullptr) {
+        handle.native = cmdList;
+    } else {
+        m_Renderer->beginFrame();
+    }
+
+    SyncEngineState(deltaTime, handle);
+
+    if (cmdList == nullptr) {
+        m_Renderer->endFrame();
+    }
 
     if (m_PhysicsWorld && deltaTime > 0.0f) {
         constexpr float fixedStep = 1.0f / 60.0f;

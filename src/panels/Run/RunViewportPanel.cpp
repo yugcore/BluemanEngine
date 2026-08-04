@@ -27,8 +27,12 @@ void RenderRunViewportPanel(bool* pOpen) {
     }
 
     float deltaTime = ImGui::GetIO().DeltaTime;
-    ViewportRenderer::Get().RenderScene(deltaTime);
+    (void)deltaTime;
+    // Viewport rendering disconnected per user instruction
+    // ViewportRenderer::Get().RenderScene(deltaTime);
 
+    ImGui::Dummy(viewportAvail);
+    /*
     uint64_t textureID = ViewportRenderer::Get().GetTextureID();
     if (textureID != 0) {
         ImGui::Image((ImTextureID)textureID, viewportAvail, ImVec2(0, 1), ImVec2(1, 0));
@@ -39,6 +43,7 @@ void RenderRunViewportPanel(bool* pOpen) {
             Logger::Get().Error("[Run Viewport] ERROR: Render texture handle is null (0)! Game viewport output unavailable.");
         }
     }
+    */
 
     ImGui::End();
     ImGui::PopStyleVar();

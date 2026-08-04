@@ -1,4 +1,5 @@
 #include "MenuBar.h"
+#include "render/ZeGFXAdapter.h"
 #include "layout/Dockspace.h"
 #include "layout/WindowLayout.h"
 #include "panels/Chrome/CustomTitleBar.h"
@@ -148,7 +149,7 @@ void RenderMenuBarContents() {
             if (target) {
                 SceneGraph::Get().SetClipboard(*target);
                 SceneGraph::Get().RemoveNode(EditorState::Get().selectedNodeName);
-                EditorState::Get().selectedNodeName = "";
+                EditorState::Get().ClearSelection();
                 Logger::Get().Info("[Menu] Cut node to clipboard.");
             }
         }
@@ -175,7 +176,7 @@ void RenderMenuBarContents() {
         }
         if (ImGui::MenuItem("Delete", "Del", false, hasSelection)) {
             SceneGraph::Get().RemoveNode(EditorState::Get().selectedNodeName);
-            EditorState::Get().selectedNodeName = "";
+            EditorState::Get().ClearSelection();
             Logger::Get().Info("[Menu] Deleted selected node.");
         }
         ImGui::Separator();
@@ -273,6 +274,22 @@ void RenderMenuBarContents() {
                 audioNode.type = SceneNodeType::Audio;
                 SceneGraph::Get().AddNode(audioNode);
                 EditorState::Get().SetSelection(audioNode.name, "Audio");
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("View")) {
+        if (ImGui::BeginMenu("Lighting Debug / Render Pass")) {
+            static int s_RenderPassMode = 0;
+            const char* renderPassNames[] = { "Lit (PBR)", "Unlit", "Depth Buffer", "World Normals", "Roughness & Metallic", "Volumetric Fog Grid", "Cascaded Shadow Atlas" };
+            int debugMap[] = { 0, 1, 7, 3, 4, 10, 8 };
+            for (int r = 0; r < 7; ++r) {
+                if (ImGui::MenuItem(renderPassNames[r], nullptr, s_RenderPassMode == r)) {
+                    s_RenderPassMode = r;
+                    EngineEditor::ZeGFXAdapter::Get().SetLightingDebugMode(debugMap[r]);
+                }
             }
             ImGui::EndMenu();
         }

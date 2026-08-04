@@ -115,6 +115,8 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx_ufbx_translator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx_pipeline.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/zegfx_factory.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/editor_overlay.cpp"
+
 
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/dx12/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/*.cpp"

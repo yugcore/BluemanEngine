@@ -21,31 +21,33 @@ struct PaletteItem {
     std::string description;
     SceneNodeType type;
     const char* badgeStr;
+    std::string meshPath = "";
+    int defaultLightType = -1; // -1: N/A, 0: Directional, 1: Point, 2: Spot
 };
 
 static char s_PaletteSearch[128] = "";
 
 static const std::vector<PaletteItem> s_PaletteItems = {
-    { "1KM Terrain Chunk", "Environment", "1024m x 1024m heightmap ground terrain", SceneNodeType::Terrain, "[Terrain]" },
-    { "Foliage Cluster", "Environment", "High-density instanced trees, bushes & grass", SceneNodeType::FoliageCluster, "[Foliage]" },
-    { "Trail Path Waypoint", "Environment", "Forest trail path marker node", SceneNodeType::PathPoint, "[Path]" },
+    { "1KM Terrain Chunk", "Environment", "1024m x 1024m heightmap ground terrain", SceneNodeType::Terrain, "[Terrain]", "Engine/DefaultPlane", -1 },
+    { "Foliage Cluster", "Environment", "High-density instanced trees, bushes & grass", SceneNodeType::FoliageCluster, "[Foliage]", "Engine/DefaultCone", -1 },
+    { "Trail Path Waypoint", "Environment", "Forest trail path marker node", SceneNodeType::PathPoint, "[Path]", "Engine/DefaultPlane", -1 },
 
-    { "Cube Mesh", "Primitives", "Standard 3D unit cube mesh", SceneNodeType::Actor, "[Cube]" },
-    { "Sphere Mesh", "Primitives", "UV sphere mesh primitive", SceneNodeType::Actor, "[Sphere]" },
-    { "Cylinder Mesh", "Primitives", "Subdivided cylinder mesh primitive", SceneNodeType::Actor, "[Cyl]" },
-    { "Plane Mesh", "Primitives", "Flat ground plane geometry", SceneNodeType::Actor, "[Plane]" },
-    { "Cone Mesh", "Primitives", "Conical geometry primitive", SceneNodeType::Actor, "[Cone]" },
+    { "Cube Mesh", "Primitives", "Standard 3D unit cube mesh", SceneNodeType::Actor, "[Cube]", "primitives/cube.zmesh", -1 },
+    { "Sphere Mesh", "Primitives", "UV sphere mesh primitive", SceneNodeType::Actor, "[Sphere]", "primitives/sphere.zmesh", -1 },
+    { "Cylinder Mesh", "Primitives", "Subdivided cylinder mesh primitive", SceneNodeType::Actor, "[Cyl]", "primitives/cylinder.zmesh", -1 },
+    { "Plane Mesh", "Primitives", "Flat ground plane geometry", SceneNodeType::Actor, "[Plane]", "primitives/plane.zmesh", -1 },
+    { "Cone Mesh", "Primitives", "Conical geometry primitive", SceneNodeType::Actor, "[Cone]", "primitives/cone.zmesh", -1 },
 
-    { "Directional Light", "Lighting", "Sunlight / main directional light source", SceneNodeType::Light, "[Sun]" },
-    { "Point Light", "Lighting", "Omnidirectional point light source", SceneNodeType::Light, "[Light]" },
-    { "Spot Light", "Lighting", "Cone-focused spot light source", SceneNodeType::Light, "[Spot]" },
-    { "Sky Atmosphere", "Lighting", "Rayleigh & Mie atmospheric sky solve", SceneNodeType::SkyAtmosphere, "[Sky]" },
+    { "Directional Light", "Lighting", "Sunlight / main directional light source", SceneNodeType::Light, "[Sun]", "", 0 },
+    { "Point Light", "Lighting", "Omnidirectional point light source", SceneNodeType::Light, "[Light]", "", 1 },
+    { "Spot Light", "Lighting", "Cone-focused spot light source", SceneNodeType::Light, "[Spot]", "", 2 },
+    { "Sky Atmosphere", "Lighting", "Rayleigh & Mie atmospheric sky solve", SceneNodeType::SkyAtmosphere, "[Sky]", "", -1 },
 
-    { "Cinematic Camera", "Cameras", "Perspective camera actor with focal length & FOV", SceneNodeType::Camera, "[Cam]" },
+    { "Cinematic Camera", "Cameras", "Perspective camera actor with focal length & FOV", SceneNodeType::Camera, "[Cam]", "", -1 },
 
-    { "Audio Source", "Volumes", "Spatial 3D audio emitter volume", SceneNodeType::Audio, "[Audio]" },
-    { "Box Collision", "Volumes", "AABB collision trigger volume", SceneNodeType::Component, "[Vol]" },
-    { "Post Process Volume", "Volumes", "Tone mapping and bloom region volume", SceneNodeType::Component, "[PP]" }
+    { "Audio Source", "Volumes", "Spatial 3D audio emitter volume", SceneNodeType::Audio, "[Audio]", "", -1 },
+    { "Box Collision", "Volumes", "AABB collision trigger volume", SceneNodeType::Component, "[Vol]", "", -1 },
+    { "Post Process Volume", "Volumes", "Tone mapping and bloom region volume", SceneNodeType::Component, "[PP]", "", -1 }
 };
 
 void RenderObjectPalettePanel(bool* pOpen) {
@@ -138,13 +140,26 @@ void RenderObjectPalettePanel(bool* pOpen) {
             SceneNode newNode;
             newNode.name = item.name + "_" + std::to_string(rand() % 1000);
             newNode.type = item.type;
-            if (item.name.find("Cube") != std::string::npos) newNode.meshPath = "primitives/cube.zmesh";
-            else if (item.name.find("Sphere") != std::string::npos) newNode.meshPath = "primitives/sphere.zmesh";
-            else if (item.name.find("Cylinder") != std::string::npos) newNode.meshPath = "primitives/cylinder.zmesh";
-            else if (item.name.find("Plane") != std::string::npos) newNode.meshPath = "primitives/plane.zmesh";
-            else if (item.name.find("Cone") != std::string::npos) newNode.meshPath = "primitives/cone.zmesh";
+            newNode.meshPath = item.meshPath;
 
             SceneGraph::Get().AddNode(newNode);
+
+            if (item.type == SceneNodeType::Light && item.defaultLightType >= 0) {
+                LightComponent* lc = ComponentRegistry::Get().GetComponent<LightComponent>(newNode.id);
+                if (lc) {
+                    lc->lightType = item.defaultLightType;
+                    if (item.defaultLightType == 0) {
+                        lc->intensity = 100000.0f;
+                        lc->color[0] = 1.0f; lc->color[1] = 0.95f; lc->color[2] = 0.85f;
+                    } else if (item.defaultLightType == 2) {
+                        lc->intensity = 5000.0f; lc->range = 25.0f;
+                        lc->color[0] = 1.0f; lc->color[1] = 0.90f; lc->color[2] = 0.70f;
+                    } else {
+                        lc->intensity = 2500.0f; lc->range = 15.0f;
+                        lc->color[0] = 1.0f; lc->color[1] = 0.90f; lc->color[2] = 0.70f;
+                    }
+                }
+            }
 
             EditorState::Get().SetSelection(newNode.name, SceneGraph::GetTypeIconTag(item.type));
             Logger::Get().Info("[Palette] Spawned node '" + newNode.name + "' into SceneGraph.");
