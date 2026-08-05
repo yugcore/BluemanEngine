@@ -15,6 +15,7 @@ enum class SceneNodeType {
     Camera,
     Audio,
     SkyAtmosphere,
+    VolumetricFog,
     Component,
     Terrain,
     FoliageCluster,

@@ -34,6 +34,25 @@ struct DirectionalLightProxy {
     uint32_t flags = 1u;
 };
 
+struct SkyAtmosphereProxy {
+    bool active = false;
+    float skyIntensity = 1.00f;
+    float zenithColor[3]  = { 0.20f, 0.42f, 0.75f };
+    float horizonColor[3] = { 0.55f, 0.68f, 0.82f };
+    float rayleighScattering = 0.058f;
+    float aerosolScattering  = 0.004f;
+    float atmosphereHeightKm = 60.00f;
+};
+
+struct VolumetricFogProxy {
+    bool active = false;
+    float density = 0.02f;
+    float heightFalloff = 0.10f;
+    float color[3] = { 0.55f, 0.65f, 0.80f };
+    float startDistance = 0.0f;
+    float endDistance = 500.0f;
+};
+
 class ZeGFXAdapter {
 public:
     static ZeGFXAdapter& Get();
@@ -90,6 +109,7 @@ private:
     std::vector<zegfx::LocalLightData> m_LocalLights;
     std::vector<zegfx::DirectionalLightData> m_DirectionalLights;
     zegfx::Color m_SkyAmbientColor = zegfx::Color(140, 170, 205, 255);
+    bool m_HasSkyAtmosphere = false;
 };
 
 } // namespace EngineEditor

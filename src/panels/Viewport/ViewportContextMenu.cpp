@@ -192,6 +192,20 @@ void ViewportContextMenu::Render() {
                         SceneGraph::Get().AddNode(spotNode);
                         EditorState::Get().SetSelection(spotNode.name, "Light");
                     }
+                    if (ImGui::MenuItem("SkyAtmosphere")) {
+                        SceneNode skyNode;
+                        skyNode.name = "SkyAtmosphere_" + std::to_string(rand() % 1000);
+                        skyNode.type = SceneNodeType::SkyAtmosphere;
+                        SceneGraph::Get().AddNode(skyNode);
+                        EditorState::Get().SetSelection(skyNode.name, "SkyAtmosphere");
+                    }
+                    if (ImGui::MenuItem("Volumetric Fog")) {
+                        SceneNode fogNode;
+                        fogNode.name = "VolumetricFog_" + std::to_string(rand() % 1000);
+                        fogNode.type = SceneNodeType::VolumetricFog;
+                        SceneGraph::Get().AddNode(fogNode);
+                        EditorState::Get().SetSelection(fogNode.name, "VolumetricFog");
+                    }
                     ImGui::EndMenu();
                 }
                 ImGui::EndMenu();

@@ -23,6 +23,7 @@ static ImVec4 GetSceneNodeTypeColor(SceneNodeType type) {
         case SceneNodeType::Camera:        return ImVec4(0.40f, 0.85f, 0.50f, 1.00f); // Green
         case SceneNodeType::Audio:         return ImVec4(0.90f, 0.45f, 0.25f, 1.00f); // Orange
         case SceneNodeType::SkyAtmosphere: return ImVec4(0.70f, 0.45f, 0.95f, 1.00f); // Purple
+        case SceneNodeType::VolumetricFog: return ImVec4(0.55f, 0.70f, 0.90f, 1.00f); // Mist Blue
         case SceneNodeType::Component:     return ImVec4(0.60f, 0.60f, 0.60f, 1.00f); // Muted
         case SceneNodeType::Terrain:       return ImVec4(0.45f, 0.75f, 0.35f, 1.00f); // Forest Green
         case SceneNodeType::FoliageCluster:return ImVec4(0.35f, 0.85f, 0.45f, 1.00f); // Emerald

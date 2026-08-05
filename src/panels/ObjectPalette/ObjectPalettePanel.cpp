@@ -40,8 +40,9 @@ static const std::vector<PaletteItem> s_PaletteItems = {
 
     { "Directional Light", "Lighting", "Sunlight / main directional light source", SceneNodeType::Light, "[Sun]", "", 0 },
     { "Point Light", "Lighting", "Omnidirectional point light source", SceneNodeType::Light, "[Light]", "", 1 },
-    { "Spot Light", "Lighting", "Cone-focused spot light source", SceneNodeType::Light, "[Spot]", "", 2 },
-    { "Sky Atmosphere", "Lighting", "Rayleigh & Mie atmospheric sky solve", SceneNodeType::SkyAtmosphere, "[Sky]", "", -1 },
+    { "Directional Sun Light", "Lighting", "Physical directional sun light source", SceneNodeType::Light, "[Sun]", "", 0 },
+    { "Sky Atmosphere", "Lighting", "Atmospheric sky dome rendering and sunlight coupling", SceneNodeType::SkyAtmosphere, "[Sky]", "", -1 },
+    { "Volumetric Fog", "Lighting", "Volumetric fog density covering ground layer and distance", SceneNodeType::VolumetricFog, "[Fog]", "", -1 },
 
     { "Cinematic Camera", "Cameras", "Perspective camera actor with focal length & FOV", SceneNodeType::Camera, "[Cam]", "", -1 },
 

@@ -566,34 +566,113 @@ void RenderDetailsPanel(bool* pOpen) {
             }
         }
 
-        // Retain SkyAtmosphere Section for SkyAtmosphere Nodes
-        if (selectedNodeName == "SkyAtmosphere" || selectedNodeType == "SkyAtmosphere") {
-            bool skyOpen = RenderCollapsibleHeaderWithGear("Sky Atmosphere", "Sky", nullptr, nullptr);
+        // Retain SkyAtmosphere Section for SkyAtmosphere Component / Nodes
+        SkyAtmosphereComponent* skyComp = ComponentRegistry::Get().GetComponent<SkyAtmosphereComponent>(entityId);
+        if (skyComp || selectedNodeName == "SkyAtmosphere" || selectedNodeType == "SkyAtmosphere") {
+            bool skyOpen = RenderCollapsibleHeaderWithGear(
+                "Sky Atmosphere", "Sky",
+                [skyComp]() { if (skyComp) *skyComp = SkyAtmosphereComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<SkyAtmosphereComponent>(entityId); }
+            );
+
             if (skyOpen) {
                 ImGui::Indent(Theme::Metrics::panelLeftMargin);
                 ImGui::Spacing();
 
-                auto& skyProps = EditorState::Get().skyAtmosphereProps;
+                if (!skyComp) {
+                    skyComp = ComponentRegistry::Get().AddComponent<SkyAtmosphereComponent>(entityId);
+                }
 
                 ImGui::Columns(2, "##SkyProps", false);
                 ImGui::SetColumnWidth(0, Theme::Metrics::labelColumnWidth * 2.0f);
 
+                ImGui::TextUnformatted("Enable Sky Atmosphere");
+                ImGui::NextColumn();
+                ImGui::Checkbox("##SkyEnable", &skyComp->enabled);
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("Sky Intensity");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##SkyIntensity", &skyComp->skyIntensity, 0.05f, 0.00f, 10.00f, "%.2f");
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("Zenith Color");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::ColorEdit3("##ZenithColor", skyComp->zenithColor);
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("Horizon Color");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::ColorEdit3("##HorizonColor", skyComp->horizonColor);
+                ImGui::NextColumn();
+
                 ImGui::TextUnformatted("Rayleigh Scattering Scale");
                 ImGui::NextColumn();
                 ImGui::SetNextItemWidth(-1.0f);
-                ImGui::DragFloat("##RayleighScattering", &skyProps.rayleighScattering, 0.001f, 0.000f, 1.000f, "%.4f");
-                ImGui::NextColumn();
-
-                ImGui::TextUnformatted("Aerosol Scattering Scale");
-                ImGui::NextColumn();
-                ImGui::SetNextItemWidth(-1.0f);
-                ImGui::DragFloat("##AerosolScattering", &skyProps.aerosolScattering, 0.001f, 0.000f, 1.000f, "%.1f");
+                ImGui::DragFloat("##RayleighScattering", &skyComp->rayleighScattering, 0.001f, 0.000f, 1.000f, "%.4f");
                 ImGui::NextColumn();
 
                 ImGui::TextUnformatted("Atmosphere Height");
                 ImGui::NextColumn();
                 ImGui::SetNextItemWidth(-1.0f);
-                ImGui::DragFloat("##AtmosphereHeight", &skyProps.atmosphereHeightKm, 0.5f, 1.0f, 100.0f, "%.1f km");
+                ImGui::DragFloat("##AtmosphereHeight", &skyComp->atmosphereHeightKm, 0.5f, 1.0f, 100.0f, "%.1f km");
+
+                ImGui::Columns(1);
+                ImGui::Spacing();
+                ImGui::Unindent(Theme::Metrics::panelLeftMargin);
+            }
+        }
+
+        // Retain Volumetric Fog Section for VolumetricFog Component / Nodes
+        VolumetricFogComponent* fogComp = ComponentRegistry::Get().GetComponent<VolumetricFogComponent>(entityId);
+        if (fogComp || selectedNodeName == "VolumetricFog" || selectedNodeType == "VolumetricFog") {
+            bool fogOpen = RenderCollapsibleHeaderWithGear(
+                "Volumetric Fog", "Fog",
+                [fogComp]() { if (fogComp) *fogComp = VolumetricFogComponent(); },
+                [entityId]() { ComponentRegistry::Get().RemoveComponent<VolumetricFogComponent>(entityId); }
+            );
+
+            if (fogOpen) {
+                ImGui::Indent(Theme::Metrics::panelLeftMargin);
+                ImGui::Spacing();
+
+                if (!fogComp) {
+                    fogComp = ComponentRegistry::Get().AddComponent<VolumetricFogComponent>(entityId);
+                }
+
+                ImGui::Columns(2, "##FogProps", false);
+                ImGui::SetColumnWidth(0, Theme::Metrics::labelColumnWidth * 2.0f);
+
+                ImGui::TextUnformatted("Enable Volumetric Fog");
+                ImGui::NextColumn();
+                ImGui::Checkbox("##FogEnable", &fogComp->enabled);
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("Fog Density");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##FogDensity", &fogComp->density, 0.001f, 0.000f, 0.500f, "%.4f");
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("Fog Color");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::ColorEdit3("##FogColor", fogComp->color);
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("Start Distance");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##FogStart", &fogComp->startDistance, 1.0f, 0.0f, 1000.0f, "%.1f m");
+                ImGui::NextColumn();
+
+                ImGui::TextUnformatted("End Distance");
+                ImGui::NextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::DragFloat("##FogEnd", &fogComp->endDistance, 5.0f, 10.0f, 5000.0f, "%.1f m");
 
                 ImGui::Columns(1);
                 ImGui::Spacing();
@@ -667,6 +746,12 @@ void RenderDetailsPanel(bool* pOpen) {
             if (MatchesFilter("Directional Light") && ImGui::MenuItem(ICON_FA_SUN " Directional Light")) {
                 LightComponent lc; lc.lightType = 0; lc.intensity = 100000.0f; lc.color[0] = 1.0f; lc.color[1] = 0.95f; lc.color[2] = 0.85f;
                 ComponentRegistry::Get().AddComponent<LightComponent>(entityId, lc);
+            }
+            if (MatchesFilter("Sky Atmosphere") && ImGui::MenuItem(ICON_FA_SUN " Sky Atmosphere")) {
+                ComponentRegistry::Get().AddComponent<SkyAtmosphereComponent>(entityId);
+            }
+            if (MatchesFilter("Volumetric Fog") && ImGui::MenuItem(ICON_FA_SUN " Volumetric Fog")) {
+                ComponentRegistry::Get().AddComponent<VolumetricFogComponent>(entityId);
             }
             ImGui::EndMenu();
         }

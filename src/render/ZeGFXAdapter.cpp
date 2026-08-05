@@ -73,6 +73,10 @@ bool ZeGFXAdapter::Initialize(ID3D12Device* device, HWND hwnd, uint32_t width, u
 
     // Phase 5: Register Sky/Atmosphere Observer (Decoupled Event, No Hard Reference)
     SunOrbitController::Get().RegisterSunChangeListener([this](const float dir[3], float elevationDeg) {
+        if (!m_HasSkyAtmosphere) {
+            m_SkyAmbientColor = zegfx::Color(0, 0, 0, 255);
+            return;
+        }
         float elevNorm = std::max(0.0f, std::min(1.0f, (elevationDeg + 10.0f) / 100.0f));
         if (elevationDeg > 0.0f) {
             uint8_t r = static_cast<uint8_t>(51.0f * elevNorm + 245.0f * (1.0f - elevNorm));
@@ -314,12 +318,12 @@ void ZeGFXAdapter::CreateDefaultPrimitives() {
             uint32_t i3 = (r + 1) * terrainResX + (c + 1);
 
             terrainIndices.push_back(i0);
-            terrainIndices.push_back(i2);
             terrainIndices.push_back(i1);
+            terrainIndices.push_back(i2);
 
             terrainIndices.push_back(i1);
-            terrainIndices.push_back(i2);
             terrainIndices.push_back(i3);
+            terrainIndices.push_back(i2);
         }
     }
 
@@ -687,8 +691,14 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
     m_LocalLights.reserve(32);
     m_DirectionalLights.reserve(4);
 
-    // 1. Traversal of SceneGraph Nodes for Directional Lights, Mesh Entities, Foliage, Terrain & Local Lights
+    // 1. Traversal of SceneGraph Nodes for Directional Lights, Mesh Entities, Foliage, Terrain, Sky & Local Lights
     const auto& rootNodes = SceneGraph::Get().GetRootNodes();
+
+    bool skyAtmosphereFound = false;
+    SkyAtmosphereProxy activeSkyProxy = {};
+
+    bool volumetricFogFound = false;
+    VolumetricFogProxy activeFogProxy = {};
 
     auto traverseNodes = [&](auto& self, const std::vector<SceneNode>& nodes) -> void {
         for (const auto& node : nodes) {
@@ -874,12 +884,83 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
                 }
             }
 
+            // Process SkyAtmosphere component or node
+            const SkyAtmosphereComponent* skyComp = ComponentRegistry::Get().GetComponent<SkyAtmosphereComponent>(node.id);
+            if ((node.type == SceneNodeType::SkyAtmosphere || skyComp != nullptr) && !skyAtmosphereFound) {
+                if (node.visible && (!skyComp || skyComp->enabled)) {
+                    skyAtmosphereFound = true;
+                    activeSkyProxy.active = true;
+                    if (skyComp) {
+                        activeSkyProxy.skyIntensity = skyComp->skyIntensity;
+                        activeSkyProxy.zenithColor[0] = skyComp->zenithColor[0];
+                        activeSkyProxy.zenithColor[1] = skyComp->zenithColor[1];
+                        activeSkyProxy.zenithColor[2] = skyComp->zenithColor[2];
+                        activeSkyProxy.horizonColor[0] = skyComp->horizonColor[0];
+                        activeSkyProxy.horizonColor[1] = skyComp->horizonColor[1];
+                        activeSkyProxy.horizonColor[2] = skyComp->horizonColor[2];
+                    }
+                }
+            }
+
+            // Process VolumetricFog component or node
+            const VolumetricFogComponent* fogComp = ComponentRegistry::Get().GetComponent<VolumetricFogComponent>(node.id);
+            if ((node.type == SceneNodeType::VolumetricFog || fogComp != nullptr) && !volumetricFogFound) {
+                if (node.visible && (!fogComp || fogComp->enabled)) {
+                    volumetricFogFound = true;
+                    activeFogProxy.active = true;
+                    if (fogComp) {
+                        activeFogProxy.density = fogComp->density;
+                        activeFogProxy.heightFalloff = fogComp->heightFalloff;
+                        activeFogProxy.color[0] = fogComp->color[0];
+                        activeFogProxy.color[1] = fogComp->color[1];
+                        activeFogProxy.color[2] = fogComp->color[2];
+                        activeFogProxy.startDistance = fogComp->startDistance;
+                        activeFogProxy.endDistance = fogComp->endDistance;
+                    }
+                }
+            }
+
             if (!node.children.empty()) {
                 self(self, node.children);
             }
         }
     };
+
     traverseNodes(traverseNodes, rootNodes);
+
+    zegfx::Color fogColor = activeFogProxy.active ? zegfx::Color(
+        static_cast<uint8_t>(activeFogProxy.color[0] * 255.0f),
+        static_cast<uint8_t>(activeFogProxy.color[1] * 255.0f),
+        static_cast<uint8_t>(activeFogProxy.color[2] * 255.0f), 255
+    ) : zegfx::Color(0, 0, 0, 255);
+
+    float fogDensity = activeFogProxy.active ? activeFogProxy.density : 0.0f;
+    float fogStart   = activeFogProxy.active ? activeFogProxy.startDistance : 0.0f;
+    float fogEnd     = activeFogProxy.active ? activeFogProxy.endDistance : 500.0f;
+    bool fogEnabled  = activeFogProxy.active;
+
+    m_HasSkyAtmosphere = skyAtmosphereFound;
+    if (!m_HasSkyAtmosphere) {
+        // Sky Component Removed/Absent: Pure Black Void
+        m_SkyAmbientColor = zegfx::Color(0, 0, 0, 255);
+        if (m_Renderer) {
+            m_Renderer->setOutdoorLighting(
+                zegfx::Color(0, 0, 0, 255),
+                zegfx::Color(0, 0, 0, 255),
+                0.0f, // 0.0f Intensity -> Sky pass bypassed, Pure Black Void
+                fogColor, fogDensity, fogStart, fogEnd, fogEnabled
+            );
+        }
+    } else {
+        if (m_Renderer) {
+            m_Renderer->setOutdoorLighting(
+                zegfx::Color(static_cast<uint8_t>(activeSkyProxy.horizonColor[0] * 255.0f), static_cast<uint8_t>(activeSkyProxy.horizonColor[1] * 255.0f), static_cast<uint8_t>(activeSkyProxy.horizonColor[2] * 255.0f), 255),
+                zegfx::Color(static_cast<uint8_t>(activeSkyProxy.zenithColor[0] * 255.0f), static_cast<uint8_t>(activeSkyProxy.zenithColor[1] * 255.0f), static_cast<uint8_t>(activeSkyProxy.zenithColor[2] * 255.0f), 255),
+                activeSkyProxy.skyIntensity,
+                fogColor, fogDensity, fogStart, fogEnd, fogEnabled
+            );
+        }
+    }
 
     if (!m_DirectionalLights.empty()) {
         const auto& activeSun = m_DirectionalLights[0];
@@ -903,7 +984,7 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
     snapshot.directionalLights = zegfx::Span<const zegfx::DirectionalLightData>(m_DirectionalLights.data(), m_DirectionalLights.size());
     snapshot.localLights = zegfx::Span<const zegfx::LocalLightData>(m_LocalLights.data(), m_LocalLights.size());
     snapshot.environment.ambientColor = m_SkyAmbientColor;
-    snapshot.environment.intensityMultiplier = 1.0f;
+    snapshot.environment.intensityMultiplier = m_HasSkyAtmosphere ? activeSkyProxy.skyIntensity : 0.0f;
 
     // 4. Camera Render Data
     const auto& edCam = EditorState::Get().camera;

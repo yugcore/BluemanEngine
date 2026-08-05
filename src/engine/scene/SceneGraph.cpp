@@ -114,6 +114,22 @@ void SceneGraph::SyncNodeComponents(SceneNode& node) {
         }
     }
 
+    if (node.type == SceneNodeType::SkyAtmosphere) {
+        SkyAtmosphereComponent* skyComp = ComponentRegistry::Get().GetComponent<SkyAtmosphereComponent>(node.id);
+        if (!skyComp) {
+            SkyAtmosphereComponent newSky;
+            ComponentRegistry::Get().AddComponent<SkyAtmosphereComponent>(node.id, newSky);
+        }
+    }
+
+    if (node.type == SceneNodeType::VolumetricFog) {
+        VolumetricFogComponent* fogComp = ComponentRegistry::Get().GetComponent<VolumetricFogComponent>(node.id);
+        if (!fogComp) {
+            VolumetricFogComponent newFog;
+            ComponentRegistry::Get().AddComponent<VolumetricFogComponent>(node.id, newFog);
+        }
+    }
+
     for (auto& child : node.children) {
         SyncNodeComponents(child);
     }
@@ -470,6 +486,7 @@ const char* SceneGraph::GetTypeName(SceneNodeType type) {
         case SceneNodeType::Camera:        return "Camera";
         case SceneNodeType::Audio:         return "Audio";
         case SceneNodeType::SkyAtmosphere: return "SkyAtmosphere";
+        case SceneNodeType::VolumetricFog: return "VolumetricFog";
         case SceneNodeType::Component:     return "Component";
         case SceneNodeType::Terrain:       return "Terrain";
         case SceneNodeType::FoliageCluster:return "FoliageCluster";
@@ -486,6 +503,7 @@ const char* SceneGraph::GetTypeIconTag(SceneNodeType type) {
         case SceneNodeType::Camera:        return ICON_FA_CAMERA;
         case SceneNodeType::Audio:         return ICON_FA_VOLUME_HIGH;
         case SceneNodeType::SkyAtmosphere: return ICON_FA_SUN;
+        case SceneNodeType::VolumetricFog: return ICON_FA_SUN;
         case SceneNodeType::Component:     return ICON_FA_SLIDERS;
         case SceneNodeType::Terrain:       return ICON_FA_MOUNTAIN;
         case SceneNodeType::FoliageCluster:return ICON_FA_TREE;

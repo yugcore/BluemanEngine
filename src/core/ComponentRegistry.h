@@ -104,6 +104,28 @@ struct DirectionalLightComponent {
     }
 };
 
+struct SkyAtmosphereComponent {
+    float rayleighScattering = 0.058f;
+    float aerosolScattering  = 0.004f;
+    float aerosolAbsorption  = 0.001f;
+    float atmosphereHeightKm = 60.00f;
+    float skyIntensity = 1.00f;
+    float zenithColor[3]  = { 0.20f, 0.42f, 0.75f };
+    float horizonColor[3] = { 0.25f, 0.48f, 0.78f };
+    bool enabled = true;
+    bool isDirty = true;
+};
+
+struct VolumetricFogComponent {
+    float density = 0.02f;
+    float heightFalloff = 0.10f;
+    float color[3] = { 0.55f, 0.65f, 0.80f };
+    float startDistance = 0.0f;
+    float endDistance = 500.0f;
+    bool enabled = true;
+    bool isDirty = true;
+};
+
 struct CameraComponent {
     float fov = 60.00f;
     float nearPlane = 0.10f;
