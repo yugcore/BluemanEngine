@@ -100,7 +100,6 @@ private:
     zegfx::RenderMeshHandle m_DefaultSphereMeshHandle = {};
     zegfx::RenderMeshHandle m_DefaultCylinderMeshHandle = {};
     zegfx::RenderMeshHandle m_DefaultConeMeshHandle = {};
-    zegfx::RenderMeshHandle m_DefaultTerrain32x32MeshHandle = {};
 
     std::unordered_map<std::string, zegfx::RenderMeshHandle> m_LoadedMeshes;
     std::unordered_map<std::string, zegfx::RenderMaterialHandle> m_LoadedMaterials;

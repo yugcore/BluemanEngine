@@ -28,7 +28,6 @@ struct PaletteItem {
 static char s_PaletteSearch[128] = "";
 
 static const std::vector<PaletteItem> s_PaletteItems = {
-    { "32x32 Terrain Ground", "Environment", "32m x 32m solid terrain ground mesh", SceneNodeType::Terrain, "[Terrain]", "Engine/DefaultTerrain32x32", -1 },
     { "Foliage Cluster", "Environment", "High-density instanced trees, bushes & grass", SceneNodeType::FoliageCluster, "[Foliage]", "Engine/DefaultCone", -1 },
     { "Trail Path Waypoint", "Environment", "Forest trail path marker node", SceneNodeType::PathPoint, "[Path]", "Engine/DefaultPlane", -1 },
 

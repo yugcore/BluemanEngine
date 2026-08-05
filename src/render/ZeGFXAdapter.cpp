@@ -278,61 +278,6 @@ void ZeGFXAdapter::CreateDefaultPrimitives() {
     m_LoadedMeshes["Engine/DefaultCone"] = m_DefaultConeMeshHandle;
     m_LoadedMeshes["primitives/cone.zmesh"] = m_DefaultConeMeshHandle;
 
-    // Create default 32x32 solid terrain mesh (32x32 vertices, 32m x 32m grid)
-    std::vector<zegfx::ProceduralVertex> terrainVerts;
-    std::vector<uint32_t> terrainIndices;
-    const int terrainResX = 32;
-    const int terrainResZ = 32;
-    const float terrainSizeX = 32.0f;
-    const float terrainSizeZ = 32.0f;
-    const float halfTerrainX = terrainSizeX * 0.5f;
-    const float halfTerrainZ = terrainSizeZ * 0.5f;
-    const zegfx::Color terrainColor(75, 125, 75, 255); // Lush terrain ground green
-
-    terrainVerts.reserve(terrainResX * terrainResZ);
-    for (int r = 0; r < terrainResZ; ++r) {
-        float normZ = (float)r / (float)(terrainResZ - 1);
-        float z = normZ * terrainSizeZ - halfTerrainZ;
-        for (int c = 0; c < terrainResX; ++c) {
-            float normX = (float)c / (float)(terrainResX - 1);
-            float x = normX * terrainSizeX - halfTerrainX;
-
-            zegfx::ProceduralVertex v = {};
-            v.x = x;
-            v.y = 0.0f; // Solid ground plane
-            v.z = z;
-            v.nx = 0.0f; v.ny = 1.0f; v.nz = 0.0f;
-            v.u = normX * 8.0f; // 8x UV texture tiling
-            v.v = normZ * 8.0f;
-            v.color = terrainColor;
-            terrainVerts.push_back(v);
-        }
-    }
-
-    terrainIndices.reserve((terrainResX - 1) * (terrainResZ - 1) * 6);
-    for (int r = 0; r < terrainResZ - 1; ++r) {
-        for (int c = 0; c < terrainResX - 1; ++c) {
-            uint32_t i0 = r * terrainResX + c;
-            uint32_t i1 = r * terrainResX + (c + 1);
-            uint32_t i2 = (r + 1) * terrainResX + c;
-            uint32_t i3 = (r + 1) * terrainResX + (c + 1);
-
-            terrainIndices.push_back(i0);
-            terrainIndices.push_back(i1);
-            terrainIndices.push_back(i2);
-
-            terrainIndices.push_back(i1);
-            terrainIndices.push_back(i3);
-            terrainIndices.push_back(i2);
-        }
-    }
-
-    m_DefaultTerrain32x32MeshHandle = m_Renderer->createProceduralMesh(terrainVerts, terrainIndices);
-    m_LoadedMeshes["DefaultTerrain32x32"] = m_DefaultTerrain32x32MeshHandle;
-    m_LoadedMeshes["Engine/DefaultTerrain32x32"] = m_DefaultTerrain32x32MeshHandle;
-    m_LoadedMeshes["DefaultTerrain"] = m_DefaultTerrain32x32MeshHandle;
-    m_LoadedMeshes["Engine/DefaultTerrain"] = m_DefaultTerrain32x32MeshHandle;
-    m_LoadedMeshes["primitives/terrain32x32.zmesh"] = m_DefaultTerrain32x32MeshHandle;
 }
 
 void ZeGFXAdapter::SetLightingDebugMode(int mode) {
@@ -407,14 +352,34 @@ zegfx::RenderMaterialHandle ZeGFXAdapter::LoadMaterialAsset(const std::string& m
 }
 
 std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, const std::string& filePath, const zegfx::HeightmapImportSettings& settings, std::string& outError) {
+    std::ofstream dbg("heightmap_import_crash_debug.log", std::ios::app);
+    if (dbg.is_open()) {
+        dbg << "[ZeGFXAdapter] CreateTerrainFromHeightmap START name=" << name << " file=" << filePath
+            << " targetW=" << settings.targetWidth << " targetH=" << settings.targetHeight << std::endl;
+    }
+
     if (!m_Renderer) {
         outError = "Renderer not initialized.";
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] FAIL: Renderer not initialized" << std::endl;
         return "";
     }
 
-    zegfx::HeightmapImportResult importRes = zegfx::HeightmapImporter::LoadFromFile(filePath, settings);
+    zegfx::HeightmapImportResult importRes;
+    try {
+        importRes = zegfx::HeightmapImporter::LoadFromFile(filePath, settings);
+    } catch (const std::exception& e) {
+        outError = std::string("Exception in HeightmapImporter::LoadFromFile: ") + e.what();
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] CRASH EXCEPTION in LoadFromFile: " << e.what() << std::endl;
+        return "";
+    } catch (...) {
+        outError = "Unknown exception in HeightmapImporter::LoadFromFile";
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] CRASH UNKNOWN EXCEPTION in LoadFromFile" << std::endl;
+        return "";
+    }
+
     if (!importRes.success) {
         outError = importRes.errorMessage;
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] FAIL LoadFromFile: " << importRes.errorMessage << std::endl;
         return "";
     }
 
@@ -423,85 +388,114 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
     float cellSize = settings.cellSize;
     float heightScale = settings.heightScale;
 
+    if (dbg.is_open()) {
+        dbg << "[ZeGFXAdapter] LoadFromFile success. W=" << W << " H=" << H
+            << " heights.size=" << importRes.heights.size() << std::endl;
+    }
+
+    if (importRes.heights.size() < static_cast<size_t>(W * H)) {
+        outError = "Heightmap data size mismatch: heights.size < W*H";
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] FAIL: heights.size (" << importRes.heights.size() << ") < W*H (" << (W*H) << ")" << std::endl;
+        return "";
+    }
+
     float halfSizeX = (W - 1) * cellSize * 0.5f;
     float halfSizeZ = (H - 1) * cellSize * 0.5f;
 
     std::vector<zegfx::ProceduralVertex> vertices;
-    vertices.reserve(W * H);
-
-    for (int r = 0; r < H; ++r) {
-        float localZ = r * cellSize - halfSizeZ;
-        for (int c = 0; c < W; ++c) {
-            float localX = c * cellSize - halfSizeX;
-            float y = importRes.heights[r * W + c] * heightScale;
-
-            // Finite difference normals
-            float eps = cellSize;
-            float hL = importRes.heights[r * W + std::max(0, c - 1)] * heightScale;
-            float hR = importRes.heights[r * W + std::min(W - 1, c + 1)] * heightScale;
-            float hD = importRes.heights[std::max(0, r - 1) * W + c] * heightScale;
-            float hU = importRes.heights[std::min(H - 1, r + 1) * W + c] * heightScale;
-
-            float nvx = hL - hR;
-            float nvy = 2.0f * eps;
-            float nvz = hD - hU;
-            float len = std::sqrt(nvx * nvx + nvy * nvy + nvz * nvz);
-            float nx = (len > 0.0f) ? nvx / len : 0.0f;
-            float ny = (len > 0.0f) ? nvy / len : 1.0f;
-            float nz = (len > 0.0f) ? nvz / len : 0.0f;
-
-            zegfx::ProceduralVertex v = {};
-            v.x = localX;
-            v.y = y;
-            v.z = localZ;
-            v.nx = nx;
-            v.ny = ny;
-            v.nz = nz;
-            v.u = (float)c / (W - 1);
-            v.v = (float)r / (H - 1);
-
-            // Slope color blending (grass green vs rocky brown)
-            float slope = 1.0f - ny;
-            float blend = std::clamp(slope * 3.0f, 0.0f, 1.0f);
-            uint8_t vr = static_cast<uint8_t>(64.0f + blend * (115.0f - 64.0f));
-            uint8_t vg = static_cast<uint8_t>(128.0f + blend * (105.0f - 128.0f));
-            uint8_t vb = static_cast<uint8_t>(72.0f + blend * (95.0f - 72.0f));
-            v.color = zegfx::Color(vr, vg, vb, 255);
-
-            vertices.push_back(v);
-        }
-    }
-
     std::vector<uint32_t> indices;
-    indices.reserve((W - 1) * (H - 1) * 6);
-    for (int r = 0; r < H - 1; ++r) {
-        for (int c = 0; c < W - 1; ++c) {
-            uint32_t i0 = r * W + c;
-            uint32_t i1 = r * W + (c + 1);
-            uint32_t i2 = (r + 1) * W + c;
-            uint32_t i3 = (r + 1) * W + (c + 1);
 
-            indices.push_back(i0);
-            indices.push_back(i2);
-            indices.push_back(i1);
+    try {
+        vertices.reserve(W * H);
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] Building vertices W=" << W << " H=" << H << std::endl;
 
-            indices.push_back(i1);
-            indices.push_back(i2);
-            indices.push_back(i3);
+        for (int r = 0; r < H; ++r) {
+            float localZ = r * cellSize - halfSizeZ;
+            for (int c = 0; c < W; ++c) {
+                float localX = c * cellSize - halfSizeX;
+                float y = importRes.heights[r * W + c] * heightScale;
+
+                // Finite difference normals
+                float eps = cellSize;
+                float hL = importRes.heights[r * W + std::max(0, c - 1)] * heightScale;
+                float hR = importRes.heights[r * W + std::min(W - 1, c + 1)] * heightScale;
+                float hD = importRes.heights[std::max(0, r - 1) * W + c] * heightScale;
+                float hU = importRes.heights[std::min(H - 1, r + 1) * W + c] * heightScale;
+
+                float nvx = hL - hR;
+                float nvy = 2.0f * eps;
+                float nvz = hD - hU;
+                float len = std::sqrt(nvx * nvx + nvy * nvy + nvz * nvz);
+                float nx = (len > 0.0f) ? nvx / len : 0.0f;
+                float ny = (len > 0.0f) ? nvy / len : 1.0f;
+                float nz = (len > 0.0f) ? nvz / len : 0.0f;
+
+                zegfx::ProceduralVertex v = {};
+                v.x = localX;
+                v.y = y;
+                v.z = localZ;
+                v.nx = nx;
+                v.ny = ny;
+                v.nz = nz;
+                v.u = (float)c / (W - 1);
+                v.v = (float)r / (H - 1);
+
+                // Solid white terrain as requested by user
+                v.color = zegfx::Color(255, 255, 255, 255);
+
+                vertices.push_back(v);
+            }
         }
+
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] Building indices..." << std::endl;
+        indices.reserve((W - 1) * (H - 1) * 6);
+        for (int r = 0; r < H - 1; ++r) {
+            for (int c = 0; c < W - 1; ++c) {
+                uint32_t i0 = r * W + c;
+                uint32_t i1 = r * W + (c + 1);
+                uint32_t i2 = (r + 1) * W + c;
+                uint32_t i3 = (r + 1) * W + (c + 1);
+
+                // Front-facing (upward normal +Y) winding order
+                indices.push_back(i0);
+                indices.push_back(i2);
+                indices.push_back(i1);
+
+                indices.push_back(i1);
+                indices.push_back(i2);
+                indices.push_back(i3);
+            }
+        }
+    } catch (const std::exception& e) {
+        outError = std::string("Exception building terrain mesh vectors: ") + e.what();
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] CRASH EXCEPTION building mesh: " << e.what() << std::endl;
+        return "";
     }
 
-    zegfx::RenderMeshHandle handle = m_Renderer->createProceduralMesh(vertices, indices);
+    if (dbg.is_open()) dbg << "[ZeGFXAdapter] Calling createProceduralMesh..." << std::endl;
+
+    zegfx::RenderMeshHandle handle;
+    try {
+        handle = m_Renderer->createProceduralMesh(vertices, indices);
+    } catch (const std::exception& e) {
+        outError = std::string("Exception in createProceduralMesh: ") + e.what();
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] CRASH EXCEPTION in createProceduralMesh: " << e.what() << std::endl;
+        return "";
+    }
+
     if (!handle.valid()) {
         outError = "Failed to create procedural mesh on GPU renderer.";
+        if (dbg.is_open()) dbg << "[ZeGFXAdapter] FAIL: createProceduralMesh returned invalid handle" << std::endl;
         return "";
     }
 
     std::string meshKey = "TerrainMesh_" + name;
     m_LoadedMeshes[meshKey] = handle;
 
-    std::cout << "[ZeGFXAdapter] Created terrain mesh key: " << meshKey
-              << " vertices=" << vertices.size() << " indices=" << indices.size() << "\n";
+    if (dbg.is_open()) {
+        dbg << "[ZeGFXAdapter] SUCCESS Created terrain mesh key: " << meshKey
+            << " vertices=" << vertices.size() << " indices=" << indices.size() << std::endl;
+    }
 
     return meshKey;
 }

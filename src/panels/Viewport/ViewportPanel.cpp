@@ -18,7 +18,7 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
-#include "third_party/ImGuizmo/ImGuizmo.h"
+#include <ImGuizmo.h>
 #include <cstdio>
 #include <filesystem>
 
@@ -72,31 +72,9 @@ void RenderViewportPanel(bool* pOpen) {
         }
     }
 
-    // 1. Build ViewportInputState for Camera Update
-    ViewportInputState inputState = {};
-    inputState.isHovered = isHovered;
-    inputState.isFocused = isFocused;
-    inputState.rmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Right);
-    inputState.lmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
-    inputState.mmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Middle);
-    inputState.altHeld = io.KeyAlt;
-    inputState.shiftHeld = io.KeyShift;
-    inputState.ctrlHeld = io.KeyCtrl;
-    inputState.mouseDeltaX = io.MouseDelta.x;
-    inputState.mouseDeltaY = io.MouseDelta.y;
-    inputState.scrollDelta = io.MouseWheel;
-
-    inputState.keyW = ImGui::IsKeyDown(ImGuiKey_W);
-    inputState.keyA = ImGui::IsKeyDown(ImGuiKey_A);
-    inputState.keyS = ImGui::IsKeyDown(ImGuiKey_S);
-    inputState.keyD = ImGui::IsKeyDown(ImGuiKey_D);
-    inputState.keyQ = ImGui::IsKeyDown(ImGuiKey_Q);
-    inputState.keyE = ImGui::IsKeyDown(ImGuiKey_E);
-
     auto& camera = EditorState::Get().camera;
-    camera.Update(deltaTime, inputState);
 
-    // 2. Build Raw Input + Hotkeys + Drag-Drop Payload Event for Layer 1 Overlay
+    // 1. Build Raw Input + Hotkeys + Drag-Drop Payload Event for Layer 1 Overlay
     zegfx::overlay::ViewportInputEvent overlayEvt = {};
     overlayEvt.mouseLocalX = io.MousePos.x - cursorPos.x;
     overlayEvt.mouseLocalY = io.MousePos.y - cursorPos.y;
@@ -139,6 +117,7 @@ void RenderViewportPanel(bool* pOpen) {
         overlayEvt.keyY = ImGui::IsKeyPressed(ImGuiKey_Y);
         overlayEvt.keyH = ImGui::IsKeyPressed(ImGuiKey_H);
         overlayEvt.keyV = ImGui::IsKeyDown(ImGuiKey_V);
+        overlayEvt.keyEscape = ImGui::IsKeyPressed(ImGuiKey_Escape);
 
         for (int bIdx = 0; bIdx < 10; ++bIdx) {
             ImGuiKey numKey = (ImGuiKey)(ImGuiKey_0 + bIdx);
@@ -163,6 +142,36 @@ void RenderViewportPanel(bool* pOpen) {
     auto& overlay = ViewportRenderer::Get().GetEditorOverlay();
     overlay.UpdateInput(overlayEvt);
 
+    // 2. Build ViewportInputState for Camera Update
+    ViewportInputState inputState = {};
+    inputState.isHovered = isHovered;
+    inputState.isFocused = isFocused;
+    inputState.rmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+    inputState.lmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    inputState.mmbDown = ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+    inputState.altHeld = io.KeyAlt;
+    inputState.shiftHeld = io.KeyShift;
+    inputState.ctrlHeld = io.KeyCtrl;
+    inputState.mouseDeltaX = io.MouseDelta.x;
+    inputState.mouseDeltaY = io.MouseDelta.y;
+    inputState.scrollDelta = io.MouseWheel;
+
+    inputState.keyW = ImGui::IsKeyDown(ImGuiKey_W);
+    inputState.keyA = ImGui::IsKeyDown(ImGuiKey_A);
+    inputState.keyS = ImGui::IsKeyDown(ImGuiKey_S);
+    inputState.keyD = ImGui::IsKeyDown(ImGuiKey_D);
+    inputState.keyQ = ImGui::IsKeyDown(ImGuiKey_Q);
+    inputState.keyE = ImGui::IsKeyDown(ImGuiKey_E);
+
+    // Gate camera interactions if gizmo drag is active
+    if (overlay.IsDraggingGizmo()) {
+        inputState.lmbDown = false;
+        inputState.rmbDown = false;
+        inputState.mmbDown = false;
+    }
+
+    camera.Update(deltaTime, inputState);
+
     // 3. Render 3D Scene via ZeGFX Engine
     ViewportRenderer::Get().RenderScene(deltaTime);
 
@@ -174,9 +183,56 @@ void RenderViewportPanel(bool* pOpen) {
         ImGui::Image((ImTextureID)textureID, viewportAvail, ImVec2(0, 1), ImVec2(1, 0));
     }
 
+    // --- ImGuizmo 3D Transform Gizmo ---
+    std::string selectedNode = EditorState::Get().selectedNodeName;
+    SceneNode* sNode = SceneGraph::Get().FindNodeMutable(selectedNode);
+
+    if (sNode) {
+        ImGuizmo::BeginFrame();
+        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+
+        ImVec2 cursorPos = ImGui::GetItemRectMin();
+        ImVec2 itemSize = ImGui::GetItemRectSize();
+        ImGuizmo::SetRect(cursorPos.x, cursorPos.y, itemSize.x, itemSize.y);
+
+        float viewMatrix[16];
+        float projMatrix[16];
+        camera.GetViewMatrix(viewMatrix);
+        float aspect = (itemSize.y > 0.0f) ? (itemSize.x / itemSize.y) : 1.777f;
+        camera.GetProjectionMatrix(aspect, projMatrix);
+
+        float modelMatrix[16];
+        float location[3] = { sNode->location[0], sNode->location[1], sNode->location[2] };
+        float rotation[3] = { sNode->rotation[0], sNode->rotation[1], sNode->rotation[2] };
+        float scale[3]    = { sNode->scale[0],    sNode->scale[1],    sNode->scale[2] };
+
+        ImGuizmo::RecomposeMatrixFromComponents(location, rotation, scale, modelMatrix);
+
+        ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
+        if (EditorState::Get().gizmoOp == GizmoOperation::Rotate) op = ImGuizmo::ROTATE;
+        else if (EditorState::Get().gizmoOp == GizmoOperation::Scale) op = ImGuizmo::SCALE;
+
+        ImGuizmo::MODE mode = (op == ImGuizmo::SCALE) ? ImGuizmo::LOCAL :
+            (EditorState::Get().activeTransformSpace == TransformSpace::World ? ImGuizmo::WORLD : ImGuizmo::LOCAL);
+
+        if (camera.GetMode() == CameraMode::Idle) {
+            ImGuizmo::Enable(true);
+            if (ImGuizmo::Manipulate(viewMatrix, projMatrix, op, mode, modelMatrix)) {
+                ImGuizmo::DecomposeMatrixToComponents(modelMatrix, location, rotation, scale);
+                sNode->location[0] = location[0]; sNode->location[1] = location[1]; sNode->location[2] = location[2];
+                sNode->rotation[0] = rotation[0]; sNode->rotation[1] = rotation[1]; sNode->rotation[2] = rotation[2];
+                sNode->scale[0]    = scale[0];    sNode->scale[1]    = scale[1];    sNode->scale[2]    = scale[2];
+                SceneGraph::Get().SyncNodeComponents(*sNode);
+            }
+        }
+    }
+
     // 5. Host Viewport Context Menu if Overlay Pick Result Is Pending
     if (overlay.HasPendingRightClickPick()) {
-        Panels::ViewportContextMenu::Get().OpenMenu(overlay.GetPendingPickNodeName());
+        if (!overlay.GetPendingPickNodeName().empty() && camera.GetMode() == CameraMode::Idle) {
+            Panels::ViewportContextMenu::Get().OpenMenu(overlay.GetPendingPickNodeName());
+        }
         overlay.ClearRightClickPick();
     }
     Panels::ViewportContextMenu::Get().Render();

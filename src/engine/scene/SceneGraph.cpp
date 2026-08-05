@@ -160,16 +160,6 @@ SceneGraph::SceneGraph() {
     cubeNode.materialPath = "DefaultPBRMaterial";
     m_RootNodes.push_back(cubeNode);
 
-    // Default 32x32 Solid Terrain (rendered via ZeGFX)
-    SceneNode terrainNode;
-    terrainNode.id = GenerateNodeId();
-    terrainNode.name = "DefaultTerrain_32x32";
-    terrainNode.type = SceneNodeType::Terrain;
-    terrainNode.location[0] = 0.0f; terrainNode.location[1] = 0.0f; terrainNode.location[2] = 0.0f;
-    terrainNode.scale[0] = 1.0f; terrainNode.scale[1] = 1.0f; terrainNode.scale[2] = 1.0f;
-    terrainNode.meshPath = "Engine/DefaultTerrain32x32";
-    terrainNode.materialPath = "DefaultPBRMaterial";
-    m_RootNodes.push_back(terrainNode);
 
     SceneNode foliageNode;
     foliageNode.id = GenerateNodeId();

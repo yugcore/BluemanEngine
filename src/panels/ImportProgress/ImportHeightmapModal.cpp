@@ -175,35 +175,55 @@ void RenderImportHeightmapModal() {
             if (s_FilePath[0] == '\0' || !std::filesystem::exists(s_FilePath)) {
                 s_ErrorMessage = "Please select a valid heightmap image file!";
             } else {
+                std::ofstream dbg("heightmap_import_crash_debug.log", std::ios::app);
+                if (dbg.is_open()) dbg << "[ImportHeightmapModal] Button clicked! s_FilePath=" << s_FilePath << " targetW=" << s_Settings.targetWidth << " targetH=" << s_Settings.targetHeight << std::endl;
+
                 std::string outErr;
-                std::string meshKey = ZeGFXAdapter::Get().CreateTerrainFromHeightmap(
-                    s_TerrainName,
-                    s_FilePath,
-                    s_Settings,
-                    outErr
-                );
+                std::string meshKey;
+                try {
+                    meshKey = ZeGFXAdapter::Get().CreateTerrainFromHeightmap(
+                        s_TerrainName,
+                        s_FilePath,
+                        s_Settings,
+                        outErr
+                    );
+                } catch (const std::exception& e) {
+                    if (dbg.is_open()) dbg << "[ImportHeightmapModal] EXCEPTION in CreateTerrainFromHeightmap: " << e.what() << std::endl;
+                    s_ErrorMessage = std::string("Exception: ") + e.what();
+                } catch (...) {
+                    if (dbg.is_open()) dbg << "[ImportHeightmapModal] UNKNOWN EXCEPTION in CreateTerrainFromHeightmap" << std::endl;
+                    s_ErrorMessage = "Unknown Exception in CreateTerrainFromHeightmap";
+                }
 
                 if (!meshKey.empty()) {
-                    // Create SceneGraph node
-                    SceneNode terrainNode;
-                    terrainNode.id = SceneGraph::Get().GenerateNodeId();
-                    terrainNode.name = s_TerrainName;
-                    terrainNode.type = SceneNodeType::Terrain;
-                    terrainNode.meshPath = meshKey;
-                    terrainNode.materialPath = "DefaultPBRMaterial";
-                    terrainNode.location[0] = 0.0f;
-                    terrainNode.location[1] = 0.0f;
-                    terrainNode.location[2] = 0.0f;
+                    if (dbg.is_open()) dbg << "[ImportHeightmapModal] meshKey=" << meshKey << ". Creating SceneNode..." << std::endl;
+                    try {
+                        // Create SceneGraph node
+                        SceneNode terrainNode;
+                        terrainNode.id = SceneGraph::Get().GenerateNodeId();
+                        terrainNode.name = s_TerrainName;
+                        terrainNode.type = SceneNodeType::Terrain;
+                        terrainNode.meshPath = meshKey;
+                        terrainNode.materialPath = "DefaultPBRMaterial";
+                        terrainNode.location[0] = 0.0f;
+                        terrainNode.location[1] = 0.0f;
+                        terrainNode.location[2] = 0.0f;
 
-                    SceneGraph::Get().AddNode(terrainNode);
-                    EditorState::Get().SetSelection(terrainNode.name, "Terrain");
+                        SceneGraph::Get().AddNode(terrainNode);
+                        EditorState::Get().SetSelection(terrainNode.name, "Terrain");
 
-                    Logger::Get().Info("[HeightmapImport] Successfully generated 3D terrain: " + terrainNode.name);
+                        Logger::Get().Info("[HeightmapImport] Successfully generated 3D terrain: " + terrainNode.name);
 
-                    state.showImportHeightmapModal = false;
-                    s_FileInspected = false;
-                    ImGui::CloseCurrentPopup();
+                        state.showImportHeightmapModal = false;
+                        s_FileInspected = false;
+                        if (dbg.is_open()) dbg << "[ImportHeightmapModal] SUCCESS! Modal closed." << std::endl;
+                        ImGui::CloseCurrentPopup();
+                    } catch (const std::exception& e) {
+                        if (dbg.is_open()) dbg << "[ImportHeightmapModal] EXCEPTION in AddNode: " << e.what() << std::endl;
+                        s_ErrorMessage = std::string("Exception adding node: ") + e.what();
+                    }
                 } else {
+                    if (dbg.is_open()) dbg << "[ImportHeightmapModal] CreateTerrainFromHeightmap failed: " << outErr << std::endl;
                     s_ErrorMessage = outErr;
                 }
             }

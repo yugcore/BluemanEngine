@@ -37,6 +37,7 @@ set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_dx12.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/ImGuizmo/src/ImGuizmo.cpp
 )
 
 add_library(imgui_lib STATIC ${IMGUI_SOURCES})
@@ -44,6 +45,7 @@ target_include_directories(imgui_lib PUBLIC
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
     ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/ImGuizmo/src
 )
 target_link_libraries(imgui_lib PUBLIC glfw)
 
@@ -59,7 +61,6 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
     "src/engine/scene/*.cpp"
     "src/engine/assets/*.cpp"
     "src/render/*.cpp"
-    "src/third_party/ImGuizmo/src/ImGuizmo.cpp"
     "src/panels/*.cpp"
     "src/panels/Chrome/*.cpp"
     "src/panels/Codebase/*.cpp"
@@ -144,8 +145,6 @@ add_executable(engine_editor ${SOURCES})
 target_include_directories(engine_editor PRIVATE
     src
     src/third_party
-    src/third_party/ImGuizmo
-    src/third_party/ImGuizmo/src
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
