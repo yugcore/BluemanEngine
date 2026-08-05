@@ -147,8 +147,8 @@ target_include_directories(engine_editor PRIVATE
     src/third_party
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/ufbx
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Zelyn/include

@@ -278,6 +278,8 @@ void ZeGFXAdapter::CreateDefaultPrimitives() {
     m_LoadedMeshes["Engine/DefaultCone"] = m_DefaultConeMeshHandle;
     m_LoadedMeshes["primitives/cone.zmesh"] = m_DefaultConeMeshHandle;
 
+    m_DefaultMaterialHandle = m_Renderer->createMaterial("DefaultPBRMaterial");
+    m_LoadedMaterials["DefaultPBRMaterial"] = m_DefaultMaterialHandle;
 }
 
 void ZeGFXAdapter::SetLightingDebugMode(int mode) {
@@ -292,7 +294,9 @@ zegfx::RenderMeshHandle ZeGFXAdapter::LoadMeshAsset(const std::string& meshPath)
     
     // Check map cache first
     auto it = m_LoadedMeshes.find(meshPath);
-    if (it != m_LoadedMeshes.end()) return it->second;
+    if (it != m_LoadedMeshes.end()) {
+        return it->second;
+    }
 
     if (!m_Renderer) return m_DefaultMeshHandle;
 
@@ -411,16 +415,19 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
 
         for (int r = 0; r < H; ++r) {
             float localZ = r * cellSize - halfSizeZ;
+            int srcR = H - 1 - r; // Flip: image top → terrain max-Z (top when viewed from above)
             for (int c = 0; c < W; ++c) {
                 float localX = c * cellSize - halfSizeX;
-                float y = importRes.heights[r * W + c] * heightScale;
+                float y = importRes.heights[srcR * W + c] * heightScale;
 
-                // Finite difference normals
+                // Finite difference normals (sample from flipped rows)
                 float eps = cellSize;
-                float hL = importRes.heights[r * W + std::max(0, c - 1)] * heightScale;
-                float hR = importRes.heights[r * W + std::min(W - 1, c + 1)] * heightScale;
-                float hD = importRes.heights[std::max(0, r - 1) * W + c] * heightScale;
-                float hU = importRes.heights[std::min(H - 1, r + 1) * W + c] * heightScale;
+                int srcRprev = std::min(H - 1, srcR + 1); // srcR+1 = image row below = terrain row above
+                int srcRnext = std::max(0, srcR - 1);     // srcR-1 = image row above = terrain row below
+                float hL = importRes.heights[srcR * W + std::max(0, c - 1)] * heightScale;
+                float hR = importRes.heights[srcR * W + std::min(W - 1, c + 1)] * heightScale;
+                float hD = importRes.heights[srcRprev * W + c] * heightScale;
+                float hU = importRes.heights[srcRnext * W + c] * heightScale;
 
                 float nvx = hL - hR;
                 float nvy = 2.0f * eps;
@@ -440,8 +447,17 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
                 v.u = (float)c / (W - 1);
                 v.v = (float)r / (H - 1);
 
-                // Solid white terrain as requested by user
-                v.color = zegfx::Color(255, 255, 255, 255);
+                // Slope + height-based terrain coloring for depth perception
+                float slope = 1.0f - ny; // 0.0 = flat, 1.0 = cliff
+                float blend = std::clamp(slope * 3.0f, 0.0f, 1.0f);
+                float heightNorm = (heightScale > 0.0f) ? std::clamp(importRes.heights[srcR * W + c], 0.0f, 1.0f) : 0.5f;
+
+                // Green (flat) → Brown (steep), with height-based brightness
+                float brightness = 0.7f + 0.3f * heightNorm;
+                uint8_t vr = static_cast<uint8_t>(std::clamp((64.0f + blend * 51.0f) * brightness, 0.0f, 255.0f));
+                uint8_t vg = static_cast<uint8_t>(std::clamp((128.0f - blend * 23.0f) * brightness, 0.0f, 255.0f));
+                uint8_t vb = static_cast<uint8_t>(std::clamp((72.0f + blend * 23.0f) * brightness, 0.0f, 255.0f));
+                v.color = zegfx::Color(vr, vg, vb, 255);
 
                 vertices.push_back(v);
             }
@@ -456,7 +472,8 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
                 uint32_t i2 = (r + 1) * W + c;
                 uint32_t i3 = (r + 1) * W + (c + 1);
 
-                // Front-facing (upward normal +Y) winding order
+                // Winding order: normals point UP (+Y) for terrain visible from above
+                // Cross(i2-i0, i1-i0) = (0, +1, 0) with FrontCounterClockwise=FALSE
                 indices.push_back(i0);
                 indices.push_back(i2);
                 indices.push_back(i1);
@@ -469,10 +486,12 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
     } catch (const std::exception& e) {
         outError = std::string("Exception building terrain mesh vectors: ") + e.what();
         if (dbg.is_open()) dbg << "[ZeGFXAdapter] CRASH EXCEPTION building mesh: " << e.what() << std::endl;
+        std::cerr << "[ZeGFXAdapter] CRASH EXCEPTION building mesh: " << e.what() << std::endl;
         return "";
     }
 
-    if (dbg.is_open()) dbg << "[ZeGFXAdapter] Calling createProceduralMesh..." << std::endl;
+    if (dbg.is_open()) dbg << "[ZeGFXAdapter] [STEP 4/5] Calling createProceduralMesh (vertices=" << vertices.size() << ", indices=" << indices.size() << ")..." << std::endl;
+    std::cout << "[ZeGFXAdapter] [STEP 4/5] Calling createProceduralMesh (vertices=" << vertices.size() << ", indices=" << indices.size() << ")..." << std::endl;
 
     zegfx::RenderMeshHandle handle;
     try {
@@ -480,12 +499,14 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
     } catch (const std::exception& e) {
         outError = std::string("Exception in createProceduralMesh: ") + e.what();
         if (dbg.is_open()) dbg << "[ZeGFXAdapter] CRASH EXCEPTION in createProceduralMesh: " << e.what() << std::endl;
+        std::cerr << "[ZeGFXAdapter] CRASH EXCEPTION in createProceduralMesh: " << e.what() << std::endl;
         return "";
     }
 
     if (!handle.valid()) {
         outError = "Failed to create procedural mesh on GPU renderer.";
         if (dbg.is_open()) dbg << "[ZeGFXAdapter] FAIL: createProceduralMesh returned invalid handle" << std::endl;
+        std::cerr << "[ZeGFXAdapter] FAIL: createProceduralMesh returned invalid handle" << std::endl;
         return "";
     }
 
@@ -493,9 +514,13 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
     m_LoadedMeshes[meshKey] = handle;
 
     if (dbg.is_open()) {
-        dbg << "[ZeGFXAdapter] SUCCESS Created terrain mesh key: " << meshKey
+        dbg << "[ZeGFXAdapter] [STEP 5/5] SUCCESS Created terrain mesh key: " << meshKey
+            << " handleIndex=" << handle.index << " handleGen=" << handle.generation
             << " vertices=" << vertices.size() << " indices=" << indices.size() << std::endl;
     }
+    std::cout << "[ZeGFXAdapter] [STEP 5/5] SUCCESS Created terrain mesh key: " << meshKey
+              << " handleIndex=" << handle.index << " handleGen=" << handle.generation
+              << " vertices=" << vertices.size() << " indices=" << indices.size() << std::endl;
 
     return meshKey;
 }
@@ -769,6 +794,16 @@ void ZeGFXAdapter::SyncEngineState(float deltaTime, zegfx::ExternalCmdListHandle
                     zegfx::RenderInstance inst = {};
                     inst.mesh = LoadMeshAsset(meshPath);
                     inst.material = LoadMaterialAsset(matPath);
+
+                    if (node.type == SceneNodeType::Terrain) {
+                        static bool s_LoggedTerrainInst = false;
+                        if (!s_LoggedTerrainInst) {
+                            s_LoggedTerrainInst = true;
+                            std::cout << "[ZeGFXAdapter] Pushing Terrain RenderInstance! meshPath=" << meshPath
+                                      << " meshValid=" << inst.mesh.valid() << " matPath=" << matPath
+                                      << " matValid=" << inst.material.valid() << std::endl;
+                        }
+                    }
 
                     float pitch = rot[0] * 3.14159265f / 180.0f;
                     float yaw   = rot[1] * 3.14159265f / 180.0f;

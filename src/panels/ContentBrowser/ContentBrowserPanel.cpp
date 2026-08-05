@@ -116,9 +116,20 @@ void RenderContentBrowserPanel(bool* pOpen) {
     ImGui::SameLine(0.0f, Theme::Metrics::groupGap);
     ImGui::AlignTextToFramePadding();
 
-    const AssetFolder* currentFolder = AssetRegistry::Get().FindFolder(EditorState::Get().selectedFolderPath);
+    AssetFolder rootFolder = AssetRegistry::Get().GetRootFolderCopy();
+
+    auto findFolderInCopy = [&](auto& self, const std::string& targetPath, const AssetFolder& folder) -> const AssetFolder* {
+        if (folder.path == targetPath) return &folder;
+        for (const auto& sub : folder.subfolders) {
+            const AssetFolder* f = self(self, targetPath, sub);
+            if (f) return f;
+        }
+        return nullptr;
+    };
+
+    const AssetFolder* currentFolder = findFolderInCopy(findFolderInCopy, EditorState::Get().selectedFolderPath, rootFolder);
     if (!currentFolder) {
-        currentFolder = &AssetRegistry::Get().GetRootFolder();
+        currentFolder = &rootFolder;
     }
 
     ImGui::TextColored(pal.textDisabled, "All  >");
@@ -208,7 +219,6 @@ void RenderContentBrowserPanel(bool* pOpen) {
     std::string searchQuery = s_SearchFilter;
     std::vector<AssetItem> itemsToDisplay;
 
-    const auto& rootFolder = AssetRegistry::Get().GetRootFolder();
     auto collectItems = [&](auto& self, const AssetFolder& folder) -> void {
         for (const auto& item : folder.items) {
             if (item.isDependencyOnly) continue;

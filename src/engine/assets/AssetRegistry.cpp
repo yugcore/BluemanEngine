@@ -31,7 +31,7 @@ AssetItemType AssetRegistry::DetectItemType(const std::string& extension) {
     if (ext == ".fbx" || ext == ".gltf" || ext == ".glb" || ext == ".obj" || ext == ".vox" || ext == ".zmesh" || ext == ".zasset") {
         return AssetItemType::Mesh;
     }
-    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga" || ext == ".dds" || ext == ".bmp" || ext == ".hdr" || ext == ".exr" || ext == ".ztex") {
+    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga" || ext == ".dds" || ext == ".bmp" || ext == ".hdr" || ext == ".exr" || ext == ".ztex" || ext == ".raw" || ext == ".r16" || ext == ".r8") {
         return AssetItemType::Texture;
     }
     if (ext == ".zmat" || ext == ".mat" || ext == ".material") {

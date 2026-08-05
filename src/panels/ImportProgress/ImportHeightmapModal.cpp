@@ -6,6 +6,7 @@
 #include "render/ZeGFXAdapter.h"
 #include "theme/Colors.h"
 
+#include "engine/assets/AssetRegistry.h"
 #include "heightmap_importer.h"
 
 #include <imgui.h>
@@ -35,6 +36,8 @@ void RenderImportHeightmapModal() {
         s_ErrorMessage = "";
     }
 
+    static int gridPresetIdx = 6; // Source Image Size
+
     // Auto-inspect file header if path is present and not yet inspected
     if (!s_FileInspected && s_FilePath[0] != '\0' && std::filesystem::exists(s_FilePath)) {
         s_InspectResult = zegfx::HeightmapImporter::InspectFile(s_FilePath);
@@ -42,6 +45,7 @@ void RenderImportHeightmapModal() {
             if (s_InspectResult.sourceWidth > 0 && s_InspectResult.sourceHeight > 0) {
                 s_Settings.targetWidth = s_InspectResult.sourceWidth;
                 s_Settings.targetHeight = s_InspectResult.sourceHeight;
+                gridPresetIdx = 6; // Source Image Size
             }
             std::filesystem::path p(s_FilePath);
             snprintf(s_TerrainName, sizeof(s_TerrainName), "Terrain_%s", p.stem().string().c_str());
@@ -112,7 +116,6 @@ void RenderImportHeightmapModal() {
 
         // --- Target Grid Dimensions ---
         ImGui::Text("Target Grid Width & Height:");
-        static int gridPresetIdx = 2; // 512
         const char* presets[] = { "64 x 64", "128 x 128", "256 x 256", "512 x 512", "1024 x 1024", "2048 x 2048", "Source Image Size", "Custom" };
         if (ImGui::Combo("Preset Resolution", &gridPresetIdx, presets, IM_ARRAYSIZE(presets))) {
             switch (gridPresetIdx) {
@@ -132,8 +135,8 @@ void RenderImportHeightmapModal() {
             }
         }
 
-        ImGui::SliderInt("Grid Width", &s_Settings.targetWidth, 16, 4096);
-        ImGui::SliderInt("Grid Height", &s_Settings.targetHeight, 16, 4096);
+        ImGui::SliderInt("Grid Width", &s_Settings.targetWidth, 16, 1024);
+        ImGui::SliderInt("Grid Height", &s_Settings.targetHeight, 16, 1024);
 
         // --- Physical Spacing & Height Scale ---
         ImGui::SliderFloat("Cell Size (m)", &s_Settings.cellSize, 0.25f, 10.0f, "%.2fm");
@@ -176,7 +179,8 @@ void RenderImportHeightmapModal() {
                 s_ErrorMessage = "Please select a valid heightmap image file!";
             } else {
                 std::ofstream dbg("heightmap_import_crash_debug.log", std::ios::app);
-                if (dbg.is_open()) dbg << "[ImportHeightmapModal] Button clicked! s_FilePath=" << s_FilePath << " targetW=" << s_Settings.targetWidth << " targetH=" << s_Settings.targetHeight << std::endl;
+                if (dbg.is_open()) dbg << "[ImportHeightmapModal] [STEP 1/5] Import button clicked! s_FilePath=" << s_FilePath << " s_TerrainName=" << s_TerrainName << " targetW=" << s_Settings.targetWidth << " targetH=" << s_Settings.targetHeight << " cellSize=" << s_Settings.cellSize << " heightScale=" << s_Settings.heightScale << std::endl;
+                std::cout << "[ImportHeightmapModal] [STEP 1/5] Import button clicked! s_FilePath=" << s_FilePath << " s_TerrainName=" << s_TerrainName << " targetW=" << s_Settings.targetWidth << " targetH=" << s_Settings.targetHeight << std::endl;
 
                 std::string outErr;
                 std::string meshKey;
@@ -189,14 +193,17 @@ void RenderImportHeightmapModal() {
                     );
                 } catch (const std::exception& e) {
                     if (dbg.is_open()) dbg << "[ImportHeightmapModal] EXCEPTION in CreateTerrainFromHeightmap: " << e.what() << std::endl;
+                    std::cerr << "[ImportHeightmapModal] EXCEPTION in CreateTerrainFromHeightmap: " << e.what() << std::endl;
                     s_ErrorMessage = std::string("Exception: ") + e.what();
                 } catch (...) {
                     if (dbg.is_open()) dbg << "[ImportHeightmapModal] UNKNOWN EXCEPTION in CreateTerrainFromHeightmap" << std::endl;
+                    std::cerr << "[ImportHeightmapModal] UNKNOWN EXCEPTION in CreateTerrainFromHeightmap" << std::endl;
                     s_ErrorMessage = "Unknown Exception in CreateTerrainFromHeightmap";
                 }
 
                 if (!meshKey.empty()) {
-                    if (dbg.is_open()) dbg << "[ImportHeightmapModal] meshKey=" << meshKey << ". Creating SceneNode..." << std::endl;
+                    if (dbg.is_open()) dbg << "[ImportHeightmapModal] [STEP 3/5] meshKey=" << meshKey << ". Creating SceneNode..." << std::endl;
+                    std::cout << "[ImportHeightmapModal] [STEP 3/5] meshKey=" << meshKey << ". Creating SceneNode..." << std::endl;
                     try {
                         // Create SceneGraph node
                         SceneNode terrainNode;
@@ -211,6 +218,23 @@ void RenderImportHeightmapModal() {
 
                         SceneGraph::Get().AddNode(terrainNode);
                         EditorState::Get().SetSelection(terrainNode.name, "Terrain");
+
+                        // Register asset safely in AssetRegistry so it shows up in Content Browser
+                        try {
+                            std::filesystem::path srcP(s_FilePath);
+                            AssetItem hmapItem;
+                            hmapItem.name = srcP.filename().string();
+                            hmapItem.path = srcP.string();
+                            hmapItem.type = AssetRegistry::DetectItemType(srcP.extension().string());
+                            if (hmapItem.type == AssetItemType::Unknown) {
+                                hmapItem.type = AssetItemType::Texture;
+                            }
+                            hmapItem.isDependencyOnly = false;
+
+                            AssetRegistry::Get().RegisterAsset(hmapItem);
+                        } catch (...) {
+                            // Non-fatal if asset registration encounters an issue
+                        }
 
                         Logger::Get().Info("[HeightmapImport] Successfully generated 3D terrain: " + terrainNode.name);
 

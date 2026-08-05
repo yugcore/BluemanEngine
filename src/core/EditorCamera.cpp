@@ -51,8 +51,10 @@ void EditorCamera::UpdateVectors() {
     front.z = std::sin(yawRad) * std::cos(pitchRad);
     m_Front = Normalize(front);
 
-    m_Right = Normalize(Cross(m_Front, m_WorldUp));
-    m_Up = Normalize(Cross(m_Right, m_Front));
+    // Left-handed convention (matches Mat4::lookAt and GetViewMatrix):
+    // x = cross(worldUp, front), y = cross(front, x)
+    m_Right = Normalize(Cross(m_WorldUp, m_Front));
+    m_Up = Normalize(Cross(m_Front, m_Right));
 }
 
 void EditorCamera::Update(float deltaTime, const ViewportInputState& input) {
@@ -205,8 +207,9 @@ void EditorCamera::FrameSelection(const std::vector<AABB>& boundsList) {
 }
 
 void EditorCamera::GetViewMatrix(float outMatrix[16]) const {
+    // Left-handed look-at (matches Mat4::lookAt convention)
     Vec3f target(m_Position.x + m_Front.x, m_Position.y + m_Front.y, m_Position.z + m_Front.z);
-    Vec3f zAxis = Normalize(Vec3f(m_Position.x - target.x, m_Position.y - target.y, m_Position.z - target.z));
+    Vec3f zAxis = Normalize(Vec3f(target.x - m_Position.x, target.y - m_Position.y, target.z - m_Position.z));
     Vec3f xAxis = Normalize(Cross(m_Up, zAxis));
     Vec3f yAxis = Cross(zAxis, xAxis);
 
@@ -295,9 +298,9 @@ void EditorCamera::GetProjectionMatrix(float aspectRatio, float outMatrix[16]) c
 
         outMatrix[0]  = 1.0f / (aspectRatio * tanHalfFov);
         outMatrix[5]  = 1.0f / tanHalfFov;
-        outMatrix[10] = m_FarPlane / (m_NearPlane - m_FarPlane);
-        outMatrix[11] = -1.0f;
-        outMatrix[14] = (m_NearPlane * m_FarPlane) / (m_NearPlane - m_FarPlane);
+        outMatrix[10] = m_FarPlane / (m_FarPlane - m_NearPlane);
+        outMatrix[11] = 1.0f;
+        outMatrix[14] = -(m_NearPlane * m_FarPlane) / (m_FarPlane - m_NearPlane);
     } else {
         // Orthographic projection matrix
         float orthoHeight = m_OrbitDistance * 1.5f;
