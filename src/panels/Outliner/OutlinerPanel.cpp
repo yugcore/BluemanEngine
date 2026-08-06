@@ -129,6 +129,14 @@ static void RenderNodeRow(const SceneNode& node, const std::string& searchQuery,
     }
 
     if (doubleClicked) {
+        // Frame camera on the selected object's position
+        const SceneNode* selNode = SceneGraph::Get().FindNode(node.name);
+        if (selNode) {
+            AABB bounds;
+            bounds.minBounds = { selNode->location[0] - 2.0f, selNode->location[1] - 2.0f, selNode->location[2] - 2.0f };
+            bounds.maxBounds = { selNode->location[0] + 2.0f, selNode->location[1] + 2.0f, selNode->location[2] + 2.0f };
+            EditorState::Get().camera.FrameSelection({ bounds });
+        }
         s_RenamingNodeId = node.id;
         snprintf(s_RenameBuf, sizeof(s_RenameBuf), "%s", node.name.c_str());
     }

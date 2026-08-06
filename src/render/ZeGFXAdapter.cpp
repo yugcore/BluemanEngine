@@ -414,24 +414,24 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
         if (dbg.is_open()) dbg << "[ZeGFXAdapter] Building vertices W=" << W << " H=" << H << std::endl;
 
         for (int r = 0; r < H; ++r) {
-            float localZ = r * cellSize - halfSizeZ;
-            int srcR = H - 1 - r; // Flip: image top → terrain max-Z (top when viewed from above)
+            // Flip Z: image row 0 (top) → max-Z, row H-1 (bottom) → min-Z
+            // This makes the terrain match the source image when viewed from above
+            float localZ = (H - 1 - r) * cellSize - halfSizeZ;
             for (int c = 0; c < W; ++c) {
                 float localX = c * cellSize - halfSizeX;
-                float y = importRes.heights[srcR * W + c] * heightScale;
+                float y = importRes.heights[r * W + c] * heightScale;
 
-                // Finite difference normals (sample from flipped rows)
+                // Finite difference normals
                 float eps = cellSize;
-                int srcRprev = std::min(H - 1, srcR + 1); // srcR+1 = image row below = terrain row above
-                int srcRnext = std::max(0, srcR - 1);     // srcR-1 = image row above = terrain row below
-                float hL = importRes.heights[srcR * W + std::max(0, c - 1)] * heightScale;
-                float hR = importRes.heights[srcR * W + std::min(W - 1, c + 1)] * heightScale;
-                float hD = importRes.heights[srcRprev * W + c] * heightScale;
-                float hU = importRes.heights[srcRnext * W + c] * heightScale;
+                float hL = importRes.heights[r * W + std::max(0, c - 1)] * heightScale;
+                float hR = importRes.heights[r * W + std::min(W - 1, c + 1)] * heightScale;
+                float hD = importRes.heights[std::max(0, r - 1) * W + c] * heightScale;
+                float hU = importRes.heights[std::min(H - 1, r + 1) * W + c] * heightScale;
 
                 float nvx = hL - hR;
                 float nvy = 2.0f * eps;
-                float nvz = hD - hU;
+                // Negate nvz because Z is flipped (increasing r → decreasing Z)
+                float nvz = -(hD - hU);
                 float len = std::sqrt(nvx * nvx + nvy * nvy + nvz * nvz);
                 float nx = (len > 0.0f) ? nvx / len : 0.0f;
                 float ny = (len > 0.0f) ? nvy / len : 1.0f;
@@ -450,7 +450,7 @@ std::string ZeGFXAdapter::CreateTerrainFromHeightmap(const std::string& name, co
                 // Slope + height-based terrain coloring for depth perception
                 float slope = 1.0f - ny; // 0.0 = flat, 1.0 = cliff
                 float blend = std::clamp(slope * 3.0f, 0.0f, 1.0f);
-                float heightNorm = (heightScale > 0.0f) ? std::clamp(importRes.heights[srcR * W + c], 0.0f, 1.0f) : 0.5f;
+                float heightNorm = (heightScale > 0.0f) ? std::clamp(importRes.heights[r * W + c], 0.0f, 1.0f) : 0.5f;
 
                 // Green (flat) → Brown (steep), with height-based brightness
                 float brightness = 0.7f + 0.3f * heightNorm;
